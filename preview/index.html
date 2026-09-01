@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docked — interactive preview</title>
+<style>
+  :root{
+    --accent:#f5b86b;
+    --accent-strong:#f7c07a;
+    --paper-dark:#212129;
+    --ink-dark:#ebebeb;
+    --bg:#0f0f12;
+    --bg-2:#17171c;
+    --hair:rgba(255,255,255,.09);
+    --muted:#9aa0a6;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(120% 90% at 50% 0%, #1b1b22 0%, var(--bg) 60%);
+    color:var(--ink-dark);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    display:flex;flex-direction:column;align-items:center;
+    padding:26px 16px 60px;gap:22px;min-height:100%;
+  }
+  h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:12.5px;margin-top:-14px;text-align:center;max-width:520px}
+  .sub code{color:var(--accent);background:rgba(245,184,107,.1);padding:1px 5px;border-radius:5px}
+
+  /* ------- phone ------- */
+  .stage{display:flex;gap:34px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  .phone{
+    position:relative;width:330px;height:690px;border-radius:52px;
+    background:linear-gradient(180deg,#08080a,#111116);
+    border:1px solid #2a2a31;
+    box-shadow:0 30px 80px -20px rgba(0,0,0,.8), inset 0 0 0 8px #050507;
+    padding:14px;flex:0 0 auto;
+  }
+  .screen{
+    position:absolute;inset:14px;border-radius:40px;overflow:hidden;
+    background:linear-gradient(180deg,#121216 0%, #17130e 140%);
+  }
+  .notch{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:104px;height:26px;border-radius:16px;background:#050506;z-index:40}
+
+  /* safe area we lay things out inside */
+  .safe{position:absolute;left:0;right:0;top:46px;bottom:20px}
+
+  /* ------- drop zone ------- */
+  .dropzone{
+    position:absolute;border:2px dashed rgba(245,184,107,.85);border-radius:18px;
+    background:rgba(245,184,107,.06);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    color:var(--accent);text-align:center;padding:8px;
+    transition:all .46s cubic-bezier(.2,.8,.2,1);
+    animation:breathe 1.6s ease-in-out infinite alternate;
+  }
+  @keyframes breathe{from{opacity:.55}to{opacity:1}}
+  .dropzone .pip{font-size:22px}
+  .dropzone .t1{font-size:12px;font-weight:700}
+  .dropzone .t2{font-size:10.5px;color:var(--muted)}
+  .dropzone.hidden{opacity:0;pointer-events:none}
+
+  /* ------- dashboard ------- */
+  .deck{
+    position:absolute;border-radius:28px;
+    background:rgba(28,28,34,.72);backdrop-filter:blur(18px);
+    border:1px solid var(--hair);
+    display:flex;flex-direction:column;gap:12px;padding:14px;overflow:hidden;
+    transition:all .46s cubic-bezier(.2,.8,.2,1);
+  }
+  .tabs{display:flex;gap:6px;align-items:center}
+  .tab{
+    display:flex;gap:6px;align-items:center;border:0;cursor:pointer;
+    font:600 12.5px/1 inherit;color:var(--muted);
+    background:transparent;padding:8px 11px;border-radius:999px;
+  }
+  .tab.active{color:var(--accent);background:rgba(245,184,107,.2)}
+  .tab .ico{width:14px;height:14px;display:inline-block}
+  .gear{margin-left:auto;background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:8px}
+  .gear:hover{color:var(--ink-dark)}
+
+  .panel{flex:1;min-height:0;border-radius:20px;position:relative;overflow:hidden}
+  .paper{position:absolute;inset:0;background:var(--paper-dark);border:1px solid var(--hair);border-radius:20px}
+
+  /* doodle */
+  #doodle{position:absolute;inset:0;touch-action:none;border-radius:20px}
+  .doodle-tools{position:absolute;left:0;right:0;bottom:8px;display:flex;gap:8px;align-items:center;justify-content:center;padding:0 10px;z-index:3}
+  .swatch{width:20px;height:20px;border-radius:999px;border:2px solid transparent;cursor:pointer}
+  .swatch.on{border-color:#fff}
+  .mini-btn{background:rgba(0,0,0,.35);border:0;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:13px}
+
+  /* notes */
+  #notes{position:absolute;inset:0;width:100%;height:100%;resize:none;border:0;outline:0;background:transparent;color:var(--ink-dark);font:14px/1.55 inherit;padding:16px}
+  #notes::placeholder{color:var(--muted)}
+
+  /* runner */
+  #runner{position:absolute;inset:0;border-radius:20px;cursor:pointer}
+  .hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;padding:12px 14px;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none}
+  .hud .best{color:var(--muted);font-weight:600}
+  .runner-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;text-align:center;pointer-events:none}
+  .runner-msg .m1{font-size:16px;font-weight:800}
+  .runner-msg .m2{font-size:11px;color:var(--muted)}
+
+  /* ------- settings sheet ------- */
+  .sheet-scrim{position:absolute;inset:0;background:rgba(0,0,0,.5);border-radius:40px;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .28s;z-index:50}
+  .sheet-scrim.open{opacity:1;pointer-events:auto}
+  .sheet{width:100%;background:#1b1b21;border-radius:26px 26px 0 0;padding:16px 16px 22px;transform:translateY(100%);transition:transform .32s cubic-bezier(.2,.8,.2,1);max-height:86%;overflow:auto}
+  .sheet-scrim.open .sheet{transform:translateY(0)}
+  .grabber{width:36px;height:5px;border-radius:3px;background:#444;margin:2px auto 12px}
+  .sheet h3{margin:14px 0 8px;font-size:13px}
+  .sheet .blurb{color:var(--muted);font-size:12px;margin:0 0 6px}
+  .diagram{display:flex;gap:16px;justify-content:center;margin:8px 0 4px}
+  .mini-phone{position:relative;width:96px;height:154px;border:2px solid rgba(255,255,255,.28);border-radius:16px;flex:0 0 auto}
+  .zone{position:absolute;border-radius:7px;background:rgba(255,255,255,.13);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;cursor:pointer;transition:.15s}
+  .zone.sel{background:var(--accent);color:#1a1205}
+  .done{margin-top:14px;width:100%;border:0;background:var(--accent);color:#1a1205;font-weight:800;font-size:14px;padding:11px;border-radius:12px;cursor:pointer}
+  .guide-row{display:flex;align-items:center;justify-content:space-between;margin-top:14px;font-weight:600;font-size:13px}
+  .toggle{width:44px;height:26px;border-radius:999px;background:#444;position:relative;cursor:pointer;transition:.2s}
+  .toggle.on{background:var(--accent)}
+  .toggle::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:999px;background:#fff;transition:.2s}
+  .toggle.on::after{left:21px}
+
+  /* side controls (desktop convenience, not part of the app) */
+  .side{max-width:300px;font-size:12.5px;color:var(--muted)}
+  .side h2{color:var(--ink-dark);font-size:13px;margin:0 0 8px}
+  .side .row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+  .side button{background:#1e1e25;border:1px solid #2c2c34;color:var(--ink-dark);border-radius:9px;padding:7px 9px;font:inherit;cursor:pointer}
+  .side button.on{border-color:var(--accent);color:var(--accent)}
+  .side .note{border-left:2px solid var(--accent);padding-left:10px;line-height:1.6}
+  .tag{display:inline-block;background:rgba(245,184,107,.12);color:var(--accent);border-radius:5px;padding:0 5px;font-size:11px}
+</style>
+</head>
+<body>
+  <h1>Docked <span class="tag">interactive preview</span></h1>
+  <p class="sub">A web mock of the SwiftUI app. Pick a video layout — the dashboard reflows so nothing sits under the floating video. The three modules (Doodle / Notes / Runner) are live. The real app runs natively via <code>Docked.xcodeproj</code>.</p>
+
+  <div class="stage">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="safe" id="safe">
+          <div class="dropzone" id="dropzone">
+            <div class="pip">▣</div>
+            <div class="t1">Float your video here</div>
+            <div class="t2" id="dz-label">Top · Wide</div>
+          </div>
+
+          <div class="deck" id="deck">
+            <div class="tabs">
+              <button class="tab active" data-tab="doodle">✏️ Doodle</button>
+              <button class="tab" data-tab="notes">📝 Notes</button>
+              <button class="tab" data-tab="game">🎮 Runner</button>
+              <button class="gear" id="gear" title="Change video layout">▧</button>
+            </div>
+
+            <div class="panel" id="panel">
+              <!-- doodle -->
+              <div class="mod" data-mod="doodle">
+                <div class="paper"></div>
+                <canvas id="doodle"></canvas>
+                <div class="doodle-tools" id="doodleTools">
+                  <span class="swatch on" style="background:#F2B950" data-c="#F2B950"></span>
+                  <span class="swatch" style="background:#FF6B6B" data-c="#FF6B6B"></span>
+                  <span class="swatch" style="background:#4ECDC4" data-c="#4ECDC4"></span>
+                  <span class="swatch" style="background:#6C8EFF" data-c="#6C8EFF"></span>
+                  <span class="swatch" style="background:#C792EA" data-c="#C792EA"></span>
+                  <button class="mini-btn" id="undo" title="Undo">↶</button>
+                  <button class="mini-btn" id="clear" title="Clear">🗑</button>
+                </div>
+              </div>
+              <!-- notes -->
+              <div class="mod" data-mod="notes" hidden>
+                <div class="paper"></div>
+                <textarea id="notes" placeholder="Jot down quotes, timestamps, show notes…"></textarea>
+              </div>
+              <!-- runner -->
+              <div class="mod" data-mod="game" hidden>
+                <div class="paper"></div>
+                <canvas id="runner"></canvas>
+                <div class="hud"><span id="score">0</span><span class="best" id="best">Best 0</span></div>
+                <div class="runner-msg" id="runnerMsg"><div class="m1">Tap to run</div><div class="m2">Tap anywhere to hop the cactus</div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- settings sheet -->
+          <div class="sheet-scrim" id="scrim">
+            <div class="sheet">
+              <div class="grabber"></div>
+              <p class="blurb">Pick where iPhone's floating video (Picture in Picture) will sit. Docked keeps every control out from under it.</p>
+
+              <h3>Small video · corner</h3>
+              <div class="diagram">
+                <div class="mini-phone" data-kind="corners"></div>
+              </div>
+
+              <h3>Large video · full width</h3>
+              <div class="diagram">
+                <div class="mini-phone" data-kind="bars"></div>
+              </div>
+
+              <div class="guide-row">
+                <span>Show drop-zone guide</span>
+                <div class="toggle on" id="guideToggle"></div>
+              </div>
+
+              <button class="done" id="sheetDone">Done</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side">
+      <h2>Layout (also in the in-app sheet ▧)</h2>
+      <div class="row" id="layoutRow"></div>
+      <div class="note">
+        <b>What you're looking at:</b><br>
+        • <b>videoRect</b> — the dashed guide, exactly where iOS parks the PiP window.<br>
+        • <b>contentRect</b> — the dashboard, always a full-width band on the <i>opposite</i> side. Corner layouts still clear the whole band, so no button is ever hidden.<br><br>
+        Switching layouts runs the same spring the SwiftUI app uses.
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const LAYOUTS = [
+    ["smallTopLeft","Top Left"],["smallTopRight","Top Right"],
+    ["smallBottomLeft","Bottom Left"],["smallBottomRight","Bottom Right"],
+    ["largeTop","Top · Wide"],["largeBottom","Bottom · Wide"]
+  ];
+  const MARGIN = 12, GAP = 12;
+  const state = { layout:"largeTop", guide:true, tab:"doodle" };
+
+  const safe = document.getElementById("safe");
+  const deck = document.getElementById("deck");
+  const dz = document.getElementById("dropzone");
+  const dzLabel = document.getElementById("dz-label");
+
+  const occupiesTop = l => l==="smallTopLeft"||l==="smallTopRight"||l==="largeTop";
+  const isLarge = l => l==="largeTop"||l==="largeBottom";
+
+  function solve(){
+    const W = safe.clientWidth, H = safe.clientHeight;
+    let v;
+    if(isLarge(state.layout)){
+      const w = W - MARGIN*2, h = Math.round(H*0.46);
+      v = state.layout==="largeTop"
+        ? {x:MARGIN,y:MARGIN,w,h}
+        : {x:MARGIN,y:H-h-MARGIN,w,h};
+    } else {
+      const w = Math.min(Math.max(W*0.42,120),190), h = Math.round(w*9/16);
+      const right = state.layout==="smallTopRight"||state.layout==="smallBottomRight";
+      const bottom = state.layout==="smallBottomLeft"||state.layout==="smallBottomRight";
+      v = {x: right ? W-w-MARGIN : MARGIN, y: bottom ? H-h-MARGIN : MARGIN, w, h};
+    }
+    let c;
+    if(occupiesTop(state.layout)){
+      const top = v.y+v.h+GAP;
+      c = {x:0,y:top,w:W,h:H-top};
+    } else {
+      const bot = v.y-GAP;
+      c = {x:0,y:0,w:W,h:bot};
+    }
+    return {v,c};
+  }
+
+  function apply(){
+    const {v,c} = solve();
+    dz.style.left=v.x+"px"; dz.style.top=v.y+"px"; dz.style.width=v.w+"px"; dz.style.height=v.h+"px";
+    deck.style.left=c.x+"px"; deck.style.top=c.y+"px"; deck.style.width=c.w+"px"; deck.style.height=c.h+"px";
+    dz.classList.toggle("hidden", !state.guide);
+    dzLabel.textContent = LAYOUTS.find(l=>l[0]===state.layout)[1];
+    document.querySelectorAll("#layoutRow button").forEach(b=>b.classList.toggle("on", b.dataset.l===state.layout));
+    drawZones();
+    sizeCanvases();
+  }
+
+  // side buttons
+  const row = document.getElementById("layoutRow");
+  LAYOUTS.forEach(([id,label])=>{
+    const b=document.createElement("button");
+    b.textContent=label; b.dataset.l=id;
+    b.onclick=()=>{ state.layout=id; apply(); };
+    row.appendChild(b);
+  });
+
+  // in-app sheet diagrams
+  function buildDiagrams(){
+    document.querySelectorAll(".mini-phone").forEach(mp=>{
+      mp.innerHTML="";
+      const kind = mp.dataset.kind;
+      const W=mp.clientWidth, H=mp.clientHeight, i=8;
+      const defs = kind==="corners"
+        ? [["smallTopLeft",i,i],["smallTopRight",W/2+i/2,i],["smallBottomLeft",i,H/2+i/2],["smallBottomRight",W/2+i/2,H/2+i/2]]
+        : [["largeTop",i,i],["largeBottom",i,H*0.5]];
+      const zw = kind==="corners" ? (W-i*3)/2 : W-i*2;
+      const zh = kind==="corners" ? zw*9/16 : H*0.44;
+      defs.forEach(([id,x,y])=>{
+        const z=document.createElement("div");
+        z.className="zone"+(state.layout===id?" sel":"");
+        z.style.cssText+=`left:${x}px;top:${y}px;width:${zw}px;height:${zh}px`;
+        z.dataset.l=id;
+        z.textContent = state.layout===id ? "✓" : "";
+        z.onclick=()=>{ state.layout=id; apply(); };
+        mp.appendChild(z);
+      });
+    });
+  }
+  function drawZones(){ buildDiagrams(); }
+
+  // sheet open/close
+  const scrim=document.getElementById("scrim");
+  document.getElementById("gear").onclick=()=>scrim.classList.add("open");
+  document.getElementById("sheetDone").onclick=()=>scrim.classList.remove("open");
+  scrim.onclick=e=>{ if(e.target===scrim) scrim.classList.remove("open"); };
+  const gt=document.getElementById("guideToggle");
+  gt.onclick=()=>{ state.guide=!state.guide; gt.classList.toggle("on",state.guide); apply(); };
+
+  // tabs
+  document.querySelectorAll(".tab").forEach(t=>{
+    t.onclick=()=>{
+      state.tab=t.dataset.tab;
+      document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===t));
+      document.querySelectorAll(".mod").forEach(m=>m.hidden = m.dataset.mod!==state.tab);
+      sizeCanvases();
+      if(state.tab==="game") resetRunner();
+    };
+  });
+
+  /* ---------- doodle ---------- */
+  const dcv=document.getElementById("doodle"), dctx=dcv.getContext("2d");
+  let strokes=[], cur=null, color="#F2B950";
+  document.querySelectorAll(".swatch").forEach(s=>{
+    s.onclick=()=>{ color=s.dataset.c; document.querySelectorAll(".swatch").forEach(x=>x.classList.toggle("on",x===s)); };
+  });
+  document.getElementById("undo").onclick=()=>{ strokes.pop(); paintDoodle(); };
+  document.getElementById("clear").onclick=()=>{ strokes=[]; paintDoodle(); };
+  const dpos=e=>{ const r=dcv.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return {x:(t.clientX-r.left)/r.width,y:(t.clientY-r.top)/r.height}; };
+  const startD=e=>{ e.preventDefault(); cur={color,w:5,pts:[dpos(e)]}; strokes.push(cur); };
+  const moveD=e=>{ if(!cur)return; e.preventDefault(); cur.pts.push(dpos(e)); paintDoodle(); };
+  const endD=()=>{ cur=null; };
+  dcv.addEventListener("pointerdown",startD); dcv.addEventListener("pointermove",moveD);
+  window.addEventListener("pointerup",endD);
+  function paintDoodle(){
+    const w=dcv.width, h=dcv.height;
+    dctx.clearRect(0,0,w,h);
+    strokes.forEach(s=>{
+      dctx.strokeStyle=s.color; dctx.lineWidth=s.w*devicePixelRatio; dctx.lineCap="round"; dctx.lineJoin="round";
+      dctx.beginPath();
+      s.pts.forEach((p,i)=>{ const x=p.x*w,y=p.y*h; i?dctx.lineTo(x,y):dctx.moveTo(x,y); });
+      dctx.stroke();
+    });
+  }
+
+  /* ---------- runner ---------- */
+  const rcv=document.getElementById("runner"), rctx=rcv.getContext("2d");
+  const rmsg=document.getElementById("runnerMsg"), scoreEl=document.getElementById("score"), bestEl=document.getElementById("best");
+  let R=null, best=0;
+  function resetRunner(){
+    R={phase:"ready",py:0,vy:0,obs:[],score:0,speed:340,spawn:1.1,t:performance.now(),ground:0};
+    scoreEl.textContent="0"; showMsg("Tap to run","Tap anywhere to hop the cactus");
+  }
+  function showMsg(a,b){ rmsg.innerHTML=`<div class="m1">${a}</div><div class="m2">${b}</div>`; rmsg.style.display="flex"; }
+  rcv.addEventListener("pointerdown",e=>{
+    e.preventDefault();
+    if(!R||R.phase==="ready"||R.phase==="over"){ const b=best; resetRunner(); R.phase="running"; rmsg.style.display="none"; best=b; }
+    else if(R.phase==="running" && R.py<=0.5){ R.vy=980; }
+  });
+  function stepRunner(now){
+    if(!R){ requestAnimationFrame(stepRunner); return; }
+    const dt=Math.min((now-R.t)/1000, 1/30); R.t=now;
+    const w=rcv.width/devicePixelRatio, h=rcv.height/devicePixelRatio;
+    const groundY=h-24, PS=30, PX=48;
+    if(R.phase==="running"){
+      R.speed=Math.min(760,340+R.score*1.6);
+      R.vy-=3200*dt; R.py+=R.vy*dt; if(R.py<=0){R.py=0;R.vy=0;}
+      R.ground=(R.ground+R.speed*dt)%22;
+      R.obs.forEach(o=>o.x-=R.speed*dt);
+      R.obs=R.obs.filter(o=>o.x+o.w>-4);
+      R.spawn-=dt;
+      if(R.spawn<=0){ const oh=18+Math.random()*30; R.obs.push({x:w+20,w:12+Math.random()*10,h:oh}); R.spawn=Math.max(0.7,(0.95+Math.random()*0.8)*(340/R.speed)); }
+      R.score+=dt*14; scoreEl.textContent=Math.floor(R.score);
+      const pb=R.py;
+      for(const o of R.obs){ if(PX<o.x+o.w && PX+PS>o.x && pb<o.h){ R.phase="over"; best=Math.max(best,Math.floor(R.score)); showMsg("Game Over",`Score ${Math.floor(R.score)} · tap to retry`); } }
+    }
+    bestEl.textContent="Best "+Math.max(best,Math.floor(R?.score||0));
+    // draw
+    rctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    rctx.clearRect(0,0,w,h);
+    rctx.strokeStyle="rgba(235,235,235,.55)"; rctx.lineWidth=2;
+    rctx.beginPath(); rctx.moveTo(0,groundY); rctx.lineTo(w,groundY); rctx.stroke();
+    rctx.strokeStyle="rgba(235,235,235,.22)";
+    for(let x=-R.ground;x<w;x+=22){ rctx.beginPath(); rctx.moveTo(x,groundY+6); rctx.lineTo(x+9,groundY+6); rctx.stroke(); }
+    rctx.fillStyle="#f5b86b";
+    rrect(rctx,PX,groundY-PS-R.py,PS,PS,7); rctx.fill();
+    rctx.fillStyle="rgba(235,235,235,.82)";
+    R.obs.forEach(o=>{ rrect(rctx,o.x,groundY-o.h,o.w,o.h,3); rctx.fill(); });
+    requestAnimationFrame(stepRunner);
+  }
+  function rrect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+  requestAnimationFrame(stepRunner);
+
+  /* ---------- canvas sizing ---------- */
+  function sizeCanvases(){
+    [dcv,rcv].forEach(cv=>{
+      const r=cv.getBoundingClientRect();
+      if(r.width<2) return;
+      cv.width=r.width*devicePixelRatio; cv.height=r.height*devicePixelRatio;
+    });
+    paintDoodle();
+  }
+
+  window.addEventListener("resize",apply);
+  resetRunner();
+  apply();
+  // show the layout sheet once on load, like first launch
+  setTimeout(()=>scrim.classList.add("open"), 350);
+})();
+</script>
+</body>
+</html>

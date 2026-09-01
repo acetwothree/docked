@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+xcuserdata/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.perspectivev3
+!default.perspectivev3
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Code-signing & App Store Connect secrets — NEVER commit these. You generate
+# them locally while following docs/TESTFLIGHT_SETUP.md; only their base64 /
+# contents go into GitHub Secrets.
+*.p12
+*.p8
+*.cer
+*.csr
+*.key
+*.pem
+*.mobileprovision
+*.base64
+AuthKey_*.p8

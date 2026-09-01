@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Uploads straight to App Store Connect / TestFlight during export. Auth is
+	     passed via -authenticationKeyPath/-ID/-IssuerID on the xcodebuild
+	     -exportArchive call in .github/workflows/testflight.yml, not stored here. -->
+	<key>method</key>
+	<string>app-store</string>
+	<key>destination</key>
+	<string>upload</string>
+
+	<!-- The CI workflow substitutes these before use. Fine to leave as
+	     placeholders for a manual export too — Xcode will prompt. -->
+	<key>teamID</key>
+	<string>__APPLE_TEAM_ID__</string>
+	<key>signingStyle</key>
+	<string>manual</string>
+	<key>signingCertificate</key>
+	<string>Apple Distribution</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.acetwothree.docked</key>
+		<string>__PROVISIONING_PROFILE_UUID__</string>
+	</dict>
+
+	<key>uploadSymbols</key>
+	<true/>
+	<key>stripSwiftSymbols</key>
+	<true/>
+</dict>
+</plist>
