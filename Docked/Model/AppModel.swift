@@ -2,80 +2,78 @@
 //  AppModel.swift
 //  Docked
 //
-//  App-wide preferences: which video layout is active, whether the drop-zone
-//  guide is shown, the selected activity module, and the runner high score.
-//  Everything here persists to `UserDefaults` the moment it changes.
+//  App-wide state + preferences, all persisted to UserDefaults on change.
 //
 
 import SwiftUI
 
-@Observable
-final class AppModel {
-
-    private enum Keys {
-        static let layout = "docked.layout"
-        static let guide = "docked.showGuide"
-        static let onboarded = "docked.onboarded"
-        static let module = "docked.module"
-        static let highScore = "docked.runner.highScore"
-    }
-
-    /// Where the user has parked their floating video.
-    var selectedLayout: VideoLayout {
-        didSet { UserDefaults.standard.set(selectedLayout.rawValue, forKey: Keys.layout) }
-    }
-
-    /// Show the dashed "television frame" guide.
-    var showGuide: Bool {
-        didSet { UserDefaults.standard.set(showGuide, forKey: Keys.guide) }
-    }
-
-    /// Has the first-run layout sheet been dismissed at least once?
-    var hasOnboarded: Bool {
-        didSet { UserDefaults.standard.set(hasOnboarded, forKey: Keys.onboarded) }
-    }
-
-    /// Currently visible activity.
-    var activeModule: ActivityModule {
-        didSet { UserDefaults.standard.set(activeModule.rawValue, forKey: Keys.module) }
-    }
-
-    /// Best distance reached in the runner mini-game.
-    var runnerHighScore: Int {
-        didSet { UserDefaults.standard.set(runnerHighScore, forKey: Keys.highScore) }
-    }
-
-    init() {
-        let defaults = UserDefaults.standard
-        selectedLayout = VideoLayout(rawValue: defaults.string(forKey: Keys.layout) ?? "") ?? .largeTop
-        showGuide = (defaults.object(forKey: Keys.guide) as? Bool) ?? true
-        hasOnboarded = defaults.bool(forKey: Keys.onboarded)
-        activeModule = ActivityModule(rawValue: defaults.string(forKey: Keys.module) ?? "") ?? .doodle
-        runnerHighScore = defaults.integer(forKey: Keys.highScore)
+enum AppTheme: String, CaseIterable, Identifiable {
+    case system, dark, light
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .dark: .dark
+        case .light: .light
+        }
     }
 }
 
-/// The three "second screen" activities.
-enum ActivityModule: String, CaseIterable, Identifiable {
-    case doodle
-    case notes
-    case game
+@Observable
+final class AppModel {
 
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .doodle: return "Doodle"
-        case .notes: return "Notes"
-        case .game: return "Runner"
-        }
+    private enum K {
+        static let layout = "docked.layout"
+        static let module = "docked.module"
+        static let hint = "docked.showHint"
+        static let theme = "docked.theme"
+        static let haptics = "docked.haptics"
+        static let onboarded = "docked.onboarded"
+        static let debug = "docked.debugOverlay"
+        static let highScore = "docked.runner.highScore"
     }
 
-    var systemImage: String {
-        switch self {
-        case .doodle: return "scribble.variable"
-        case .notes: return "note.text"
-        case .game: return "gamecontroller"
-        }
+    var layout: VideoLayout { didSet { store(layout.rawValue, K.layout) } }
+    var module: ActivityModule { didSet { store(module.rawValue, K.module) } }
+    var showHint: Bool { didSet { store(showHint, K.hint) } }
+    var theme: AppTheme { didSet { store(theme.rawValue, K.theme) } }
+    var haptics: Bool { didSet { store(haptics, K.haptics) } }
+    var hasOnboarded: Bool { didSet { store(hasOnboarded, K.onboarded) } }
+    var debugOverlay: Bool { didSet { store(debugOverlay, K.debug) } }
+    var runnerHighScore: Int { didSet { store(runnerHighScore, K.highScore) } }
+
+    /// Transient — true while the tap-to-place layout editor is open.
+    var isEditingLayout = false
+
+    init() {
+        let d = UserDefaults.standard
+        layout = VideoLayout(rawValue: d.string(forKey: K.layout) ?? "") ?? .top
+        module = ActivityModule(rawValue: d.string(forKey: K.module) ?? "") ?? .doodle
+        showHint = (d.object(forKey: K.hint) as? Bool) ?? true
+        theme = AppTheme(rawValue: d.string(forKey: K.theme) ?? "") ?? .system
+        haptics = (d.object(forKey: K.haptics) as? Bool) ?? true
+        hasOnboarded = d.bool(forKey: K.onboarded)
+        debugOverlay = d.bool(forKey: K.debug)
+        runnerHighScore = d.integer(forKey: K.highScore)
+    }
+
+    private func store(_ value: Any, _ key: String) {
+        UserDefaults.standard.set(value, forKey: key)
+    }
+
+    // MARK: Developer actions
+
+    func resetOnboarding() { hasOnboarded = false }
+
+    func clearAllData(notes: NotesStore, doodle: DoodleStore) {
+        notes.text = ""
+        doodle.clear()
+        runnerHighScore = 0
+        layout = .top
+        module = .doodle
+        showHint = true
+        debugOverlay = false
+        hasOnboarded = false
     }
 }

@@ -2,422 +2,729 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Docked — interactive preview</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f0f13">
+<title>Docked — prototype</title>
 <style>
   :root{
     --accent:#f5b86b;
-    --accent-strong:#f7c07a;
-    --paper-dark:#212129;
-    --ink-dark:#ebebeb;
-    --bg:#0f0f12;
-    --bg-2:#17171c;
+    --accent-deep:#e79a3c;
+    --ink:#ececf0;
+    --ink-dim:#9aa0a8;
+    --bg:#0f0f13;
+    --bg-elev:#191921;
+    --paper:#20202a;
+    --paper-2:#262631;
     --hair:rgba(255,255,255,.09);
-    --muted:#9aa0a6;
+    --danger:#ff6b6b;
+    /* safe-area: on a real iPhone env() wins; on desktop (env()=0) the --sim-*
+       floor kicks in so the notch/home-indicator gap is still previewed.
+       The admin panel tweaks --sim-top / --sim-bot. */
+    --sim-top:59px;
+    --sim-bot:34px;
+    --sat: max(env(safe-area-inset-top, 0px), var(--sim-top));
+    --sab: max(env(safe-area-inset-bottom, 0px), var(--sim-bot));
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
   }
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%}
+  :root[data-theme="light"]{
+    --ink:#1b1b22;--ink-dim:#5b6069;--bg:#dfe6ee;--bg-elev:#f2f4f8;
+    --paper:#ffffff;--paper-2:#f4f0ea;--hair:rgba(0,0,0,.12);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overscroll-behavior:none}
   body{
-    background:radial-gradient(120% 90% at 50% 0%, #1b1b22 0%, var(--bg) 60%);
-    color:var(--ink-dark);
-    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    display:flex;flex-direction:column;align-items:center;
-    padding:26px 16px 60px;gap:22px;min-height:100%;
+    background:#050507;color:var(--ink);
+    font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
   }
-  h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.2px}
-  .sub{color:var(--muted);font-size:12.5px;margin-top:-14px;text-align:center;max-width:520px}
-  .sub code{color:var(--accent);background:rgba(245,184,107,.1);padding:1px 5px;border-radius:5px}
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 
-  /* ------- phone ------- */
-  .stage{display:flex;gap:34px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
-  .phone{
-    position:relative;width:330px;height:690px;border-radius:52px;
-    background:linear-gradient(180deg,#08080a,#111116);
-    border:1px solid #2a2a31;
-    box-shadow:0 30px 80px -20px rgba(0,0,0,.8), inset 0 0 0 8px #050507;
-    padding:14px;flex:0 0 auto;
+  /* ---------- app shell ---------- */
+  .app{
+    position:fixed;inset:0;max-width:480px;margin:0 auto;overflow:hidden;
+    background:
+      radial-gradient(130% 80% at 50% -10%, #21212c 0%, var(--bg) 62%);
   }
-  .screen{
-    position:absolute;inset:14px;border-radius:40px;overflow:hidden;
-    background:linear-gradient(180deg,#121216 0%, #17130e 140%);
+  /* everything lays out inside the safe area */
+  .surface{
+    position:absolute;
+    left:var(--sal);right:var(--sar);top:var(--sat);bottom:var(--sab);
   }
-  .notch{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:104px;height:26px;border-radius:16px;background:#050506;z-index:40}
 
-  /* safe area we lay things out inside */
-  .safe{position:absolute;left:0;right:0;top:46px;bottom:20px}
+  .region{position:absolute;transition:left .5s cubic-bezier(.2,.85,.25,1),top .5s cubic-bezier(.2,.85,.25,1),width .5s cubic-bezier(.2,.85,.25,1),height .5s cubic-bezier(.2,.85,.25,1)}
 
-  /* ------- drop zone ------- */
-  .dropzone{
-    position:absolute;border:2px dashed rgba(245,184,107,.85);border-radius:18px;
-    background:rgba(245,184,107,.06);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
-    color:var(--accent);text-align:center;padding:8px;
-    transition:all .46s cubic-bezier(.2,.8,.2,1);
-    animation:breathe 1.6s ease-in-out infinite alternate;
+  /* ---------- video slot + pixel TV frame ---------- */
+  #video{z-index:6}
+  #video .tvframe{position:absolute;inset:0;image-rendering:pixelated;display:block}
+  #video .glass{
+    position:absolute;background:repeating-linear-gradient(0deg,rgba(255,255,255,.02) 0 2px,rgba(0,0,0,.05) 2px 4px),radial-gradient(120% 120% at 30% 20%, rgba(120,150,190,.10), transparent 60%);
   }
-  @keyframes breathe{from{opacity:.55}to{opacity:1}}
-  .dropzone .pip{font-size:22px}
-  .dropzone .t1{font-size:12px;font-weight:700}
-  .dropzone .t2{font-size:10.5px;color:var(--muted)}
-  .dropzone.hidden{opacity:0;pointer-events:none}
+  #video .hint{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    text-align:center;color:var(--accent);pointer-events:none;transition:opacity .6s;padding:14px;
+  }
+  #video .hint .big{font-size:12px;font-weight:800;letter-spacing:2.5px}
+  #video .hint .sub{font-size:10px;color:var(--ink-dim);letter-spacing:.5px}
+  #video .hint .pip{font-size:22px;filter:drop-shadow(0 2px 0 rgba(0,0,0,.35))}
+  #video.dim .hint{opacity:.22}
+  #video.small .hint{gap:3px}
+  #video.small .hint .big{font-size:8.5px;letter-spacing:1.4px}
+  #video.small .hint .sub{display:none}
+  #video.small .hint .pip{font-size:15px}
+  #video .antenna{position:absolute;left:0;right:0;top:-16px;height:18px;pointer-events:none;display:none}
+  #video.ant .antenna{display:block}
 
-  /* ------- dashboard ------- */
-  .deck{
-    position:absolute;border-radius:28px;
-    background:rgba(28,28,34,.72);backdrop-filter:blur(18px);
-    border:1px solid var(--hair);
-    display:flex;flex-direction:column;gap:12px;padding:14px;overflow:hidden;
-    transition:all .46s cubic-bezier(.2,.8,.2,1);
-  }
-  .tabs{display:flex;gap:6px;align-items:center}
-  .tab{
-    display:flex;gap:6px;align-items:center;border:0;cursor:pointer;
-    font:600 12.5px/1 inherit;color:var(--muted);
-    background:transparent;padding:8px 11px;border-radius:999px;
-  }
-  .tab.active{color:var(--accent);background:rgba(245,184,107,.2)}
-  .tab .ico{width:14px;height:14px;display:inline-block}
-  .gear{margin-left:auto;background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:8px}
-  .gear:hover{color:var(--ink-dark)}
+  /* ---------- tab bar (header or footer) ---------- */
+  #tabs{z-index:7;display:flex;align-items:center;gap:6px;padding:0 8px;background:var(--bg-elev);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+  #tabs.header{border-top:0}
+  #tabs.footer{border-bottom:0}
+  .tab{display:flex;align-items:center;gap:7px;padding:9px 12px;border-radius:999px;color:var(--ink-dim);font-weight:700;font-size:13.5px;flex:0 0 auto}
+  .tab .ic{width:16px;height:16px}
+  .tab.on{color:var(--accent);background:rgba(245,184,107,.18)}
+  #tabs .spacer{flex:1}
 
-  .panel{flex:1;min-height:0;border-radius:20px;position:relative;overflow:hidden}
-  .paper{position:absolute;inset:0;background:var(--paper-dark);border:1px solid var(--hair);border-radius:20px}
+  /* ---------- content / modules ---------- */
+  #content{z-index:4}
+  .mod{position:absolute;inset:0;border-radius:20px;overflow:hidden;background:var(--paper);border:1px solid var(--hair)}
+  .mod[hidden]{display:none}
 
   /* doodle */
-  #doodle{position:absolute;inset:0;touch-action:none;border-radius:20px}
-  .doodle-tools{position:absolute;left:0;right:0;bottom:8px;display:flex;gap:8px;align-items:center;justify-content:center;padding:0 10px;z-index:3}
-  .swatch{width:20px;height:20px;border-radius:999px;border:2px solid transparent;cursor:pointer}
-  .swatch.on{border-color:#fff}
-  .mini-btn{background:rgba(0,0,0,.35);border:0;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:13px}
+  #doodleCv{position:absolute;inset:0;touch-action:none}
+  .doodlebar{position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;z-index:3}
+  .sw{width:22px;height:22px;border-radius:999px;border:2px solid transparent}
+  .sw.on{border-color:#fff}
+  .tbtn{width:30px;height:30px;border-radius:9px;background:rgba(0,0,0,.35);color:#fff;font-size:14px;display:grid;place-items:center}
+  :root[data-theme="light"] .tbtn{background:rgba(0,0,0,.12);color:#111}
 
   /* notes */
-  #notes{position:absolute;inset:0;width:100%;height:100%;resize:none;border:0;outline:0;background:transparent;color:var(--ink-dark);font:14px/1.55 inherit;padding:16px}
-  #notes::placeholder{color:var(--muted)}
+  #notes{position:absolute;inset:0;width:100%;height:100%;resize:none;background:transparent;border:0;outline:0;color:var(--ink);font:15px/1.55 inherit;padding:16px}
+  #notes::placeholder{color:var(--ink-dim)}
 
   /* runner */
-  #runner{position:absolute;inset:0;border-radius:20px;cursor:pointer}
-  .hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;padding:12px 14px;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none}
-  .hud .best{color:var(--muted);font-weight:600}
-  .runner-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;text-align:center;pointer-events:none}
-  .runner-msg .m1{font-size:16px;font-weight:800}
-  .runner-msg .m2{font-size:11px;color:var(--muted)}
+  #runnerCv{position:absolute;inset:0}
+  .rhud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;padding:10px 14px;font-weight:800;font-variant-numeric:tabular-nums;pointer-events:none}
+  .rhud .best{color:var(--ink-dim);font-weight:700}
+  .rmsg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;pointer-events:none;padding:16px}
+  .rmsg .m1{font-size:17px;font-weight:900}
+  .rmsg .m2{font-size:11.5px;color:var(--ink-dim)}
 
-  /* ------- settings sheet ------- */
-  .sheet-scrim{position:absolute;inset:0;background:rgba(0,0,0,.5);border-radius:40px;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .28s;z-index:50}
-  .sheet-scrim.open{opacity:1;pointer-events:auto}
-  .sheet{width:100%;background:#1b1b21;border-radius:26px 26px 0 0;padding:16px 16px 22px;transform:translateY(100%);transition:transform .32s cubic-bezier(.2,.8,.2,1);max-height:86%;overflow:auto}
-  .sheet-scrim.open .sheet{transform:translateY(0)}
-  .grabber{width:36px;height:5px;border-radius:3px;background:#444;margin:2px auto 12px}
-  .sheet h3{margin:14px 0 8px;font-size:13px}
-  .sheet .blurb{color:var(--muted);font-size:12px;margin:0 0 6px}
-  .diagram{display:flex;gap:16px;justify-content:center;margin:8px 0 4px}
-  .mini-phone{position:relative;width:96px;height:154px;border:2px solid rgba(255,255,255,.28);border-radius:16px;flex:0 0 auto}
-  .zone{position:absolute;border-radius:7px;background:rgba(255,255,255,.13);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;cursor:pointer;transition:.15s}
-  .zone.sel{background:var(--accent);color:#1a1205}
-  .done{margin-top:14px;width:100%;border:0;background:var(--accent);color:#1a1205;font-weight:800;font-size:14px;padding:11px;border-radius:12px;cursor:pointer}
-  .guide-row{display:flex;align-items:center;justify-content:space-between;margin-top:14px;font-weight:600;font-size:13px}
-  .toggle{width:44px;height:26px;border-radius:999px;background:#444;position:relative;cursor:pointer;transition:.2s}
+  /* ---------- floating controls (gear + layout) ---------- */
+  #controls{position:absolute;z-index:9;display:flex;gap:6px;align-items:center;transition:left .5s cubic-bezier(.2,.85,.25,1),top .5s cubic-bezier(.2,.85,.25,1)}
+  #controls.stack{flex-direction:row}
+  .cbtn{
+    width:42px;height:42px;border-radius:13px;display:grid;place-items:center;
+    background:var(--bg-elev);border:1px solid var(--hair);font-size:19px;
+    box-shadow:0 6px 16px -6px rgba(0,0,0,.5);
+  }
+  .cbtn:active{transform:scale(.94)}
+  #controls .chip{
+    font-size:10px;font-weight:800;letter-spacing:.4px;color:var(--ink-dim);
+    background:var(--bg-elev);border:1px solid var(--hair);border-radius:10px;padding:6px 8px;max-width:150px;line-height:1.25;
+  }
+
+  /* ---------- edit-layout overlay ---------- */
+  #edit{position:absolute;inset:0;z-index:30;display:none}
+  #edit.on{display:block}
+  #edit .scrim{position:absolute;inset:0;background:rgba(4,4,8,.55);backdrop-filter:blur(1.5px)}
+  .target{
+    position:absolute;border:2px dashed var(--accent);border-radius:14px;
+    background:rgba(245,184,107,.10);display:flex;align-items:center;justify-content:center;
+    color:var(--accent);font-weight:800;font-size:12px;letter-spacing:.5px;
+    animation:pulse 1.4s ease-in-out infinite;
+  }
+  .target .lab{background:rgba(0,0,0,.35);padding:3px 8px;border-radius:8px}
+  :root[data-theme="light"] .target .lab{background:rgba(255,255,255,.6);color:var(--accent-deep)}
+  .target.sel{background:var(--accent);color:#1c1305;border-style:solid;animation:none}
+  .target.sel .lab{background:transparent}
+  @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+  #edit .headline{
+    position:absolute;left:0;right:0;text-align:center;color:#fff;
+    font-weight:900;font-size:16px;text-shadow:0 2px 8px rgba(0,0,0,.6);padding:0 30px;
+  }
+  #edit .headsub{position:absolute;left:0;right:0;text-align:center;color:#cfd3da;font-size:11.5px;text-shadow:0 2px 8px rgba(0,0,0,.6)}
+  #edit .x{
+    position:absolute;top:2px;right:6px;width:34px;height:34px;border-radius:999px;
+    background:rgba(0,0,0,.5);color:#fff;font-size:16px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.15);
+  }
+
+  /* ---------- sheets / onboarding ---------- */
+  .scrim{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .28s}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .sheet{width:100%;max-width:480px;margin:0 auto;background:var(--bg-elev);border-radius:26px 26px 0 0;
+    padding:14px 16px calc(20px + var(--sab));max-height:88vh;overflow:auto;transform:translateY(102%);transition:transform .34s cubic-bezier(.2,.85,.25,1)}
+  .scrim.on .sheet{transform:translateY(0)}
+  .grab{width:38px;height:5px;border-radius:3px;background:var(--hair);margin:2px auto 12px}
+  .sh-h{font-size:12px;font-weight:800;letter-spacing:1px;color:var(--ink-dim);margin:18px 2px 8px;text-transform:uppercase}
+  .card{background:var(--paper);border:1px solid var(--hair);border-radius:16px;padding:12px 14px;margin-bottom:8px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 2px;font-size:14px}
+  .row + .row{border-top:1px solid var(--hair)}
+  .row .r-desc{color:var(--ink-dim);font-size:11.5px;margin-top:2px}
+  .seg{display:flex;background:var(--paper-2);border-radius:10px;padding:3px;gap:3px}
+  .seg button{padding:6px 12px;border-radius:8px;font-size:12.5px;font-weight:700;color:var(--ink-dim)}
+  .seg button.on{background:var(--accent);color:#1c1305}
+  .toggle{width:46px;height:27px;border-radius:999px;background:#555;position:relative;flex:0 0 auto;transition:.2s}
   .toggle.on{background:var(--accent)}
-  .toggle::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:999px;background:#fff;transition:.2s}
-  .toggle.on::after{left:21px}
+  .toggle::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:999px;background:#fff;transition:.2s}
+  .toggle.on::after{left:22px}
+  .pill{display:inline-block;padding:7px 11px;border-radius:9px;background:var(--paper-2);font-size:12px;font-weight:700;margin:3px 4px 0 0}
+  .pill.on{background:var(--accent);color:#1c1305}
+  .btn{display:block;width:100%;padding:12px;border-radius:12px;background:var(--accent);color:#1c1305;font-weight:900;font-size:15px;text-align:center;margin-top:6px}
+  .btn.ghost{background:var(--paper-2);color:var(--ink)}
+  .btn.warn{background:rgba(255,107,107,.16);color:var(--danger)}
+  .help p{margin:6px 0;font-size:12.5px;color:var(--ink-dim)}
+  .help b{color:var(--ink)}
+  .help ul{margin:6px 0 6px 16px;padding:0;font-size:12.5px;color:var(--ink-dim)}
+  .help li{margin:4px 0}
 
-  /* side controls (desktop convenience, not part of the app) */
-  .side{max-width:300px;font-size:12.5px;color:var(--muted)}
-  .side h2{color:var(--ink-dark);font-size:13px;margin:0 0 8px}
-  .side .row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
-  .side button{background:#1e1e25;border:1px solid #2c2c34;color:var(--ink-dark);border-radius:9px;padding:7px 9px;font:inherit;cursor:pointer}
-  .side button.on{border-color:var(--accent);color:var(--accent)}
-  .side .note{border-left:2px solid var(--accent);padding-left:10px;line-height:1.6}
-  .tag{display:inline-block;background:rgba(245,184,107,.12);color:var(--accent);border-radius:5px;padding:0 5px;font-size:11px}
+  /* onboarding */
+  #ob{position:fixed;inset:0;z-index:60;background:radial-gradient(120% 80% at 50% 0%, #23232f, #0d0d12 70%);display:none}
+  #ob.on{display:flex;flex-direction:column}
+  #ob .track{flex:1;display:flex;transition:transform .35s cubic-bezier(.2,.85,.25,1)}
+  #ob .slide{min-width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:34px 30px calc(30px + var(--sab));gap:14px}
+  #ob .em{font-size:52px}
+  #ob h2{font-size:22px;margin:0;font-weight:900}
+  #ob p{font-size:14px;color:var(--ink-dim);margin:0;max-width:330px}
+  #ob .steps{text-align:left;font-size:13px;color:var(--ink-dim);max-width:330px;display:grid;gap:8px}
+  #ob .steps b{color:var(--ink)}
+  #ob .nav{display:flex;align-items:center;justify-content:space-between;padding:16px 22px calc(16px + var(--sab))}
+  #ob .dots{display:flex;gap:6px}
+  #ob .dot{width:7px;height:7px;border-radius:999px;background:var(--hair)}
+  #ob .dot.on{background:var(--accent);width:18px}
+  #ob .skip{color:var(--ink-dim);font-weight:700;font-size:13px}
+  #ob .next{background:var(--accent);color:#1c1305;font-weight:900;padding:10px 20px;border-radius:12px;font-size:14px}
+
+  /* debug */
+  .dbg{position:absolute;border:1px dashed rgba(0,255,180,.7);z-index:20;pointer-events:none;font:9px/1 monospace;color:#0fb;padding:2px}
 </style>
 </head>
 <body>
-  <h1>Docked <span class="tag">interactive preview</span></h1>
-  <p class="sub">A web mock of the SwiftUI app. Pick a video layout — the dashboard reflows so nothing sits under the floating video. The three modules (Doodle / Notes / Runner) are live. The real app runs natively via <code>Docked.xcodeproj</code>.</p>
+<div class="app" id="app">
+  <div class="surface" id="surface">
 
-  <div class="stage">
-    <div class="phone">
-      <div class="notch"></div>
-      <div class="screen">
-        <div class="safe" id="safe">
-          <div class="dropzone" id="dropzone">
-            <div class="pip">▣</div>
-            <div class="t1">Float your video here</div>
-            <div class="t2" id="dz-label">Top · Wide</div>
-          </div>
+    <!-- video slot -->
+    <div class="region" id="video">
+      <svg class="antenna" viewBox="0 0 100 18" preserveAspectRatio="none">
+        <line x1="42" y1="18" x2="30" y2="2" stroke="#9c8055" stroke-width="2"/>
+        <line x1="58" y1="18" x2="70" y2="2" stroke="#9c8055" stroke-width="2"/>
+        <circle cx="30" cy="2" r="2.4" fill="#c8a06a"/><circle cx="70" cy="2" r="2.4" fill="#c8a06a"/>
+      </svg>
+      <div class="glass" id="glass"></div>
+      <div class="hint" id="hint">
+        <div class="pip">📺</div>
+        <div class="big">DRAG YOUR VIDEO HERE</div>
+        <div class="sub">float your Picture-in-Picture window into the frame</div>
+      </div>
+    </div>
 
-          <div class="deck" id="deck">
-            <div class="tabs">
-              <button class="tab active" data-tab="doodle">✏️ Doodle</button>
-              <button class="tab" data-tab="notes">📝 Notes</button>
-              <button class="tab" data-tab="game">🎮 Runner</button>
-              <button class="gear" id="gear" title="Change video layout">▧</button>
-            </div>
+    <!-- tab bar -->
+    <div class="region" id="tabs">
+      <button class="tab on" data-tab="doodle"><span class="ic">✏️</span>Doodle</button>
+      <button class="tab" data-tab="notes"><span class="ic">🗒️</span>Notes</button>
+      <button class="tab" data-tab="game"><span class="ic">🎮</span>Runner</button>
+      <span class="spacer"></span>
+    </div>
 
-            <div class="panel" id="panel">
-              <!-- doodle -->
-              <div class="mod" data-mod="doodle">
-                <div class="paper"></div>
-                <canvas id="doodle"></canvas>
-                <div class="doodle-tools" id="doodleTools">
-                  <span class="swatch on" style="background:#F2B950" data-c="#F2B950"></span>
-                  <span class="swatch" style="background:#FF6B6B" data-c="#FF6B6B"></span>
-                  <span class="swatch" style="background:#4ECDC4" data-c="#4ECDC4"></span>
-                  <span class="swatch" style="background:#6C8EFF" data-c="#6C8EFF"></span>
-                  <span class="swatch" style="background:#C792EA" data-c="#C792EA"></span>
-                  <button class="mini-btn" id="undo" title="Undo">↶</button>
-                  <button class="mini-btn" id="clear" title="Clear">🗑</button>
-                </div>
-              </div>
-              <!-- notes -->
-              <div class="mod" data-mod="notes" hidden>
-                <div class="paper"></div>
-                <textarea id="notes" placeholder="Jot down quotes, timestamps, show notes…"></textarea>
-              </div>
-              <!-- runner -->
-              <div class="mod" data-mod="game" hidden>
-                <div class="paper"></div>
-                <canvas id="runner"></canvas>
-                <div class="hud"><span id="score">0</span><span class="best" id="best">Best 0</span></div>
-                <div class="runner-msg" id="runnerMsg"><div class="m1">Tap to run</div><div class="m2">Tap anywhere to hop the cactus</div></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- settings sheet -->
-          <div class="sheet-scrim" id="scrim">
-            <div class="sheet">
-              <div class="grabber"></div>
-              <p class="blurb">Pick where iPhone's floating video (Picture in Picture) will sit. Docked keeps every control out from under it.</p>
-
-              <h3>Small video · corner</h3>
-              <div class="diagram">
-                <div class="mini-phone" data-kind="corners"></div>
-              </div>
-
-              <h3>Large video · full width</h3>
-              <div class="diagram">
-                <div class="mini-phone" data-kind="bars"></div>
-              </div>
-
-              <div class="guide-row">
-                <span>Show drop-zone guide</span>
-                <div class="toggle on" id="guideToggle"></div>
-              </div>
-
-              <button class="done" id="sheetDone">Done</button>
-            </div>
-          </div>
+    <!-- content -->
+    <div class="region" id="content">
+      <div class="mod" data-mod="doodle">
+        <canvas id="doodleCv"></canvas>
+        <div class="doodlebar" id="doodlebar">
+          <span class="sw on" style="background:#F2B950" data-c="#F2B950"></span>
+          <span class="sw" style="background:#FF6B6B" data-c="#FF6B6B"></span>
+          <span class="sw" style="background:#4ECDC4" data-c="#4ECDC4"></span>
+          <span class="sw" style="background:#6C8EFF" data-c="#6C8EFF"></span>
+          <span class="sw" style="background:#C792EA" data-c="#C792EA"></span>
+          <button class="tbtn" id="dUndo">↶</button>
+          <button class="tbtn" id="dClear">🗑</button>
         </div>
       </div>
-    </div>
-
-    <div class="side">
-      <h2>Layout (also in the in-app sheet ▧)</h2>
-      <div class="row" id="layoutRow"></div>
-      <div class="note">
-        <b>What you're looking at:</b><br>
-        • <b>videoRect</b> — the dashed guide, exactly where iOS parks the PiP window.<br>
-        • <b>contentRect</b> — the dashboard, always a full-width band on the <i>opposite</i> side. Corner layouts still clear the whole band, so no button is ever hidden.<br><br>
-        Switching layouts runs the same spring the SwiftUI app uses.
+      <div class="mod" data-mod="notes" hidden>
+        <textarea id="notes" placeholder="Jot quotes, timestamps, show notes…"></textarea>
+      </div>
+      <div class="mod" data-mod="game" hidden>
+        <canvas id="runnerCv"></canvas>
+        <div class="rhud"><span id="rScore">0</span><span class="best" id="rBest">Best 0</span></div>
+        <div class="rmsg" id="rMsg"><div class="m1">Tap to run</div><div class="m2">Tap to hop the cactus</div></div>
       </div>
     </div>
+
+    <!-- floating controls -->
+    <div id="controls" class="stack">
+      <button class="cbtn" id="btnLayout" title="Move video">⧉</button>
+      <button class="cbtn" id="btnSettings" title="Settings">⚙️</button>
+      <span class="chip" id="ctrlChip" hidden></span>
+    </div>
+
+    <!-- edit-layout overlay -->
+    <div id="edit">
+      <div class="scrim" id="editScrim"></div>
+      <div class="headline" id="editHead">Tap where your video floats</div>
+      <div class="headsub" id="editSub">everything else stays usable</div>
+      <button class="x" id="editX">✕</button>
+      <!-- targets injected -->
+    </div>
+
   </div>
+</div>
+
+<!-- settings sheet -->
+<div class="scrim" id="setScrim">
+  <div class="sheet" id="setSheet">
+    <div class="grab"></div>
+    <div id="setBody"></div>
+  </div>
+</div>
+
+<!-- onboarding -->
+<div id="ob">
+  <div class="track" id="obTrack">
+    <div class="slide">
+      <div class="em">🧩</div>
+      <h2>Meet Docked</h2>
+      <p>Watch anything in a floating window while you doodle, take notes, or play. Docked reshapes itself around your video so nothing is ever hidden underneath it.</p>
+    </div>
+    <div class="slide">
+      <div class="em">📺</div>
+      <h2>Turn on Picture-in-Picture</h2>
+      <div class="steps">
+        <div><b>1.</b> iOS <b>Settings ▸ General ▸ Picture in Picture</b> → turn on <b>Start PiP Automatically</b>.</div>
+        <div><b>2.</b> Play a video full-screen in YouTube, Netflix, Hulu, Safari…</div>
+        <div><b>3.</b> <b>Swipe up</b> to the Home Screen — the video shrinks into a floating window.</div>
+      </div>
+    </div>
+    <div class="slide">
+      <div class="em">⧉</div>
+      <h2>Place it &amp; go</h2>
+      <p>Tap <b>⧉</b> any time to pick where your video sits — 4 corners, or a big top / bottom strip. Then drag the floating window into the TV frame. That's it.</p>
+    </div>
+  </div>
+  <div class="nav">
+    <button class="skip" id="obSkip">Skip</button>
+    <div class="dots" id="obDots"><span class="dot on"></span><span class="dot"></span><span class="dot"></span></div>
+    <button class="next" id="obNext">Next</button>
+  </div>
+</div>
 
 <script>
 (() => {
-  const LAYOUTS = [
-    ["smallTopLeft","Top Left"],["smallTopRight","Top Right"],
-    ["smallBottomLeft","Bottom Left"],["smallBottomRight","Bottom Right"],
-    ["largeTop","Top · Wide"],["largeBottom","Bottom · Wide"]
-  ];
-  const MARGIN = 12, GAP = 12;
-  const state = { layout:"largeTop", guide:true, tab:"doodle" };
+'use strict';
+const $ = s => document.querySelector(s);
+const el = (t,c)=>{const e=document.createElement(t);if(c)e.className=c;return e;};
+const LS = {
+  get:(k,d)=>{try{const v=localStorage.getItem('docked.'+k);return v==null?d:JSON.parse(v);}catch{return d;}},
+  set:(k,v)=>{try{localStorage.setItem('docked.'+k,JSON.stringify(v));}catch{}},
+  del:(k)=>{try{localStorage.removeItem('docked.'+k);}catch{}}
+};
 
-  const safe = document.getElementById("safe");
-  const deck = document.getElementById("deck");
-  const dz = document.getElementById("dropzone");
-  const dzLabel = document.getElementById("dz-label");
+/* ---------------- state ---------------- */
+const LAYOUTS = ['topLeft','topRight','bottomLeft','bottomRight','top','bottom'];
+const LABELS = {topLeft:'Top-left',topRight:'Top-right',bottomLeft:'Bottom-left',bottomRight:'Bottom-right',top:'Top',bottom:'Bottom'};
+const st = {
+  layout: LS.get('layout','top'),
+  tab: LS.get('tab','doodle'),
+  editing:false,
+  showHint: LS.get('showHint',true),
+  theme: LS.get('theme','system'),
+  haptics: LS.get('haptics',true),
+  debug:false,
+  simTop: LS.get('simTop',null),
+  simBot: LS.get('simBot',null),
+};
+if(!LAYOUTS.includes(st.layout)) st.layout='top';
 
-  const occupiesTop = l => l==="smallTopLeft"||l==="smallTopRight"||l==="largeTop";
-  const isLarge = l => l==="largeTop"||l==="largeBottom";
+applyTheme();
+applySimSafe();
 
-  function solve(){
-    const W = safe.clientWidth, H = safe.clientHeight;
-    let v;
-    if(isLarge(state.layout)){
-      const w = W - MARGIN*2, h = Math.round(H*0.46);
-      v = state.layout==="largeTop"
-        ? {x:MARGIN,y:MARGIN,w,h}
-        : {x:MARGIN,y:H-h-MARGIN,w,h};
-    } else {
-      const w = Math.min(Math.max(W*0.42,120),190), h = Math.round(w*9/16);
-      const right = state.layout==="smallTopRight"||state.layout==="smallBottomRight";
-      const bottom = state.layout==="smallBottomLeft"||state.layout==="smallBottomRight";
-      v = {x: right ? W-w-MARGIN : MARGIN, y: bottom ? H-h-MARGIN : MARGIN, w, h};
-    }
-    let c;
-    if(occupiesTop(state.layout)){
-      const top = v.y+v.h+GAP;
-      c = {x:0,y:top,w:W,h:H-top};
-    } else {
-      const bot = v.y-GAP;
-      c = {x:0,y:0,w:W,h:bot};
-    }
-    return {v,c};
+/* ---------------- geometry ---------------- */
+const MX=12, MY=10, G=10, TAB=52;
+// PiP footprints measured from the reference iPhone screenshots (pts, ~393-wide screen), 16:9
+function metrics(){
+  const s = $('#surface').getBoundingClientRect();
+  const AW = s.width, AH = s.height;
+  const cw = Math.min(Math.max(AW*0.37,132),150);      // corner PiP width  (~37% width)
+  const ch = Math.round(cw*9/16);                       // corner PiP height (16:9)
+  const bw = AW - MX*2;                                 // band width (full, minus side margin)
+  const bh = Math.round(bw*9/16);                       // band height (16:9)
+  return {AW,AH,cw,ch,bw,bh};
+}
+function solve(layout){
+  const {AW,AH,cw,ch,bw,bh} = metrics();
+  let video, onTop, corner=null;
+  switch(layout){
+    case 'topLeft':     video={x:MX,y:MY,w:cw,h:ch}; onTop=true;  corner='L'; break;
+    case 'topRight':    video={x:AW-MX-cw,y:MY,w:cw,h:ch}; onTop=true; corner='R'; break;
+    case 'bottomLeft':  video={x:MX,y:AH-MY-ch,w:cw,h:ch}; onTop=false; corner='L'; break;
+    case 'bottomRight': video={x:AW-MX-cw,y:AH-MY-ch,w:cw,h:ch}; onTop=false; corner='R'; break;
+    case 'top':         video={x:MX,y:MY,w:bw,h:bh}; onTop=true; break;
+    case 'bottom':      video={x:MX,y:AH-MY-bh,w:bw,h:bh}; onTop=false; break;
+  }
+  const tab = onTop ? {x:0,y:AH-TAB,w:AW,h:TAB,edge:'footer'} : {x:0,y:0,w:AW,h:TAB,edge:'header'};
+  let cTop, cBot;
+  if(onTop){ cTop = video.y+video.h+G; cBot = tab.y-G; }
+  else     { cTop = tab.y+tab.h+G;     cBot = video.y-G; }
+  const content = {x:MX,y:cTop,w:AW-MX*2,h:Math.max(60,cBot-cTop)};
+
+  let ctrl, chip=false;
+  if(corner){
+    // strip beside the corner video
+    if(corner==='L') ctrl={x:video.x+video.w+G, y:video.y, w:AW-MX-(video.x+video.w+G), h:video.h, side:true};
+    else             ctrl={x:MX, y:video.y, w:video.x-G-MX, h:video.h, side:true};
+    chip=true;
+  } else {
+    // float over the content corner nearest the tab bar
+    const cwid=92, chgt=42;
+    ctrl={x:content.x+content.w-cwid, y: onTop ? content.y+content.h-chgt : content.y, w:cwid, h:chgt, side:false};
+  }
+  return {video,tab,content,ctrl,chip,onTop,corner};
+}
+
+/* ---------------- render ---------------- */
+function place(node,r){ node.style.left=r.x+'px'; node.style.top=r.y+'px'; node.style.width=r.w+'px'; node.style.height=r.h+'px'; }
+
+function render(){
+  const g = solve(st.layout);
+
+  place($('#video'), g.video);
+  place($('#content'), g.content);
+  const tabs=$('#tabs'); place(tabs,g.tab); tabs.className='region '+g.tab.edge;
+
+  // TV frame
+  buildTV($('#video'), g.video.w, g.video.h);
+  $('#video').classList.toggle('ant', st.layout==='top'||st.layout==='topLeft'||st.layout==='topRight');
+  $('#video').classList.toggle('small', !!g.corner);
+  $('#hint').style.display = st.showHint ? 'flex' : 'none';
+
+  // controls
+  const c=$('#controls');
+  c.style.left = g.ctrl.x+'px';
+  c.style.top  = g.ctrl.y+'px';
+  const chip=$('#ctrlChip');
+  if(g.chip){ chip.hidden=false; chip.textContent = 'Video: '+LABELS[st.layout]+'  ·  tap ⧉ to move'; c.style.width=g.ctrl.w+'px'; }
+  else { chip.hidden=true; c.style.width='auto'; }
+
+  layoutModules(g.content);
+  drawDebug(g);
+}
+
+/* pixel-art CRT frame ---------------------------------------------------- */
+function buildTV(host,w,h){
+  w=Math.round(w); h=Math.round(h);
+  const small = w < 210;
+  const B = small ? 9 : 14;                                  // top/side bezel
+  const CHIN = small ? 13 : Math.min(26, Math.max(18, Math.round(h*0.13)));  // chin
+  const K=2;                                                 // pixel unit
+  // palette (warm retro plastic)
+  const C={ key:'#201914', hi:'#e9cd9c', tan:'#c99f66', mid:'#b6884f', lo:'#8a6a3d', deep:'#5f4a2c', glass:'#141019' };
+  const R=[];
+  const rc=(x,y,ww,hh,c)=>R.push(`<rect x="${x}" y="${y}" width="${Math.max(0,ww)}" height="${Math.max(0,hh)}" fill="${c}"/>`);
+
+  // base plate
+  rc(0,0,w,h,C.key);
+  rc(K,K,w-2*K,h-2*K,C.tan);
+
+  // bevel: light top+left, dark bottom+right  (4 strips, screen stays open)
+  rc(K,K,w-2*K,K,C.hi);                       // top highlight
+  rc(K,K,K,h-2*K,C.hi);                       // left highlight
+  rc(K,h-2*K,w-2*K,K,C.lo);                   // bottom shade
+  rc(w-2*K,K,K,h-2*K,C.lo);                   // right shade
+  // inner bezel mid-tone band
+  rc(2*K,2*K,w-4*K,B-2*K,C.mid);              // under top
+  rc(2*K,h-CHIN,w-4*K,K,C.mid);
+  rc(2*K,2*K,B-2*K,h-2*K-CHIN,C.mid);         // left
+  rc(w-B,2*K,B-2*K,h-2*K-CHIN,C.mid);         // right
+
+  // screen recess (dark ring just inside the bezel)
+  const sx=B, sy=B, sxr=w-B, syb=h-CHIN;
+  rc(sx-K,sy-K,sxr-sx+2*K,K,C.key);
+  rc(sx-K,syb,sxr-sx+2*K,K,C.key);
+  rc(sx-K,sy-K,K,syb-sy+2*K,C.key);
+  rc(sxr,sy-K,K,syb-sy+2*K,C.key);
+  rc(sx-2,sy-2,sxr-sx+4,2,C.deep);            // faint inner glow line
+  // dark glass fill so the empty slot reads as a screen
+  rc(sx,sy,sxr-sx,syb-sy,C.glass);
+
+  // chunky stepped corners (pixel rounding)
+  const notch=(cx,cy,dx,dy)=>{
+    rc(cx,cy,3*K,3*K,C.key);                  // cut the square
+    rc(cx+dx*K,cy+dy*K,2*K,2*K,C.tan);        // step 1
+    rc(cx+dx*2*K,cy+dy*2*K,K,K,C.tan);        // step 2
+  };
+  notch(0,0,1,1); notch(w-3*K,0,-1,1); notch(0,h-3*K,1,-1); notch(w-3*K,h-3*K,-1,-1);
+
+  // corner screws
+  const screw=(x,y)=>{ rc(x,y,2*K,2*K,C.deep); rc(x,y,K,K,C.hi); rc(x+K,y+K,K,K,C.lo); };
+  const so = small ? 3 : 4;
+  screw(so,so); screw(w-so-2*K,so); screw(so,h-CHIN+2); screw(w-so-2*K,h-CHIN+2);
+
+  // chin: speaker grille + power LED + brand slit
+  if(!small){
+    for(let i=0;i<7;i++) for(let j=0;j<2;j++) rc(8+i*3, h-CHIN+7+j*4, K, K, C.deep);
+    rc(w-15, h-CHIN+8, 3*K, 3*K, '#ff5a3c'); rc(w-14, h-CHIN+9, K, K, '#ffd6c6');   // LED
+    rc(w/2-6, h-4, 12, K, C.lo);
+  } else {
+    rc(w-9, h-CHIN+4, 2*K, 2*K, '#ff5a3c'); rc(w-8, h-CHIN+5, K, K, '#ffd6c6');
   }
 
-  function apply(){
-    const {v,c} = solve();
-    dz.style.left=v.x+"px"; dz.style.top=v.y+"px"; dz.style.width=v.w+"px"; dz.style.height=v.h+"px";
-    deck.style.left=c.x+"px"; deck.style.top=c.y+"px"; deck.style.width=c.w+"px"; deck.style.height=c.h+"px";
-    dz.classList.toggle("hidden", !state.guide);
-    dzLabel.textContent = LAYOUTS.find(l=>l[0]===state.layout)[1];
-    document.querySelectorAll("#layoutRow button").forEach(b=>b.classList.toggle("on", b.dataset.l===state.layout));
-    drawZones();
-    sizeCanvases();
-  }
+  const svg=`<svg class="tvframe" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">${R.join('')}</svg>`;
+  const old=host.querySelector('.tvframe'); if(old) old.remove();
+  host.insertAdjacentHTML('afterbegin', svg);
 
-  // side buttons
-  const row = document.getElementById("layoutRow");
-  LAYOUTS.forEach(([id,label])=>{
-    const b=document.createElement("button");
-    b.textContent=label; b.dataset.l=id;
-    b.onclick=()=>{ state.layout=id; apply(); };
-    row.appendChild(b);
+  const gl=$('#glass'); gl.style.cssText=`left:${B}px;top:${B}px;right:${B}px;bottom:${CHIN}px`;
+  const hint=$('#hint'); hint.style.cssText=`left:${B}px;top:${B}px;right:${B}px;bottom:${CHIN}px`;
+}
+
+/* ---------------- edit-layout mode ---------------- */
+function buildTargets(){
+  const wrap=$('#edit');
+  wrap.querySelectorAll('.target').forEach(n=>n.remove());
+  const {AW,AH,cw,ch} = metrics();
+  const mid = AW - 2*(MX+cw+8);
+  const defs = {
+    topLeft:{x:MX,y:MY,w:cw,h:ch},
+    topRight:{x:AW-MX-cw,y:MY,w:cw,h:ch},
+    bottomLeft:{x:MX,y:AH-MY-ch,w:cw,h:ch},
+    bottomRight:{x:AW-MX-cw,y:AH-MY-ch,w:cw,h:ch},
+    top:{x:MX+cw+8,y:MY,w:mid,h:ch},
+    bottom:{x:MX+cw+8,y:AH-MY-ch,w:mid,h:ch},
+  };
+  for(const k of LAYOUTS){
+    const r=defs[k], t=el('div','target'+(k===st.layout?' sel':''));
+    t.style.cssText+=`left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px`;
+    t.innerHTML=`<span class="lab">${LABELS[k]}${k===st.layout?' ✓':''}</span>`;
+    t.onclick=()=>{ setLayout(k); closeEdit(); };
+    wrap.appendChild(t);
+  }
+  // headline vertical position: middle of the free content zone
+  const g=solve(st.layout);
+  $('#editHead').style.top = (g.content.y + g.content.h/2 - 18)+'px';
+  $('#editSub').style.top  = (g.content.y + g.content.h/2 + 6)+'px';
+}
+function openEdit(){ st.editing=true; buildTargets(); $('#edit').classList.add('on'); $('#controls').style.opacity=0; }
+function closeEdit(){ st.editing=false; $('#edit').classList.remove('on'); $('#controls').style.opacity=1; }
+function setLayout(k){
+  st.layout=k; LS.set('layout',k);
+  $('#video').classList.remove('dim');
+  clearTimeout(setLayout._t); setLayout._t=setTimeout(()=>$('#video').classList.add('dim'), 4500);
+  render();
+}
+
+/* ---------------- tabs ---------------- */
+function setTab(k){
+  st.tab=k; LS.set('tab',k);
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===k));
+  document.querySelectorAll('.mod').forEach(m=>m.hidden = m.dataset.mod!==k);
+  const g=solve(st.layout); layoutModules(g.content);
+  if(k==='game') resetRunner();
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>setTab(t.dataset.tab));
+
+/* ---------------- modules ---------------- */
+function layoutModules(content){
+  [dCv,rCv].forEach(cv=>{
+    const r=cv.getBoundingClientRect();
+    if(r.width<2) return;
+    cv.width=r.width*devicePixelRatio; cv.height=r.height*devicePixelRatio;
   });
+  paintDoodle();
+}
 
-  // in-app sheet diagrams
-  function buildDiagrams(){
-    document.querySelectorAll(".mini-phone").forEach(mp=>{
-      mp.innerHTML="";
-      const kind = mp.dataset.kind;
-      const W=mp.clientWidth, H=mp.clientHeight, i=8;
-      const defs = kind==="corners"
-        ? [["smallTopLeft",i,i],["smallTopRight",W/2+i/2,i],["smallBottomLeft",i,H/2+i/2],["smallBottomRight",W/2+i/2,H/2+i/2]]
-        : [["largeTop",i,i],["largeBottom",i,H*0.5]];
-      const zw = kind==="corners" ? (W-i*3)/2 : W-i*2;
-      const zh = kind==="corners" ? zw*9/16 : H*0.44;
-      defs.forEach(([id,x,y])=>{
-        const z=document.createElement("div");
-        z.className="zone"+(state.layout===id?" sel":"");
-        z.style.cssText+=`left:${x}px;top:${y}px;width:${zw}px;height:${zh}px`;
-        z.dataset.l=id;
-        z.textContent = state.layout===id ? "✓" : "";
-        z.onclick=()=>{ state.layout=id; apply(); };
-        mp.appendChild(z);
-      });
-    });
-  }
-  function drawZones(){ buildDiagrams(); }
+/* doodle */
+const dCv=$('#doodleCv'), dCtx=dCv.getContext('2d');
+let strokes=LS.get('doodle',[]), curStroke=null, inkColor='#F2B950';
+document.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{inkColor=s.dataset.c;document.querySelectorAll('.sw').forEach(x=>x.classList.toggle('on',x===s));});
+$('#dUndo').onclick=()=>{strokes.pop();LS.set('doodle',strokes);paintDoodle();};
+$('#dClear').onclick=()=>{strokes=[];LS.set('doodle',strokes);paintDoodle();};
+const dp=e=>{const r=dCv.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:(t.clientX-r.left)/r.width,y:(t.clientY-r.top)/r.height};};
+dCv.addEventListener('pointerdown',e=>{e.preventDefault();curStroke={c:inkColor,p:[dp(e)]};strokes.push(curStroke);});
+dCv.addEventListener('pointermove',e=>{if(!curStroke)return;e.preventDefault();curStroke.p.push(dp(e));paintDoodle();});
+window.addEventListener('pointerup',()=>{if(curStroke){LS.set('doodle',strokes);curStroke=null;}});
+function paintDoodle(){
+  const w=dCv.width,h=dCv.height; dCtx.clearRect(0,0,w,h);
+  dCtx.lineCap='round';dCtx.lineJoin='round';
+  strokes.forEach(s=>{dCtx.strokeStyle=s.c;dCtx.lineWidth=5*devicePixelRatio;dCtx.beginPath();
+    s.p.forEach((p,i)=>{const x=p.x*w,y=p.y*h;i?dCtx.lineTo(x,y):dCtx.moveTo(x,y);});dCtx.stroke();});
+}
 
-  // sheet open/close
-  const scrim=document.getElementById("scrim");
-  document.getElementById("gear").onclick=()=>scrim.classList.add("open");
-  document.getElementById("sheetDone").onclick=()=>scrim.classList.remove("open");
-  scrim.onclick=e=>{ if(e.target===scrim) scrim.classList.remove("open"); };
-  const gt=document.getElementById("guideToggle");
-  gt.onclick=()=>{ state.guide=!state.guide; gt.classList.toggle("on",state.guide); apply(); };
+/* notes */
+const notes=$('#notes'); notes.value=LS.get('notes','');
+notes.addEventListener('input',()=>LS.set('notes',notes.value));
 
-  // tabs
-  document.querySelectorAll(".tab").forEach(t=>{
-    t.onclick=()=>{
-      state.tab=t.dataset.tab;
-      document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===t));
-      document.querySelectorAll(".mod").forEach(m=>m.hidden = m.dataset.mod!==state.tab);
-      sizeCanvases();
-      if(state.tab==="game") resetRunner();
-    };
-  });
-
-  /* ---------- doodle ---------- */
-  const dcv=document.getElementById("doodle"), dctx=dcv.getContext("2d");
-  let strokes=[], cur=null, color="#F2B950";
-  document.querySelectorAll(".swatch").forEach(s=>{
-    s.onclick=()=>{ color=s.dataset.c; document.querySelectorAll(".swatch").forEach(x=>x.classList.toggle("on",x===s)); };
-  });
-  document.getElementById("undo").onclick=()=>{ strokes.pop(); paintDoodle(); };
-  document.getElementById("clear").onclick=()=>{ strokes=[]; paintDoodle(); };
-  const dpos=e=>{ const r=dcv.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return {x:(t.clientX-r.left)/r.width,y:(t.clientY-r.top)/r.height}; };
-  const startD=e=>{ e.preventDefault(); cur={color,w:5,pts:[dpos(e)]}; strokes.push(cur); };
-  const moveD=e=>{ if(!cur)return; e.preventDefault(); cur.pts.push(dpos(e)); paintDoodle(); };
-  const endD=()=>{ cur=null; };
-  dcv.addEventListener("pointerdown",startD); dcv.addEventListener("pointermove",moveD);
-  window.addEventListener("pointerup",endD);
-  function paintDoodle(){
-    const w=dcv.width, h=dcv.height;
-    dctx.clearRect(0,0,w,h);
-    strokes.forEach(s=>{
-      dctx.strokeStyle=s.color; dctx.lineWidth=s.w*devicePixelRatio; dctx.lineCap="round"; dctx.lineJoin="round";
-      dctx.beginPath();
-      s.pts.forEach((p,i)=>{ const x=p.x*w,y=p.y*h; i?dctx.lineTo(x,y):dctx.moveTo(x,y); });
-      dctx.stroke();
-    });
-  }
-
-  /* ---------- runner ---------- */
-  const rcv=document.getElementById("runner"), rctx=rcv.getContext("2d");
-  const rmsg=document.getElementById("runnerMsg"), scoreEl=document.getElementById("score"), bestEl=document.getElementById("best");
-  let R=null, best=0;
-  function resetRunner(){
-    R={phase:"ready",py:0,vy:0,obs:[],score:0,speed:340,spawn:1.1,t:performance.now(),ground:0};
-    scoreEl.textContent="0"; showMsg("Tap to run","Tap anywhere to hop the cactus");
-  }
-  function showMsg(a,b){ rmsg.innerHTML=`<div class="m1">${a}</div><div class="m2">${b}</div>`; rmsg.style.display="flex"; }
-  rcv.addEventListener("pointerdown",e=>{
-    e.preventDefault();
-    if(!R||R.phase==="ready"||R.phase==="over"){ const b=best; resetRunner(); R.phase="running"; rmsg.style.display="none"; best=b; }
-    else if(R.phase==="running" && R.py<=0.5){ R.vy=980; }
-  });
-  function stepRunner(now){
-    if(!R){ requestAnimationFrame(stepRunner); return; }
-    const dt=Math.min((now-R.t)/1000, 1/30); R.t=now;
-    const w=rcv.width/devicePixelRatio, h=rcv.height/devicePixelRatio;
-    const groundY=h-24, PS=30, PX=48;
-    if(R.phase==="running"){
+/* runner (endless hopper) */
+const rCv=$('#runnerCv'), rCtx=rCv.getContext('2d');
+const rScore=$('#rScore'), rBest=$('#rBest'), rMsg=$('#rMsg');
+let R=null, best=LS.get('runnerBest',0);
+rBest.textContent='Best '+best;
+function resetRunner(){ R={phase:'ready',py:0,vy:0,obs:[],score:0,speed:340,spawn:1.1,t:performance.now(),g:0}; rScore.textContent='0'; msg('Tap to run','Tap to hop the cactus'); }
+function msg(a,b){ rMsg.innerHTML=`<div class="m1">${a}</div><div class="m2">${b}</div>`; rMsg.style.display='flex'; }
+rCv.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  if(!R||R.phase==='ready'||R.phase==='over'){ resetRunner(); R.phase='running'; rMsg.style.display='none'; }
+  else if(R.phase==='running' && R.py<=0.5) R.vy=980;
+});
+function runLoop(now){
+  if(R){
+    const w=rCv.width/devicePixelRatio, h=rCv.height/devicePixelRatio;
+    const gy=h-22, PS=28, PX=46;
+    if(R.phase==='running'){
+      const dt=Math.min((now-R.t)/1000,1/30);
       R.speed=Math.min(760,340+R.score*1.6);
       R.vy-=3200*dt; R.py+=R.vy*dt; if(R.py<=0){R.py=0;R.vy=0;}
-      R.ground=(R.ground+R.speed*dt)%22;
-      R.obs.forEach(o=>o.x-=R.speed*dt);
-      R.obs=R.obs.filter(o=>o.x+o.w>-4);
+      R.g=(R.g+R.speed*dt)%22;
+      R.obs.forEach(o=>o.x-=R.speed*dt); R.obs=R.obs.filter(o=>o.x+o.w>-4);
       R.spawn-=dt;
-      if(R.spawn<=0){ const oh=18+Math.random()*30; R.obs.push({x:w+20,w:12+Math.random()*10,h:oh}); R.spawn=Math.max(0.7,(0.95+Math.random()*0.8)*(340/R.speed)); }
-      R.score+=dt*14; scoreEl.textContent=Math.floor(R.score);
-      const pb=R.py;
-      for(const o of R.obs){ if(PX<o.x+o.w && PX+PS>o.x && pb<o.h){ R.phase="over"; best=Math.max(best,Math.floor(R.score)); showMsg("Game Over",`Score ${Math.floor(R.score)} · tap to retry`); } }
+      if(R.spawn<=0){ R.obs.push({x:w+16,w:12+Math.random()*10,h:16+Math.random()*26}); R.spawn=Math.max(0.7,(0.95+Math.random()*0.8)*(340/R.speed)); }
+      R.score+=dt*14; rScore.textContent=Math.floor(R.score);
+      for(const o of R.obs){ if(PX<o.x+o.w && PX+PS>o.x && R.py<o.h){ R.phase='over'; best=Math.max(best,Math.floor(R.score)); LS.set('runnerBest',best); rBest.textContent='Best '+best; msg('Game Over','Score '+Math.floor(R.score)+' · tap to retry'); } }
     }
-    bestEl.textContent="Best "+Math.max(best,Math.floor(R?.score||0));
-    // draw
-    rctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-    rctx.clearRect(0,0,w,h);
-    rctx.strokeStyle="rgba(235,235,235,.55)"; rctx.lineWidth=2;
-    rctx.beginPath(); rctx.moveTo(0,groundY); rctx.lineTo(w,groundY); rctx.stroke();
-    rctx.strokeStyle="rgba(235,235,235,.22)";
-    for(let x=-R.ground;x<w;x+=22){ rctx.beginPath(); rctx.moveTo(x,groundY+6); rctx.lineTo(x+9,groundY+6); rctx.stroke(); }
-    rctx.fillStyle="#f5b86b";
-    rrect(rctx,PX,groundY-PS-R.py,PS,PS,7); rctx.fill();
-    rctx.fillStyle="rgba(235,235,235,.82)";
-    R.obs.forEach(o=>{ rrect(rctx,o.x,groundY-o.h,o.w,o.h,3); rctx.fill(); });
-    requestAnimationFrame(stepRunner);
+    R.t=now;
+    rCtx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); rCtx.clearRect(0,0,w,h);
+    const ink=getComputedStyle(document.documentElement).getPropertyValue('--ink').trim()||'#eee';
+    rCtx.strokeStyle=ink; rCtx.globalAlpha=.5; rCtx.lineWidth=2;
+    rCtx.beginPath(); rCtx.moveTo(0,gy); rCtx.lineTo(w,gy); rCtx.stroke();
+    rCtx.globalAlpha=.25; for(let x=-R.g;x<w;x+=22){rCtx.beginPath();rCtx.moveTo(x,gy+6);rCtx.lineTo(x+9,gy+6);rCtx.stroke();}
+    rCtx.globalAlpha=1;
+    rCtx.fillStyle='#f5b86b'; rr(rCtx,PX,gy-PS-R.py,PS,PS,7); rCtx.fill();
+    rCtx.fillStyle=ink; rCtx.globalAlpha=.8;
+    R.obs.forEach(o=>{ rr(rCtx,o.x,gy-o.h,o.w,o.h,3); rCtx.fill(); });
+    rCtx.globalAlpha=1;
   }
-  function rrect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
-  requestAnimationFrame(stepRunner);
+  requestAnimationFrame(runLoop);
+}
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+requestAnimationFrame(runLoop);
 
-  /* ---------- canvas sizing ---------- */
-  function sizeCanvases(){
-    [dcv,rcv].forEach(cv=>{
-      const r=cv.getBoundingClientRect();
-      if(r.width<2) return;
-      cv.width=r.width*devicePixelRatio; cv.height=r.height*devicePixelRatio;
-    });
-    paintDoodle();
-  }
+/* ---------------- controls & edit wiring ---------------- */
+$('#btnLayout').onclick = ()=> st.editing ? closeEdit() : openEdit();
+$('#editX').onclick = closeEdit;
+$('#editScrim').onclick = closeEdit;
 
-  window.addEventListener("resize",apply);
-  resetRunner();
-  apply();
-  // show the layout sheet once on load, like first launch
-  setTimeout(()=>scrim.classList.add("open"), 350);
+/* ---------------- theme / safe-area ---------------- */
+function applyTheme(){
+  const r=document.documentElement;
+  if(st.theme==='system') r.removeAttribute('data-theme');
+  else r.setAttribute('data-theme',st.theme);
+}
+function applySimSafe(){
+  const r=document.documentElement.style;
+  if(st.simTop!=null) r.setProperty('--sim-top', st.simTop+'px');
+  if(st.simBot!=null) r.setProperty('--sim-bot', st.simBot+'px');
+}
+
+/* ---------------- debug overlay ---------------- */
+function drawDebug(g){
+  document.querySelectorAll('.dbg').forEach(n=>n.remove());
+  if(!st.debug) return;
+  const s=$('#surface');
+  const add=(r,name,col)=>{const d=el('div','dbg');d.style.cssText=`left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;border-color:${col};color:${col}`;d.textContent=`${name} ${Math.round(r.w)}×${Math.round(r.h)}`;s.appendChild(d);};
+  add(g.video,'video','#ff5a3c'); add(g.content,'content','#0fb'); add(g.tab,'tab','#6cf'); add(g.ctrl,'ctrl','#fd6');
+}
+
+/* ---------------- settings sheet ---------------- */
+function openSettings(){ renderSettings(); $('#setScrim').classList.add('on'); }
+function closeSettings(){ $('#setScrim').classList.remove('on'); }
+$('#btnSettings').onclick = openSettings;
+$('#setScrim').onclick = e=>{ if(e.target.id==='setScrim') closeSettings(); };
+
+function renderSettings(){
+  const b=$('#setBody'); b.innerHTML='';
+  const H=t=>{const h=el('div','sh-h');h.textContent=t;b.appendChild(h);};
+  const Card=()=>{const c=el('div','card');b.appendChild(c);return c;};
+  const Row=(host,label,ctrl,desc)=>{
+    const r=el('div','row');const L=el('div');L.innerHTML=`<div>${label}</div>${desc?`<div class="r-desc">${desc}</div>`:''}`;
+    r.appendChild(L);r.appendChild(ctrl);host.appendChild(r);return r;
+  };
+  const Toggle=(val,on)=>{const t=el('div','toggle'+(val?' on':''));t.onclick=()=>{t.classList.toggle('on');on(t.classList.contains('on'));};return t;};
+
+  H('Video layout');
+  let c=Card();
+  const lb=el('button','btn ghost');lb.textContent='⧉  Change video position';lb.onclick=()=>{closeSettings();setTimeout(openEdit,260);};c.appendChild(lb);
+  Row(c,'Show “drag here” hint', Toggle(st.showHint,v=>{st.showHint=v;LS.set('showHint',v);render();}),'text inside the empty TV frame');
+
+  H('Appearance');
+  c=Card();
+  const seg=el('div','seg');['system','dark','light'].forEach(m=>{const x=el('button');x.textContent=m[0].toUpperCase()+m.slice(1);x.classList.toggle('on',st.theme===m);x.onclick=()=>{st.theme=m;LS.set('theme',m);applyTheme();renderSettings();};seg.appendChild(x);});
+  Row(c,'Theme',seg);
+  Row(c,'Haptics', Toggle(st.haptics,v=>{st.haptics=v;LS.set('haptics',v);}),'vibrate on taps (native build)');
+
+  H('Picture-in-Picture — help');
+  c=Card(); c.className='card help';
+  c.innerHTML=`
+    <p><b>Enable PiP on iPhone</b><br>Settings ▸ General ▸ Picture in Picture → turn on <b>Start PiP Automatically</b>.</p>
+    <p><b>Start a floating video</b><br>Play full-screen in the video app, then swipe up to the Home Screen. Drag the window into the TV frame.</p>
+    <p><b>By app</b></p>
+    <ul>
+      <li><b>YouTube</b> — needs Premium for in-app background PiP; otherwise open the video in <b>Safari</b> and swipe up.</li>
+      <li><b>Netflix / Disney+ / Max / Prime Video / Apple TV / Hulu</b> — start playback, then swipe up.</li>
+      <li><b>Twitch</b> — swipe up during a stream.</li>
+      <li><b>Safari</b> — play any video, tap the <b>PiP</b> button in the player controls.</li>
+    </ul>
+    <p><b>Fixes for common glitches</b></p>
+    <ul>
+      <li>Won't shrink to a window → <b>force-quit and reopen</b> the video app.</li>
+      <li>PiP option greyed out → re-check the iOS Setting above.</li>
+      <li>App blocks PiP (some free tiers) → try <b>Safari</b> or another app.</li>
+      <li>Window slid off-screen → <b>swipe inward</b> from that edge to pull it back.</li>
+      <li>Frame doesn't line up → tap <b>⧉</b>, pick the matching spot, then nudge the window to fit.</li>
+      <li>Black window / audio only → close the video and start it again.</li>
+    </ul>`;
+
+  H('About');
+  c=Card(); c.className='card help';
+  c.innerHTML=`<p><b>Docked</b> turns the space around your floating video into a doodle pad, a notepad and a quick game — and keeps every control out from under the video. <br><br>Version 1.0 · prototype</p>`;
+
+  H('Developer');
+  c=Card();
+  const mk=(txt,cls,fn)=>{const x=el('button','btn '+cls);x.textContent=txt;x.onclick=fn;c.appendChild(x);};
+  mk('Replay onboarding','ghost',()=>{closeSettings();LS.del('onboarded');startOnboarding(true);});
+  mk('Reset high score','ghost',()=>{best=0;LS.set('runnerBest',0);rBest.textContent='Best 0';flash('High score reset');});
+  Row(c,'Debug overlay', Toggle(st.debug,v=>{st.debug=v;render();}),'show region rectangles + sizes');
+  // force layout
+  const fl=el('div');fl.style.marginTop='8px';
+  LAYOUTS.forEach(k=>{const p=el('span','pill'+(k===st.layout?' on':''));p.textContent=LABELS[k];p.onclick=()=>{setLayout(k);renderSettings();};fl.appendChild(p);});
+  Row(c,'Force layout',el('span'));c.appendChild(fl);
+  // simulated safe area
+  const mkSlider=(label,val,min,max,fn)=>{
+    const r=el('div','row');const L=el('div');L.innerHTML=`<div>${label}</div><div class="r-desc">desktop testing — <span>${val}px</span></div>`;
+    const inp=el('input');inp.type='range';inp.min=min;inp.max=max;inp.value=val;inp.style.width='120px';
+    inp.oninput=()=>{L.querySelector('span').textContent=inp.value+'px';fn(+inp.value);};
+    r.appendChild(L);r.appendChild(inp);c.appendChild(r);
+  };
+  mkSlider('Sim. safe-area top', st.simTop??59, 40, 66, v=>{st.simTop=v;LS.set('simTop',v);applySimSafe();render();});
+  mkSlider('Sim. safe-area bottom', st.simBot??34, 20, 44, v=>{st.simBot=v;LS.set('simBot',v);applySimSafe();render();});
+  mk('Clear ALL app data','warn',()=>{
+    ['layout','tab','showHint','theme','haptics','notes','doodle','runnerBest','onboarded','simTop','simBot'].forEach(LS.del);
+    location.reload();
+  });
+}
+function flash(t){
+  const f=el('div');f.textContent=t;
+  f.style.cssText='position:fixed;left:50%;bottom:calc(60px + var(--sab));transform:translateX(-50%);background:#000c;color:#fff;padding:8px 14px;border-radius:10px;z-index:99;font-size:13px;font-weight:700';
+  document.body.appendChild(f); setTimeout(()=>f.remove(),1400);
+}
+
+/* ---------------- onboarding ---------------- */
+let obIdx=0;
+function startOnboarding(force){
+  if(!force && LS.get('onboarded',false)) return;
+  obIdx=0; updateOb(); $('#ob').classList.add('on');
+}
+function updateOb(){
+  $('#obTrack').style.transform=`translateX(${-obIdx*100}%)`;
+  document.querySelectorAll('#obDots .dot').forEach((d,i)=>d.classList.toggle('on',i===obIdx));
+  $('#obNext').textContent = obIdx===2 ? 'Get started' : 'Next';
+}
+$('#obNext').onclick=()=>{ if(obIdx<2){obIdx++;updateOb();} else finishOb(); };
+$('#obSkip').onclick=finishOb;
+function finishOb(){ LS.set('onboarded',true); $('#ob').classList.remove('on'); }
+
+/* ---------------- boot ---------------- */
+setTab(st.tab);
+render();
+window.addEventListener('resize',()=>{ render(); if(st.editing) buildTargets(); });
+setTimeout(()=>$('#video').classList.add('dim'), 5000);
+startOnboarding(false);
 })();
 </script>
 </body>

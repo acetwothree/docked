@@ -19,7 +19,30 @@ enum Theme {
     static let pagePadding: CGFloat = 16
 
     /// The one animation used whenever the layout shifts around the video.
-    static let layoutAnimation: Animation = .spring(response: 0.45, dampingFraction: 0.86)
+    static let layoutAnimation: Animation = .spring(response: 0.5, dampingFraction: 0.82)
+
+    /// Adaptive elevated surface (tab bar, control buttons, sheets).
+    static let elevated = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0.10, green: 0.10, blue: 0.13, alpha: 1)
+            : UIColor(red: 0.95, green: 0.96, blue: 0.98, alpha: 1)
+    })
+
+    /// Hairline separators / strokes.
+    static let hairline = Color.primary.opacity(0.10)
+
+    // MARK: Pixel-art CRT frame palette (warm retro plastic)
+    enum TV {
+        static let key   = Color(red: 0.125, green: 0.098, blue: 0.078)
+        static let hi    = Color(red: 0.914, green: 0.804, blue: 0.612)
+        static let tan   = Color(red: 0.788, green: 0.624, blue: 0.400)
+        static let mid   = Color(red: 0.714, green: 0.533, blue: 0.310)
+        static let lo    = Color(red: 0.541, green: 0.416, blue: 0.239)
+        static let deep  = Color(red: 0.373, green: 0.290, blue: 0.173)
+        static let glass = Color(red: 0.078, green: 0.063, blue: 0.098)
+        static let led   = Color(red: 1.0, green: 0.353, blue: 0.235)
+        static let ledHi = Color(red: 1.0, green: 0.839, blue: 0.776)
+    }
 
     /// Warm amber accent. Defined as a literal (not the asset) so it renders
     /// identically inside `Canvas`, which has no environment tint.

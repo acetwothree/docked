@@ -24,21 +24,13 @@ struct RunnerGameView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                    .fill(Theme.paper)
-
                 // `tick` changes every frame, so this subview — and its
                 // Canvas renderer — is rebuilt at ~60 fps.
                 gameCanvas(size: geo.size, tick: lastTick)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
 
                 hud
 
                 messageOverlay
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                    .strokeBorder(Theme.ink.opacity(0.08))
             }
             .contentShape(Rectangle())
             .onTapGesture { game.tap() }

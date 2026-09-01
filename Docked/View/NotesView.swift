@@ -3,7 +3,7 @@
 //  Docked
 //
 //  A plain scratchpad. `TextEditor` bound straight to `NotesStore.text`,
-//  which autosaves. A placeholder shows through while empty.
+//  which autosaves. Fills the content area; a slim footer floats at the base.
 //
 
 import SwiftUI
@@ -15,30 +15,24 @@ struct NotesView: View {
     var body: some View {
         @Bindable var store = store
 
-        VStack(alignment: .leading, spacing: 8) {
+        ZStack(alignment: .bottom) {
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                    .fill(Theme.paper)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                            .strokeBorder(Theme.ink.opacity(0.08))
-                    }
-
                 if store.text.isEmpty {
-                    Text("Jot down quotes, timestamps, show notes…")
+                    Text("Jot quotes, timestamps, show notes…")
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 18)
                         .padding(.vertical, 20)
                         .allowsHitTesting(false)
                 }
-
                 TextEditor(text: $store.text)
                     .focused($focused)
                     .scrollContentBackground(.hidden)
                     .font(.body)
-                    .padding(12)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 10)
+                    .padding(.bottom, 40)
             }
-            .frame(maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             footer
         }
@@ -49,23 +43,16 @@ struct NotesView: View {
             Text("\(wordCount) words · \(store.text.count) chars")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-
             Spacer()
-
             if focused {
-                Button("Done") { focused = false }
-                    .font(.callout.weight(.semibold))
+                Button("Done") { focused = false }.font(.callout.weight(.semibold))
             }
-
-            Button(role: .destructive) {
-                store.text = ""
-            } label: {
-                Image(systemName: "trash")
-            }
-            .font(.system(size: 16, weight: .semibold))
-            .disabled(store.text.isEmpty)
+            Button(role: .destructive) { store.text = "" } label: { Image(systemName: "trash") }
+                .font(.system(size: 15, weight: .semibold))
+                .disabled(store.text.isEmpty)
         }
-        .padding(.horizontal, 2)
+        .padding(.horizontal, 12).padding(.vertical, 7)
+        .background(.ultraThinMaterial)
     }
 
     private var wordCount: Int {
