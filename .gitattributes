@@ -1,0 +1,10 @@
+# Keep LF in the repo for everything. The TestFlight workflow's shell scripts
+# and the Xcode project files break or churn if they land with CRLF on the
+# macOS CI runner.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
+*.p12 binary
+*.mobileprovision binary
