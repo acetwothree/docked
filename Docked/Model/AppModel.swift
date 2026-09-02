@@ -32,6 +32,7 @@ final class AppModel {
         static let onboarded = "docked.onboarded"
         static let debug = "docked.debugOverlay"
         static let highScore = "docked.runner.highScore"
+        static let zenHigh = "docked.zen.highScore"
     }
 
     var layout: VideoLayout { didSet { store(layout.rawValue, K.layout) } }
@@ -42,6 +43,7 @@ final class AppModel {
     var hasOnboarded: Bool { didSet { store(hasOnboarded, K.onboarded) } }
     var debugOverlay: Bool { didSet { store(debugOverlay, K.debug) } }
     var runnerHighScore: Int { didSet { store(runnerHighScore, K.highScore) } }
+    var zenHighScore: Int { didSet { store(zenHighScore, K.zenHigh) } }
 
     /// Transient — true while the tap-to-place layout editor is open.
     var isEditingLayout = false
@@ -56,6 +58,7 @@ final class AppModel {
         hasOnboarded = d.bool(forKey: K.onboarded)
         debugOverlay = d.bool(forKey: K.debug)
         runnerHighScore = d.integer(forKey: K.highScore)
+        zenHighScore = d.integer(forKey: K.zenHigh)
     }
 
     private func store(_ value: Any, _ key: String) {
@@ -70,6 +73,7 @@ final class AppModel {
         notes.text = ""
         doodle.clear()
         runnerHighScore = 0
+        zenHighScore = 0
         layout = .top
         module = .doodle
         showHint = true

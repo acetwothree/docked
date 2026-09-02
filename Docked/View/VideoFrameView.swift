@@ -80,7 +80,7 @@ struct VideoFrameView: View {
             guard ww > 0, hh > 0 else { return }
             ctx.fill(Path(CGRect(x: x, y: y, width: ww, height: hh)), with: .color(c))
         }
-        let T = Theme.TV.self
+        typealias T = Theme.TV
 
         // base plate + body
         fill(0, 0, w, h, T.key)

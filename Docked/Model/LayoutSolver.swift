@@ -13,11 +13,9 @@ import CoreGraphics
 struct SolvedLayout {
     var video: CGRect
     var tab: CGRect
-    var tabIsHeader: Bool          // true = tabs pinned to the top, false = bottom
-    var content: CGRect
-    var controls: CGRect
-    var controlsIsSideStrip: Bool  // true = beside a corner video, false = floating in content
-    var showsChip: Bool
+    var tabIsHeader: Bool     // true = tabs pinned to the top, false = bottom
+    var content: CGRect       // doodle / notes / runner — full-width band away from the video
+    var zenField: CGRect      // zen puzzle — everything except the tab bar
     var isCorner: Bool
     var occupiesTop: Bool
 }
@@ -63,32 +61,15 @@ enum LayoutSolver {
         let cBot = occupiesTop ? tab.minY - G : video.minY - G
         let content = CGRect(x: MX, y: cTop, width: W - MX * 2, height: max(60, cBot - cTop))
 
-        // Controls: beside a corner video, or floating in the content corner
-        // nearest the tab bar for the band layouts.
-        var controls: CGRect
-        var sideStrip = false
-        var showsChip = false
-        if let side = layout.cornerSide {
-            sideStrip = true
-            showsChip = true
-            switch side {
-            case .left:
-                let x = video.maxX + G
-                controls = CGRect(x: x, y: video.minY, width: W - MX - x, height: video.height)
-            case .right:
-                controls = CGRect(x: MX, y: video.minY, width: video.minX - G - MX, height: video.height)
-            }
-        } else {
-            let cwid: CGFloat = 92, chgt: CGFloat = 42
-            let x = content.maxX - cwid
-            let y = occupiesTop ? content.maxY - chgt : content.minY
-            controls = CGRect(x: x, y: y, width: cwid, height: chgt)
-        }
+        // Zen puzzle uses everything except the tab bar; the video is punched
+        // out of its grid as blocked cells.
+        let zenField = occupiesTop
+            ? CGRect(x: 0, y: 0, width: W, height: H - TAB)
+            : CGRect(x: 0, y: TAB, width: W, height: H - TAB)
 
         return SolvedLayout(
             video: video, tab: tab, tabIsHeader: !occupiesTop,
-            content: content, controls: controls,
-            controlsIsSideStrip: sideStrip, showsChip: showsChip,
+            content: content, zenField: zenField,
             isCorner: isCorner, occupiesTop: occupiesTop
         )
     }

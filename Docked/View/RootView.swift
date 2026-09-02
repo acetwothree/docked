@@ -3,9 +3,11 @@
 //  Docked
 //
 //  The single screen. A GeometryReader gives the safe-area size to
-//  `LayoutSolver`, which returns the rectangle for every region. Everything
-//  is packed edge to edge; only the video slot is left empty. Switching
-//  layouts glides the whole UI with one spring.
+//  `LayoutSolver`, which returns the rectangle for every region. Doodle /
+//  Notes / Runner get the full-width band away from the video; Zen Puzzle
+//  gets the whole area and builds around the video. The tab bar carries the
+//  four modes plus the move-video / settings pair, and always sits on the
+//  edge the video doesn't.
 //
 
 import SwiftUI
@@ -22,21 +24,21 @@ struct RootView: View {
     var body: some View {
         GeometryReader { geo in
             let s = LayoutSolver.solve(app.layout, size: geo.size)
+            let moduleFrame = app.module == .zen ? s.zenField : s.content
 
             ZStack(alignment: .topLeading) {
                 Theme.backdrop.ignoresSafeArea()
 
                 // module content
-                ModuleHost()
-                    .frame(width: s.content.width, height: s.content.height)
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline)
-                    }
-                    .position(x: s.content.midX, y: s.content.midY)
+                moduleHost(solved: s)
+                    .frame(width: moduleFrame.width, height: moduleFrame.height)
+                    .clipShape(RoundedRectangle(cornerRadius: app.module == .zen ? 0 : 20, style: .continuous))
+                    .position(x: moduleFrame.midX, y: moduleFrame.midY)
 
-                // tab bar (header / footer)
-                TabBarView(isHeader: s.tabIsHeader)
+                // tab bar — modes + control pair
+                TabBarView(isHeader: s.tabIsHeader,
+                           onLayout: { withAnimation(.easeInOut(duration: 0.2)) { app.isEditingLayout = true } },
+                           onSettings: { showSettings = true })
                     .frame(width: s.tab.width, height: s.tab.height)
                     .position(x: s.tab.midX, y: s.tab.midY)
 
@@ -44,12 +46,6 @@ struct RootView: View {
                 VideoFrameView(layout: app.layout, dimHint: hintDim)
                     .frame(width: s.video.width, height: s.video.height)
                     .position(x: s.video.midX, y: s.video.midY)
-
-                // floating controls
-                ControlsCluster(solved: s, openSettings: { showSettings = true })
-                    .frame(width: s.controls.width, height: s.controls.height, alignment: .topLeading)
-                    .position(x: s.controls.midX, y: s.controls.midY)
-                    .opacity(app.isEditingLayout ? 0 : 1)
 
                 if app.debugOverlay {
                     DebugOverlay(solved: s)
@@ -70,6 +66,7 @@ struct RootView: View {
             }
             .animation(Theme.layoutAnimation, value: app.layout)
             .animation(.easeInOut(duration: 0.2), value: app.isEditingLayout)
+            .animation(.easeInOut(duration: 0.25), value: app.module)
         }
         .preferredColorScheme(app.theme.colorScheme)
         .sheet(isPresented: $showSettings) {
@@ -90,20 +87,27 @@ struct RootView: View {
             if phase != .active { doodle.saveNow() }
         }
     }
-}
 
-/// Hosts the active activity module, sized by RootView to the content rect.
-private struct ModuleHost: View {
-    @Environment(AppModel.self) private var app
-
-    var body: some View {
-        ZStack {
-            Theme.paper
-            switch app.module {
-            case .doodle: DoodlePadView()
-            case .notes:  NotesView()
-            case .game:   RunnerGameView()
-            }
+    @ViewBuilder
+    private func moduleHost(solved s: SolvedLayout) -> some View {
+        switch app.module {
+        case .doodle:
+            ZStack { Theme.paper; DoodlePadView() }
+                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
+        case .notes:
+            ZStack { Theme.paper; NotesView() }
+                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
+        case .game:
+            ZStack { Theme.paper; RunnerGameView() }
+                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
+        case .zen:
+            ZenPuzzleView(
+                videoRectInField: s.video.offsetBy(dx: -s.zenField.minX, dy: -s.zenField.minY),
+                tabsAreHeader: s.tabIsHeader,
+                isBandLayout: !app.layout.isCorner,
+                layoutKey: app.layout,
+                highScore: app.zenHighScore
+            )
         }
     }
 }
@@ -115,8 +119,8 @@ private struct DebugOverlay: View {
         ZStack(alignment: .topLeading) {
             box(solved.video, "video", .red)
             box(solved.content, "content", .green)
+            box(solved.zenField, "zenField", .cyan)
             box(solved.tab, "tab", .blue)
-            box(solved.controls, "controls", .yellow)
         }
         .allowsHitTesting(false)
     }
