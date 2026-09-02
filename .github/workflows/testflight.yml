@@ -32,6 +32,34 @@ jobs:
           # Bump this as Apple's minimum-SDK requirement moves forward.
           xcode-version: "26"
 
+      - name: Preflight — all 8 secrets present
+        env:
+          DISTRIBUTION_CERTIFICATE_P12_BASE64: ${{ secrets.DISTRIBUTION_CERTIFICATE_P12_BASE64 }}
+          DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+          APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+        run: |
+          missing=0
+          for name in DISTRIBUTION_CERTIFICATE_P12_BASE64 DISTRIBUTION_CERTIFICATE_PASSWORD \
+                      PROVISIONING_PROFILE_BASE64 APPLE_TEAM_ID KEYCHAIN_PASSWORD \
+                      APP_STORE_CONNECT_API_KEY_P8 APPLE_KEY_ID APPLE_ISSUER_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Repository secret '$name' is empty or not set on acetwothree/docked."
+              missing=1
+            else
+              echo "ok: $name"
+            fi
+          done
+          if [ "$missing" = "1" ]; then
+            echo "::error::GitHub secrets are per-repository. Add every secret above under"
+            echo "::error::Settings > Secrets and variables > Actions on THIS repo (same values as stepmates)."
+            exit 1
+          fi
+
       - name: Import signing certificate & provisioning profile
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.DISTRIBUTION_CERTIFICATE_P12_BASE64 }}
@@ -45,21 +73,34 @@ jobs:
           PP_PATH="$RUNNER_TEMP/build_pp.mobileprovision"
           KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
 
-          # Decode the base64 binary secrets back into real files.
-          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERTIFICATE_PATH"
-          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o "$PP_PATH"
+          # Decode the base64 binary secrets back into real files. Strip any
+          # whitespace/newlines a copy-paste may have introduced.
+          printf '%s' "$BUILD_CERTIFICATE_BASE64" | tr -d '[:space:]' | base64 --decode -o "$CERTIFICATE_PATH"
+          printf '%s' "$BUILD_PROVISION_PROFILE_BASE64" | tr -d '[:space:]' | base64 --decode -o "$PP_PATH"
+
+          if [ ! -s "$CERTIFICATE_PATH" ]; then
+            echo "::error::Decoded distribution .p12 is empty — DISTRIBUTION_CERTIFICATE_P12_BASE64 is missing or not valid base64."
+            exit 1
+          fi
+          if ! security cms -D -i "$PP_PATH" > "$RUNNER_TEMP/profile.plist" 2>/dev/null; then
+            echo "::error::Provisioning profile did not decode — re-encode 'Docked AppStore.mobileprovision' as one unbroken base64 line into PROVISIONING_PROFILE_BASE64."
+            exit 1
+          fi
 
           # Job-scoped keychain so codesign finds the cert without touching the
           # runner's default keychain.
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          if ! security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"; then
+            echo "::error::.p12 import failed — DISTRIBUTION_CERTIFICATE_PASSWORD likely doesn't match the .p12."
+            exit 1
+          fi
           security set-key-partition-list -S apple-tool:,apple:,codesign: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH"
 
-          # Install the profile where Xcode looks for it, named by its UUID.
-          security cms -D -i "$PP_PATH" > "$RUNNER_TEMP/profile.plist"
+          # Install the profile where Xcode looks for it, named by its UUID
+          # (profile.plist was already produced + validated above).
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/profile.plist")
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/"$PROFILE_UUID".mobileprovision

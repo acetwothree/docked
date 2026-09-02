@@ -4,10 +4,13 @@ Gets `.github/workflows/testflight.yml` deploying **Docked** to TestFlight on ev
 to `main`. Same pipeline you used for StepMates, minus HealthKit/CloudKit/Push (Docked has
 no special capabilities) and minus XcodeGen (the `.xcodeproj` is committed).
 
-If you already have a **distribution certificate, App Store Connect API key, Team ID and
-keychain password** from StepMates, you can **reuse all of them** — a distribution cert and
-an API key are account-wide, not per-app. You only need the *app-specific* pieces below:
-a new App ID, a new provisioning profile, and a new App Store Connect app record.
+The **certificate, API key, Team ID and keychain password** are *values* you can reuse from
+StepMates — a distribution cert and an API key are account-wide, not per-app. But **GitHub
+secrets live on each repository**, so you still have to add all 8 secrets to
+`acetwothree/docked` (Settings → Secrets and variables → Actions); GitHub never shows you
+an existing secret's value, so keep the originals (`distribution.p12` + its password, the
+`.p8` file, the two IDs) somewhere you can re-paste from. Only the App ID, the provisioning
+profile, and the App Store Connect app record are genuinely new for Docked.
 
 ---
 
@@ -72,8 +75,9 @@ download the `.p8` immediately (one download only), note the **Key ID** and **Is
 
 ## 6. GitHub Secrets
 
-Repo → **Settings → Secrets and variables → Actions → New repository secret**. All eight —
-copy the values straight from StepMates for the six account-wide ones:
+Repo → **Settings → Secrets and variables → Actions → New repository secret**. Add **all
+eight to this repo** (they don't carry over from another repo). Six of the values are the
+same ones you used for StepMates:
 
 | Secret | Value | Notes |
 |---|---|---|
