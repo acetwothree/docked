@@ -3,7 +3,8 @@ name: TestFlight Deploy
 # Every push to main builds & archives (fast "does it compile" feedback).
 # The archive is only exported and UPLOADED to TestFlight when you either:
 #   - run this workflow manually from the Actions tab (workflow_dispatch), or
-#   - put "[deploy]" anywhere in the commit message.
+#   - put the token [deploy] in the commit's SUBJECT line (first line only —
+#     mentions in the body are ignored, so "no [deploy] here" won't trigger).
 # This keeps routine commits from burning App Store Connect's per-app daily
 # upload limit (error 90382). No Mac required.
 
@@ -29,13 +30,25 @@ jobs:
       PROJECT: Docked.xcodeproj
       ARCHIVE_PATH: ${{ github.workspace }}/build/Docked.xcarchive
       EXPORT_PATH: ${{ github.workspace }}/build/export
-      # "true" only for manual runs or commits whose message contains [deploy];
-      # otherwise the run stops after archiving and does not upload.
-      DO_UPLOAD: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[deploy]') }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      - name: Decide whether to upload
+        id: gate
+        # Upload only for a manual run, or when the commit's SUBJECT LINE
+        # (not the body) contains the literal token [deploy]. Checking just the
+        # subject avoids false positives from prose like "no [deploy] here".
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          elif git -C "$GITHUB_WORKSPACE" log -1 --pretty=%s | grep -qF '[deploy]'; then
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Decision: upload=$(tail -n1 "$GITHUB_OUTPUT")"
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -155,14 +168,14 @@ jobs:
           if-no-files-found: ignore
 
       - name: Skipping TestFlight upload
-        if: env.DO_UPLOAD != 'true'
+        if: steps.gate.outputs.upload != 'true'
         run: |
           echo "::notice::Built & archived only. To upload to TestFlight, re-run"
           echo "::notice::this workflow from the Actions tab, or push a commit whose"
           echo "::notice::message contains [deploy]."
 
       - name: Write App Store Connect API key
-        if: env.DO_UPLOAD == 'true'
+        if: steps.gate.outputs.upload == 'true'
         env:
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
@@ -174,7 +187,7 @@ jobs:
           EOF
 
       - name: Export & upload to TestFlight
-        if: env.DO_UPLOAD == 'true'
+        if: steps.gate.outputs.upload == 'true'
         env:
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
