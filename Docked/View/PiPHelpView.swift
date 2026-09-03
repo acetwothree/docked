@@ -29,6 +29,13 @@ struct PiPHelpView: View {
                 stepped("3", "Open Docked, then drag the floating window into the TV frame.")
             }
 
+            Section("Fit the frame to your video") {
+                Text("The **speaker grille** — the ribbed vertical lines on the bottom-left of the TV console — is also the size control. **Drag it up or down** to stretch the screen taller or shorter until the wood border wraps your video with no black bars.")
+                Text("It stays in the same spot no matter what you're doing, so you can re-adjust any time you switch to a video with a different shape.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("By app") {
                 appRow("YouTube", "Needs Premium for background PiP in the app. Otherwise open the video in Safari and swipe up.")
                 appRow("Netflix · Disney+ · Max · Prime Video · Apple TV · Hulu", "Start playback, then swipe up to the Home Screen.")

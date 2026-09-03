@@ -114,10 +114,9 @@ final class ZenPuzzleModel {
         let cleared = clearFullLines()
         if cleared > 0 { score += cleared * 10 + (cleared - 1) * 6 }
 
-        dock[slot] = nil
-        if dock.allSatisfy({ $0 == nil }) {
-            dock = [Self.roll(), Self.roll(), Self.roll()]
-        }
+        // Refill the used slot right away so there are always 3 options —
+        // keeps the 6×6 board approachable.
+        dock[slot] = Self.roll()
 
         let alive = dock.compactMap { $0 }
         if !alive.isEmpty, !alive.contains(where: { self.fitsAnywhere($0) }) {

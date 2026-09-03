@@ -29,7 +29,7 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
 
 enum ActivityModule: String, CaseIterable, Identifiable {
     case doodle, notes, mindmap
-    case game, zen, flow, idle, sand, merge, drop, marble, solitaire
+    case game, zen, flow, idle, sand, merge, drop, marble
     case pop, click, scratch, spinner, ksand
     case tictactoe, connect4, dots
     var id: String { rawValue }
@@ -37,7 +37,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
     var category: ActivityCategory {
         switch self {
         case .doodle, .notes, .mindmap: .create
-        case .game, .zen, .flow, .idle, .sand, .merge, .drop, .marble, .solitaire: .play
+        case .game, .zen, .flow, .idle, .sand, .merge, .drop, .marble: .play
         case .pop, .click, .scratch, .spinner, .ksand: .fidget
         case .tictactoe, .connect4, .dots: .versus
         }
@@ -56,7 +56,6 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .merge: "2048"
         case .drop: "Merge"
         case .marble: "Roll"
-        case .solitaire: "Solitaire"
         case .pop: "Pop"
         case .click: "Clicker"
         case .scratch: "Scratcher"
@@ -80,7 +79,6 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .merge: "square.stack.3d.up.fill"
         case .drop: "circle.grid.2x2.fill"
         case .marble: "circle.fill"
-        case .solitaire: "suit.spade.fill"
         case .pop: "circle.hexagongrid.fill"
         case .click: "hand.tap.fill"
         case .scratch: "rectangle.dashed"

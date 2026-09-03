@@ -22,7 +22,7 @@ struct RootView: View {
     @State private var showPlus = false
     @State private var hintDim = false
     @State private var stretchStart: CGFloat? = nil
-    @State private var showStretchHint = true
+    @State private var stretching = false
 
     var body: some View {
         GeometryReader { safeGeo in
@@ -63,7 +63,7 @@ struct RootView: View {
                 // real knob buttons, dropped onto the drawn wells
                 consoleKnobs(s)
 
-                // drag handle to stretch the screen to any video's height
+                // the speaker grille doubles as the "stretch screen" control
                 stretchHandle(s)
 
                 if app.debugOverlay {
@@ -143,37 +143,41 @@ struct RootView: View {
             #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    /// A grabber on the bottom edge of the screen — drag it to stretch the TV
-    /// down so the border wraps whatever video you have playing.
+    /// The speaker grille on the bottom-left of the console is the screen-fit
+    /// control: drag it up or down to stretch the TV so the border wraps
+    /// whatever video is playing. It's always on screen, so there's no
+    /// separate grabber to find. Onboarding + Settings ▸ How to use explain it.
     private func stretchHandle(_ s: SolvedLayout) -> some View {
-        let y = s.pip.maxY - 2
-        return VStack(spacing: 2) {
-            Capsule().fill(Theme.accent).frame(width: 40, height: 5)
-            if showStretchHint {
-                Text("drag to fit your video")
-                    .font(.system(size: 9, weight: .heavy))
-                    .foregroundStyle(Theme.accent.opacity(0.9))
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(.ultraThinMaterial, in: Capsule())
-            }
+        let zoneW: CGFloat = 84
+        let cx = s.console.minX + 8 + zoneW / 2
+        return ZStack {
+            // A faint up/down cue sitting just right of the drawn grille bars,
+            // so the grille reads as a control without adding clutter.
+            Image(systemName: "arrow.up.and.down")
+                .font(.system(size: 11, weight: .black))
+                .foregroundStyle(app.tvTheme.palette.hi.opacity(stretching ? 0.9 : 0.4))
+                .offset(x: 30)
         }
-        .padding(10)
+        .frame(width: zoneW, height: s.console.height)
         .contentShape(Rectangle())
-        .position(x: s.pip.midX, y: y)
+        .position(x: cx, y: s.console.midY)
         .gesture(
             DragGesture(minimumDistance: 1)
                 .onChanged { v in
-                    if stretchStart == nil { stretchStart = app.tvStretch }
+                    if stretchStart == nil {
+                        stretchStart = app.tvStretch
+                        stretching = true
+                    }
                     let base = stretchStart ?? app.tvStretch
                     app.tvStretch = min(max(base + v.translation.height, LayoutSolver.stretchRange.lowerBound),
                                         LayoutSolver.stretchRange.upperBound)
                 }
                 .onEnded { _ in
                     stretchStart = nil
-                    withAnimation { showStretchHint = false }
+                    withAnimation(.easeOut(duration: 0.2)) { stretching = false }
                 }
         )
-        .accessibilityLabel("Stretch TV screen")
+        .accessibilityLabel("Stretch TV screen to fit your video")
     }
 
     /// The three console knobs, positioned over the wells drawn by VideoFrameView.
@@ -224,7 +228,6 @@ struct RootView: View {
         case .merge:     MergeView()
         case .drop:      MergeDropView()
         case .marble:    MarbleView()
-        case .solitaire: SolitaireView()
         case .pop:       PopView()
         case .click:     ClickPenView()
         case .scratch:   ScratchGameView()

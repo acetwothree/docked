@@ -2,9 +2,9 @@
 //  MergeDropView.swift
 //  Docked
 //
-//  "Merge" — a tiny column dropper. Tap a column to drop the next block; equal
-//  blocks stacked on each other merge into the next tier and everything falls.
-//  Best score persists.
+//  "Merge" — a tiny column dropper. Drag across the board to aim, release over
+//  a column to drop the next block; equal blocks stacked on each other merge
+//  into the next tier and everything falls. Best score persists.
 //
 
 import SwiftUI
@@ -21,6 +21,17 @@ struct MergeDropView: View {
     @State private var over = false
     @State private var dropTick = 0
     @State private var mergeTick = 0
+
+    /// Column currently under the finger while aiming.
+    @State private var hoverCol: Int? = nil
+    /// The block mid-fall — no taps accepted until it lands.
+    @State private var falling: FallingPiece? = nil
+
+    private struct FallingPiece: Equatable {
+        var col: Int
+        var val: Int
+        var y: CGFloat
+    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -54,23 +65,47 @@ struct MergeDropView: View {
                 ZStack(alignment: .topLeading) {
                     RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.05))
                         .frame(width: boardW, height: boardH)
+
+                    // aim highlight for the column under the finger
+                    if let hc = hoverCol, falling == nil, !over {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(color(next).opacity(0.14))
+                            .frame(width: cw - 2, height: boardH)
+                            .position(x: CGFloat(hc) * cw + cw / 2, y: boardH / 2)
+                        // ghost of the block that will drop
+                        blockTile(next, side: cw - 8)
+                            .opacity(0.4)
+                            .position(x: CGFloat(hc) * cw + cw / 2, y: ch / 2)
+                    }
+
                     ForEach(Array(0..<40), id: \.self) { i in
                         cellView(i, cw: cw, ch: ch)
                     }
-                    HStack(spacing: 0) {
-                        ForEach(Array(0..<cols), id: \.self) { c in
-                            Rectangle().fill(Color.clear)
-                                .frame(width: cw, height: boardH)
-                                .contentShape(Rectangle())
-                                .onTapGesture { drop(c) }
-                        }
+
+                    // the block in flight
+                    if let f = falling {
+                        blockTile(f.val, side: cw - 4)
+                            .position(x: CGFloat(f.col) * cw + cw / 2, y: f.y)
                     }
                 }
                 .frame(width: boardW, height: boardH)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { v in
+                            guard !over, falling == nil else { return }
+                            hoverCol = clampCol(Int(v.location.x / cw))
+                        }
+                        .onEnded { v in
+                            defer { hoverCol = nil }
+                            guard !over, falling == nil else { return }
+                            drop(clampCol(Int(v.location.x / cw)), ch: ch)
+                        }
+                )
             }
 
-            Text(over ? "Full — tap ↻" : "Tap a column")
+            Text(over ? "Full — tap ↻" : "Drag to aim, release to drop")
                 .font(.system(size: 12, weight: .heavy)).foregroundStyle(.secondary)
         }
         .padding(14)
@@ -78,6 +113,18 @@ struct MergeDropView: View {
         .sensoryFeedback(.impact(weight: .light), trigger: dropTick)
         .sensoryFeedback(.impact(weight: .medium), trigger: mergeTick)
         .onAppear { if grid.allSatisfy({ $0 == 0 }) { newGame() } }
+    }
+
+    private func blockTile(_ v: Int, side: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(color(v))
+            .overlay {
+                Text("\(1 << v)")
+                    .font(.system(size: side * 0.34, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .minimumScaleFactor(0.5)
+            }
+            .frame(width: side, height: side)
     }
 
     private func cellView(_ i: Int, cw: CGFloat, ch: CGFloat) -> some View {
@@ -105,27 +152,42 @@ struct MergeDropView: View {
 
     // MARK: logic
 
+    private func clampCol(_ x: Int) -> Int { min(max(x, 0), cols - 1) }
+
     private func newGame() {
         grid = Array(repeating: 0, count: 40)
         score = 0
         over = false
+        falling = nil
+        hoverCol = nil
         next = Int.random(in: 1...3)
     }
 
-    private func drop(_ col: Int) {
-        guard !over else { return }
+    private func drop(_ col: Int, ch: CGFloat) {
+        guard !over, falling == nil else { return }
         var landing = -1
         for r in stride(from: rows - 1, through: 0, by: -1) where grid[r * cols + col] == 0 {
             landing = r
             break
         }
         guard landing >= 0 else { return }
-        grid[landing * cols + col] = next
-        dropTick += 1
-        resolve()
-        best = max(best, score)
+
+        let val = next
         next = Int.random(in: 1...3)
-        if topRowFull() { over = true }
+
+        let endY = CGFloat(landing) * ch + ch / 2
+        falling = FallingPiece(col: col, val: val, y: ch / 2)
+        let dur = min(0.36, 0.08 + Double(max(1, landing)) * 0.035)
+        withAnimation(.easeIn(duration: dur)) {
+            falling?.y = endY
+        } completion: {
+            grid[landing * cols + col] = val
+            falling = nil
+            dropTick += 1
+            resolve()
+            best = max(best, score)
+            if topRowFull() { over = true }
+        }
     }
 
     private func topRowFull() -> Bool {

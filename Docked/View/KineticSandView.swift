@@ -2,8 +2,9 @@
 //  KineticSandView.swift
 //  Docked
 //
-//  A zen sand tray. Drag to rake grooves in the sand; "Smooth" flattens it
-//  again. Session only — it's a fidget.
+//  A zen sand tray. Drag to rake grooves in the sand; "Smooth" sweeps a fresh
+//  layer of sand over the tray and flattens it again. Session only — it's a
+//  fidget.
 //
 
 import SwiftUI
@@ -11,10 +12,15 @@ import SwiftUI
 struct KineticSandView: View {
     @State private var strokes: [[CGPoint]] = []
     @State private var current: [CGPoint] = []
+    /// 0 = grooves visible, 1 = fresh sand fully swept over the tray.
+    @State private var smoothWipe: Double = 0
+    @State private var smoothCount = 0
 
     private let sand = Color(red: 0.90, green: 0.83, blue: 0.68)
     private let groove = Color(red: 0.74, green: 0.65, blue: 0.49)
     private let ridge = Color(red: 0.97, green: 0.92, blue: 0.80)
+
+    private var isSmooth: Bool { strokes.isEmpty && current.count < 2 }
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -25,26 +31,47 @@ struct KineticSandView: View {
             }
             .contentShape(Rectangle())
             .gesture(
-                DragGesture(minimumDistance: 0)
+                DragGesture(minimumDistance: 4)
                     .onChanged { v in current.append(v.location) }
                     .onEnded { _ in
                         if current.count > 1 { strokes.append(current) }
                         current = []
                     }
             )
+            .overlay {
+                // The "smoothing" sweep: a fresh sheet of sand fades in over the
+                // grooves, then fades back out once the tray has been cleared.
+                Rectangle()
+                    .fill(sand)
+                    .opacity(smoothWipe)
+                    .allowsHitTesting(false)
+            }
 
             Button {
-                strokes = []
-                current = []
+                smoothOver()
             } label: {
                 Label("Smooth", systemImage: "wind")
                     .font(.system(size: 12, weight: .heavy))
                     .padding(.horizontal, 12).padding(.vertical, 8)
                     .background(.ultraThinMaterial, in: Capsule())
                     .foregroundStyle(.primary)
+                    .opacity(isSmooth ? 0.4 : 1)
             }
             .buttonStyle(.plain)
+            .disabled(isSmooth)
             .padding(14)
+        }
+        .sensoryFeedback(.impact(flexibility: .soft), trigger: smoothCount)
+    }
+
+    private func smoothOver() {
+        guard !isSmooth else { return }
+        smoothCount += 1
+        withAnimation(.easeIn(duration: 0.28)) { smoothWipe = 1 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            strokes = []
+            current = []
+            withAnimation(.easeOut(duration: 0.3)) { smoothWipe = 0 }
         }
     }
 

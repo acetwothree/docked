@@ -14,7 +14,7 @@ struct OnboardingView: View {
     var onDone: () -> Void
 
     @State private var page = 0
-    private let pageCount = 4
+    private let pageCount = 5
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -37,6 +37,7 @@ struct OnboardingView: View {
                 page2.tag(1)
                 page3.tag(2)
                 page4.tag(3)
+                page5.tag(4)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .frame(height: 296)
@@ -85,6 +86,12 @@ struct OnboardingView: View {
     }
 
     private var page4: some View {
+        card(emoji: "🔊", title: "Make it fit your video") {
+            Text("Videos come in different shapes. **Drag the speaker grille** — the ribbed lines on the bottom-left of the TV — up or down to stretch the screen until the wood border hugs your video exactly. It's always right there whenever you need to adjust.")
+        }
+    }
+
+    private var page5: some View {
         card(emoji: "✨", title: "Free, no ads") {
             Text("Docked is free with no ads or tracking. If you want extra games and want to support development, check out **Docked Plus** in Settings — one small monthly subscription, and the core app always stays free.")
         }

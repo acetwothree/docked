@@ -59,15 +59,15 @@ struct DoodlePadView: View {
                 }
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: 5) {
                 ForEach(Array(widths.enumerated()), id: \.offset) { pair in
                     let w = pair.element
                     let on = abs(lineWidth - w) < 0.5
                     Button { lineWidth = w } label: {
                         Circle()
                             .fill(erasing ? Color.secondary : Color(hex: colorHex))
-                            .frame(width: min(w + 6, 26), height: min(w + 6, 26))
-                            .frame(width: 38, height: 34)
+                            .frame(width: min(w + 6, 24), height: min(w + 6, 24))
+                            .frame(width: 33, height: 34)
                             .background(on ? Color.primary.opacity(0.12) : Color.clear,
                                        in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .contentShape(Rectangle())
@@ -77,7 +77,7 @@ struct DoodlePadView: View {
 
                 Button { erasing.toggle() } label: {
                     Image(systemName: "eraser.fill")
-                        .frame(width: 38, height: 34)
+                        .frame(width: 33, height: 34)
                         .foregroundStyle(erasing ? Theme.accent : Color.secondary)
                         .background(erasing ? Theme.accent.opacity(0.15) : Color.clear,
                                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -90,25 +90,25 @@ struct DoodlePadView: View {
                 if let exportImage {
                     ShareLink(item: exportImage,
                               preview: SharePreview("Doodle", image: exportImage)) {
-                        Image(systemName: "square.and.arrow.up").frame(width: 40, height: 34).contentShape(Rectangle())
+                        Image(systemName: "square.and.arrow.up").frame(width: 34, height: 34).contentShape(Rectangle())
                     }
                 } else {
                     Image(systemName: "square.and.arrow.up")
-                        .frame(width: 40, height: 34)
+                        .frame(width: 34, height: 34)
                         .foregroundStyle(.tertiary)
                 }
                 Button { store.undo() } label: {
-                    Image(systemName: "arrow.uturn.backward").frame(width: 40, height: 34).contentShape(Rectangle())
+                    Image(systemName: "arrow.uturn.backward").frame(width: 34, height: 34).contentShape(Rectangle())
                 }
                 .disabled(store.strokes.isEmpty)
                 Button(role: .destructive) { store.clear() } label: {
-                    Image(systemName: "trash").frame(width: 40, height: 34).contentShape(Rectangle())
+                    Image(systemName: "trash").frame(width: 34, height: 34).contentShape(Rectangle())
                 }
                 .disabled(store.strokes.isEmpty)
             }
-            .font(.system(size: 16, weight: .semibold))
+            .font(.system(size: 15, weight: .semibold))
         }
-        .padding(.horizontal, 14).padding(.vertical, 8)
+        .padding(.horizontal, 10).padding(.vertical, 8)
         .background(.ultraThinMaterial)
     }
 
