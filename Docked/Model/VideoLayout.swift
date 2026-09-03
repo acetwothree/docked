@@ -28,15 +28,18 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
 }
 
 enum ActivityModule: String, CaseIterable, Identifiable {
-    case doodle, notes, game, zen, flow, idle, sand, merge, marble, pop, click, scratch, tictactoe
+    case doodle, notes, mindmap
+    case game, zen, flow, idle, sand, merge, drop, marble, solitaire
+    case pop, click, scratch, spinner, ksand
+    case tictactoe, connect4, dots
     var id: String { rawValue }
 
     var category: ActivityCategory {
         switch self {
-        case .doodle, .notes: .create
-        case .game, .zen, .flow, .idle, .sand, .merge, .marble: .play
-        case .pop, .click, .scratch: .fidget
-        case .tictactoe: .versus
+        case .doodle, .notes, .mindmap: .create
+        case .game, .zen, .flow, .idle, .sand, .merge, .drop, .marble, .solitaire: .play
+        case .pop, .click, .scratch, .spinner, .ksand: .fidget
+        case .tictactoe, .connect4, .dots: .versus
         }
     }
 
@@ -44,34 +47,48 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         switch self {
         case .doodle: "Doodle"
         case .notes: "Notes"
+        case .mindmap: "Mind Map"
         case .game: "Runner"
         case .zen: "Blocks"
         case .flow: "Flow"
         case .idle: "Garden Idle"
         case .sand: "Sand Sort"
         case .merge: "2048"
+        case .drop: "Merge"
         case .marble: "Roll"
+        case .solitaire: "Solitaire"
         case .pop: "Pop"
         case .click: "Clicker"
         case .scratch: "Scratcher"
+        case .spinner: "Spinner"
+        case .ksand: "Kinetic Sand"
         case .tictactoe: "Tic-Tac-Toe"
+        case .connect4: "Connect 4"
+        case .dots: "Dots & Boxes"
         }
     }
     var systemImage: String {
         switch self {
         case .doodle: "scribble.variable"
         case .notes: "note.text"
+        case .mindmap: "brain"
         case .game: "figure.run"
         case .zen: "square.grid.2x2.fill"
         case .flow: "point.3.connected.trianglepath.dotted"
         case .idle: "leaf.fill"
         case .sand: "chart.bar.fill"
         case .merge: "square.stack.3d.up.fill"
+        case .drop: "circle.grid.2x2.fill"
         case .marble: "circle.fill"
+        case .solitaire: "suit.spade.fill"
         case .pop: "circle.hexagongrid.fill"
         case .click: "hand.tap.fill"
         case .scratch: "rectangle.dashed"
+        case .spinner: "fan.fill"
+        case .ksand: "hand.draw.fill"
         case .tictactoe: "number"
+        case .connect4: "circle.grid.cross.fill"
+        case .dots: "square.grid.4x3.fill"
         }
     }
 

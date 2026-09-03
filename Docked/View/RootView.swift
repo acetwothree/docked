@@ -165,50 +165,42 @@ struct RootView: View {
 
     @ViewBuilder
     private func moduleHost(solved s: SolvedLayout) -> some View {
-        switch app.module {
-        case .doodle:
-            ZStack { Theme.paper; DoodlePadView() }
-                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
-        case .notes:
-            ZStack { Theme.paper; NotesView() }
-                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
-        case .game:
-            ZStack { Theme.paper; RunnerGameView() }
-                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
-        case .zen:
-            ZenPuzzleView(
-                tabsAreHeader: s.tabIsHeader,
-                layoutKey: app.layout,
-                highScore: app.zenHighScore
-            )
-        case .pop:
-            ZStack { Theme.paper; PopView() }
-                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
-        case .flow:
-            ZStack { Theme.paper; FlowView() }
-                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
-        case .idle:
-            ZStack { Theme.paper; IdleGameView() }
-                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
-        case .merge:
-            ZStack { Theme.paper; MergeView() }
-                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
-        case .marble:
-            ZStack { Theme.paper; MarbleView() }
-                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
-        case .click:
-            ZStack { Theme.paper; ClickPenView() }
-                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
-        case .scratch:
-            ZStack { Theme.paper; ScratchGameView() }
-                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
-        case .sand:
-            ZStack { Theme.paper; SandSortView() }
-                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
-        case .tictactoe:
-            ZStack { Theme.paper; TicTacToeView() }
-                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
+        if app.module == .zen {
+            ZenPuzzleView(tabsAreHeader: s.tabIsHeader, layoutKey: app.layout, highScore: app.zenHighScore)
+        } else {
+            framed(moduleBody)
         }
+    }
+
+    @ViewBuilder
+    private var moduleBody: some View {
+        switch app.module {
+        case .doodle:    DoodlePadView()
+        case .notes:     NotesView()
+        case .mindmap:   MindMapView()
+        case .game:      RunnerGameView()
+        case .flow:      FlowView()
+        case .idle:      IdleGameView()
+        case .sand:      SandSortView()
+        case .merge:     MergeView()
+        case .drop:      MergeDropView()
+        case .marble:    MarbleView()
+        case .solitaire: SolitaireView()
+        case .pop:       PopView()
+        case .click:     ClickPenView()
+        case .scratch:   ScratchGameView()
+        case .spinner:   SpinnerView()
+        case .ksand:     KineticSandView()
+        case .tictactoe: TicTacToeView()
+        case .connect4:  ConnectFourView()
+        case .dots:      DotsBoxesView()
+        case .zen:       EmptyView()   // handled above
+        }
+    }
+
+    private func framed(_ content: some View) -> some View {
+        ZStack { Theme.paper; content }
+            .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
     }
 }
 

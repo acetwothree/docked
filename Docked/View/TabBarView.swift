@@ -68,14 +68,7 @@ struct ActivityPickerPanel: View {
 
     private let cols = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
-    private let soon: [ComingSoon] = [
-        .init(title: "Mind Map",  systemImage: "brain",                     category: .create),
-        .init(title: "Solitaire", systemImage: "suit.spade.fill",          category: .play),
-        .init(title: "Spinner",     systemImage: "fan.fill",               category: .fidget),
-        .init(title: "Kinetic Sand", systemImage: "hand.draw.fill",        category: .fidget),
-        .init(title: "Connect 4",    systemImage: "circle.grid.cross.fill", category: .versus),
-        .init(title: "Dots & Boxes", systemImage: "square.grid.4x3.fill",   category: .versus),
-    ]
+    private let soon: [ComingSoon] = []
 
     var body: some View {
         ZStack {
