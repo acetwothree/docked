@@ -2,39 +2,37 @@
 //  VideoFrameView.swift
 //  Docked
 //
-//  The pixel-art CRT "television" that marks where the floating video goes.
-//  Drawn with a Canvas of integer-aligned rectangles so it stays crisp at
-//  any size. The centre stays open — the live PiP window sits on top of it.
+//  The pixel-art CRT "television" drawn around the floating video. The bezel
+//  fills everything outside `hole`; the user drags their PiP window into the
+//  opening so the frame shows all the way around it. Drawn with a Canvas of
+//  integer rectangles so it stays crisp at any size.
 //
 
 import SwiftUI
 
 struct VideoFrameView: View {
     var layout: VideoLayout
+    /// The opening, in this view's local coordinates.
+    var hole: CGRect
     var dimHint: Bool
 
     private var isSmall: Bool { layout.isCorner }
 
     var body: some View {
-        ZStack {
-            Canvas { ctx, size in
-                drawBezel(ctx, size: size)
-            }
+        ZStack(alignment: .topLeading) {
+            Canvas { ctx, size in draw(ctx, size: size) }
 
-            // "Drag your video here" hint, inset to the screen opening.
-            hint
-                .padding(.horizontal, bezel + 6)
-                .padding(.top, bezel + 2)
-                .padding(.bottom, (isSmall ? 15 : 24))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .opacity(dimHint ? 0.22 : 1)
+            hintView
+                .frame(width: max(0, hole.width - 8), height: max(0, hole.height - 8))
+                .position(x: hole.midX, y: hole.midY)
+                .opacity(dimHint ? 0.2 : 1)
                 .animation(.easeInOut(duration: 0.6), value: dimHint)
                 .allowsHitTesting(false)
         }
         .overlay(alignment: .top) {
             if layout.showsAntenna {
                 Antenna()
-                    .frame(width: 46, height: 16)
+                    .frame(width: 48, height: 16)
                     .offset(y: -13)
             }
         }
@@ -42,15 +40,13 @@ struct VideoFrameView: View {
         .accessibilityLabel("Video drop zone, \(layout.label)")
     }
 
-    // MARK: Hint
-
-    @ViewBuilder private var hint: some View {
+    @ViewBuilder private var hintView: some View {
         VStack(spacing: isSmall ? 3 : 6) {
             Image(systemName: "tv.fill")
-                .font(.system(size: isSmall ? 15 : 22))
+                .font(.system(size: isSmall ? 14 : 22))
             Text("DRAG YOUR VIDEO HERE")
-                .font(.system(size: isSmall ? 8.5 : 12, weight: .heavy))
-                .tracking(isSmall ? 1.4 : 2.5)
+                .font(.system(size: isSmall ? 8 : 12, weight: .heavy))
+                .tracking(isSmall ? 1.2 : 2.4)
             if !isSmall {
                 Text("float your Picture-in-Picture window into the frame")
                     .font(.system(size: 10))
@@ -63,60 +59,47 @@ struct VideoFrameView: View {
         .lineLimit(2)
     }
 
-    // MARK: Bezel drawing
-
-    private var bezel: CGFloat { isSmall ? 9 : 14 }
-    private func chin(for h: CGFloat) -> CGFloat {
-        isSmall ? 13 : min(26, max(18, (h * 0.13).rounded()))
-    }
-
-    private func drawBezel(_ ctx: GraphicsContext, size: CGSize) {
+    private func draw(_ ctx: GraphicsContext, size: CGSize) {
         let w = size.width.rounded(), h = size.height.rounded()
-        let B = bezel
-        let CHIN = chin(for: h)
         let K: CGFloat = 2
+        let hx = hole.minX.rounded(), hy = hole.minY.rounded()
+        let hw = hole.width.rounded(), hh = hole.height.rounded()
 
         func fill(_ x: CGFloat, _ y: CGFloat, _ ww: CGFloat, _ hh: CGFloat, _ c: Color) {
             guard ww > 0, hh > 0 else { return }
             ctx.fill(Path(CGRect(x: x, y: y, width: ww, height: hh)), with: .color(c))
         }
 
-        // base plate + body
+        // plate + body
         fill(0, 0, w, h, Theme.TV.key)
         fill(K, K, w - 2*K, h - 2*K, Theme.TV.tan)
-
-        // bevel highlights / shades
+        // bevel: light top+left, dark bottom+right
         fill(K, K, w - 2*K, K, Theme.TV.hi)
         fill(K, K, K, h - 2*K, Theme.TV.hi)
         fill(K, h - 2*K, w - 2*K, K, Theme.TV.lo)
         fill(w - 2*K, K, K, h - 2*K, Theme.TV.lo)
+        // subtle inner mid-tone frame just outside the recess
+        fill(hx - 6, hy - 6, hw + 12, 3, Theme.TV.mid)
+        fill(hx - 6, hy + hh + 3, hw + 12, 3, Theme.TV.mid)
+        fill(hx - 6, hy - 6, 3, hh + 12, Theme.TV.mid)
+        fill(hx + hw + 3, hy - 6, 3, hh + 12, Theme.TV.mid)
 
-        // inner mid-tone band
-        fill(2*K, 2*K, w - 4*K, B - 2*K, Theme.TV.mid)
-        fill(2*K, h - CHIN, w - 4*K, K, Theme.TV.mid)
-        fill(2*K, 2*K, B - 2*K, h - 2*K - CHIN, Theme.TV.mid)
-        fill(w - B, 2*K, B - 2*K, h - 2*K - CHIN, Theme.TV.mid)
+        // screen recess ring (dark, right at the opening)
+        fill(hx - K, hy - K, hw + 2*K, K, Theme.TV.key)
+        fill(hx - K, hy + hh, hw + 2*K, K, Theme.TV.key)
+        fill(hx - K, hy - K, K, hh + 2*K, Theme.TV.key)
+        fill(hx + hw, hy - K, K, hh + 2*K, Theme.TV.key)
+        fill(hx - 3, hy - 3, hw + 6, 2, Theme.TV.deep)
+        // dark glass so the empty opening reads as a screen
+        fill(hx, hy, hw, hh, Theme.TV.glass)
 
-        // screen recess ring
-        let sx = B, sy = B, sxr = w - B, syb = h - CHIN
-        fill(sx - K, sy - K, sxr - sx + 2*K, K, Theme.TV.key)
-        fill(sx - K, syb, sxr - sx + 2*K, K, Theme.TV.key)
-        fill(sx - K, sy - K, K, syb - sy + 2*K, Theme.TV.key)
-        fill(sxr, sy - K, K, syb - sy + 2*K, Theme.TV.key)
-        fill(sx - 2, sy - 2, sxr - sx + 4, 2, Theme.TV.deep)
-        // dark glass so the empty slot reads as a screen
-        fill(sx, sy, sxr - sx, syb - sy, Theme.TV.glass)
-
-        // chunky stepped corners
+        // chunky stepped outer corners
         func notch(_ cx: CGFloat, _ cy: CGFloat, _ dx: CGFloat, _ dy: CGFloat) {
             fill(cx, cy, 3*K, 3*K, Theme.TV.key)
             fill(cx + dx*K, cy + dy*K, 2*K, 2*K, Theme.TV.tan)
-            fill(cx + dx*2*K, cy + dy*2*K, K, K, Theme.TV.tan)
         }
-        notch(0, 0, 1, 1)
-        notch(w - 3*K, 0, -1, 1)
-        notch(0, h - 3*K, 1, -1)
-        notch(w - 3*K, h - 3*K, -1, -1)
+        notch(0, 0, 1, 1); notch(w - 3*K, 0, -1, 1)
+        notch(0, h - 3*K, 1, -1); notch(w - 3*K, h - 3*K, -1, -1)
 
         // corner screws
         func screw(_ x: CGFloat, _ y: CGFloat) {
@@ -124,28 +107,26 @@ struct VideoFrameView: View {
             fill(x, y, K, K, Theme.TV.hi)
             fill(x + K, y + K, K, K, Theme.TV.lo)
         }
-        let so: CGFloat = isSmall ? 3 : 4
+        let so: CGFloat = 5
         screw(so, so); screw(w - so - 2*K, so)
-        screw(so, h - CHIN + 2); screw(w - so - 2*K, h - CHIN + 2)
+        screw(so, h - so - 2*K); screw(w - so - 2*K, h - so - 2*K)
 
-        // chin: speaker grille + power LED
-        if !isSmall {
+        // chin details, if there's a real bottom bezel below the opening
+        let chinTop = hy + hh + 5
+        let chinH = h - chinTop - 4
+        if chinH >= 8, !isSmall {
             for i in 0..<7 {
-                for j in 0..<2 {
-                    fill(8 + CGFloat(i)*3, h - CHIN + 7 + CGFloat(j)*4, K, K, Theme.TV.deep)
-                }
+                fill(hx + CGFloat(i) * 3, chinTop + 3, K, min(chinH - 4, 12), Theme.TV.deep)
             }
-            fill(w - 15, h - CHIN + 8, 3*K, 3*K, Theme.TV.led)
-            fill(w - 14, h - CHIN + 9, K, K, Theme.TV.ledHi)
+            fill(hx + hw - 14, chinTop + 2, 3*K, 3*K, Theme.TV.led)
+            fill(hx + hw - 13, chinTop + 3, K, K, Theme.TV.ledHi)
             fill(w/2 - 6, h - 4, 12, K, Theme.TV.lo)
-        } else {
-            fill(w - 9, h - CHIN + 4, 2*K, 2*K, Theme.TV.led)
-            fill(w - 8, h - CHIN + 5, K, K, Theme.TV.ledHi)
+        } else if chinH >= 5 {
+            fill(hx + hw - 8, chinTop + 1, 2*K, 2*K, Theme.TV.led)
         }
     }
 }
 
-/// Two little antenna nubs for the top layouts.
 private struct Antenna: View {
     var body: some View {
         Canvas { ctx, size in

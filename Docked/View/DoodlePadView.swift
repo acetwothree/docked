@@ -47,24 +47,28 @@ struct DoodlePadView: View {
     }
 
     private var toolbar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             ForEach(palette, id: \.self) { hex in
                 Circle()
                     .fill(Color(hex: hex))
-                    .frame(width: 22, height: 22)
-                    .overlay { Circle().strokeBorder(.white.opacity(colorHex == hex ? 0.95 : 0), lineWidth: 2) }
+                    .frame(width: 30, height: 30)
+                    .overlay { Circle().strokeBorder(.white.opacity(colorHex == hex ? 0.95 : 0), lineWidth: 2.5) }
+                    .padding(4)
                     .contentShape(Circle())
                     .onTapGesture { colorHex = hex }
             }
-            Slider(value: $lineWidth, in: 2...22).frame(maxWidth: 90)
-            Spacer(minLength: 0)
-            Button { store.undo() } label: { Image(systemName: "arrow.uturn.backward") }
-                .disabled(store.strokes.isEmpty)
-            Button(role: .destructive) { store.clear() } label: { Image(systemName: "trash") }
-                .disabled(store.strokes.isEmpty)
+            Slider(value: $lineWidth, in: 2...22).frame(minWidth: 60)
+            Button { store.undo() } label: {
+                Image(systemName: "arrow.uturn.backward").frame(width: 40, height: 40).contentShape(Rectangle())
+            }
+            .disabled(store.strokes.isEmpty)
+            Button(role: .destructive) { store.clear() } label: {
+                Image(systemName: "trash").frame(width: 40, height: 40).contentShape(Rectangle())
+            }
+            .disabled(store.strokes.isEmpty)
         }
-        .font(.system(size: 15, weight: .semibold))
-        .padding(.horizontal, 12).padding(.vertical, 8)
+        .font(.system(size: 17, weight: .semibold))
+        .padding(.horizontal, 8).padding(.vertical, 6)
         .background(.ultraThinMaterial)
     }
 

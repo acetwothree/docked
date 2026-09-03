@@ -83,45 +83,53 @@ struct ZenPuzzleView: View {
     // MARK: Dock
 
     private func dockBar(_ g: ZenGeom) -> some View {
-        HStack(spacing: 8) {
-            dockSlot(0, g)
-            VStack(spacing: 1) {
-                Text("\(model.score)").font(.system(size: 15, weight: .black)).monospacedDigit()
-                Text("Best \(max(model.highScore, model.score))")
-                    .font(.system(size: 9.5, weight: .bold)).foregroundStyle(.secondary).monospacedDigit()
+        VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                Text("\(model.score)")
+                    .font(.system(size: 18, weight: .black)).monospacedDigit()
+                Text("· Best \(max(model.highScore, model.score))")
+                    .font(.system(size: 12, weight: .bold)).monospacedDigit()
+                    .foregroundStyle(.secondary)
             }
-            dockSlot(1, g)
-            dockSlot(2, g)
+            HStack(spacing: 0) {
+                dockSlot(0, g)
+                Spacer(minLength: 0)
+                dockSlot(1, g)
+                Spacer(minLength: 0)
+                dockSlot(2, g)
+            }
+            .padding(.horizontal, 14)
         }
-        .padding(.horizontal, 12)
-        .frame(height: 64)
+        .frame(height: 84)
+        .frame(maxWidth: .infinity)
+        .background(Theme.elevated.opacity(0.85))
     }
 
     private func dockSlot(_ i: Int, _ g: ZenGeom) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Theme.paper)
                 .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.hairline)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.hairline)
                 }
             if let shape = model.dock[i], drag?.slot != i {
                 thumbnail(shape)
             }
         }
-        .frame(width: 74, height: 52)
+        .frame(width: 96, height: 66)
         .opacity(model.dock[i] == nil || drag?.slot == i ? 0.28 : 1)
         .contentShape(Rectangle())
         .gesture(dragGesture(slot: i, g: g))
     }
 
     private func thumbnail(_ shape: ZenShape) -> some View {
-        let dot: CGFloat = 8, gap: CGFloat = 2
+        let dot: CGFloat = 12, gap: CGFloat = 3
         let filled = Set(shape.cells.map { "\($0.0),\($0.1)" })
         return VStack(spacing: gap) {
             ForEach(Array(0..<shape.height), id: \.self) { r in
                 HStack(spacing: gap) {
                     ForEach(Array(0..<shape.width), id: \.self) { c in
-                        RoundedRectangle(cornerRadius: 2)
+                        RoundedRectangle(cornerRadius: 3)
                             .fill(filled.contains("\(r),\(c)") ? AnyShapeStyle(shape.gradient) : AnyShapeStyle(Color.clear))
                             .frame(width: dot, height: dot)
                     }
@@ -248,15 +256,16 @@ struct ZenPuzzleView: View {
 
     static func geom(size: CGSize, video: CGRect, tabsHeader: Bool, band: Bool) -> ZenGeom {
         let W = size.width, H = size.height
-        let dockH: CGFloat = 64
-        var top: CGFloat = 6, bot: CGFloat = H - 6
-        if tabsHeader { top = dockH + 6 } else { bot = H - dockH - 6 }
+        let dockH: CGFloat = 84
+        var top: CGFloat = 8, bot: CGFloat = H - 8
+        if tabsHeader { top = dockH + 8 } else { bot = H - dockH - 8 }
         if band {
-            if video.minY < H / 2 { top = max(top, video.maxY + 10) }
-            else { bot = min(bot, video.minY - 10) }
+            if video.minY < H / 2 { top = max(top, video.maxY + 12) }
+            else { bot = min(bot, video.minY - 12) }
         }
         let gw = W - 16, gh = max(40, bot - top)
-        let cell = min(max((min(gw / 11, gh / 16)).rounded(), 24), 38)
+        // Bigger, chunkier cells — roughly 7 columns, fewer squares overall.
+        let cell = min(max((min(gw / 7.2, gh / 12)).rounded(), 42), 62)
         let cols = max(4, Int((gw + 2) / (cell + 2)))
         let rows = max(4, Int((gh + 2) / (cell + 2)))
         let usedW = CGFloat(cols) * cell + CGFloat(cols - 1) * 2

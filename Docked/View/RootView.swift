@@ -42,8 +42,8 @@ struct RootView: View {
                     .frame(width: s.tab.width, height: s.tab.height)
                     .position(x: s.tab.midX, y: s.tab.midY)
 
-                // pixel-art TV frame
-                VideoFrameView(layout: app.layout, dimHint: hintDim)
+                // pixel-art TV frame (bezel shows around the PiP window)
+                VideoFrameView(layout: app.layout, hole: s.holeInFrame, dimHint: hintDim)
                     .frame(width: s.video.width, height: s.video.height)
                     .position(x: s.video.midX, y: s.video.midY)
 
