@@ -10,8 +10,10 @@
 import SwiftUI
 
 struct FlowView: View {
-    @State private var model = FlowModel(reached: 0)
+    @Environment(AppModel.self) private var app
+    @State private var model = FlowModel()
     @State private var active: Int? = nil
+    @State private var didResume = false
 
     var body: some View {
         GeometryReader { geo in
@@ -61,6 +63,10 @@ struct FlowView: View {
             )
         }
         .sensoryFeedback(.success, trigger: model.completions)
+        .onAppear {
+            if !didResume { model.resume(at: app.flowLevel); didResume = true }
+        }
+        .onChange(of: model.levelIndex) { _, v in app.flowLevel = v }
     }
 
     // MARK: geometry (one coordinate space — the whole GeometryReader)

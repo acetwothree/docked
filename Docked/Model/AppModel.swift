@@ -36,6 +36,9 @@ final class AppModel {
         static let pinned = "docked.pinnedModules"
         static let clickPen = "docked.clickPen.count"
         static let clickerMuted = "docked.clicker.muted"
+        static let flowLevel = "docked.flow.level"
+        static let popClears = "docked.pop.clears"
+        static let tttGames = "docked.ttt.games"
     }
 
     var layout: VideoLayout { didSet { store(layout.rawValue, K.layout) } }
@@ -47,6 +50,11 @@ final class AppModel {
     var debugOverlay: Bool { didSet { store(debugOverlay, K.debug) } }
     var runnerHighScore: Int { didSet { store(runnerHighScore, K.highScore) } }
     var zenHighScore: Int { didSet { store(zenHighScore, K.zenHigh) } }
+
+    // Lightweight per-activity progress trackers.
+    var flowLevel: Int { didSet { store(flowLevel, K.flowLevel) } }
+    var popClearCount: Int { didSet { store(popClearCount, K.popClears) } }
+    var tttGames: Int { didSet { store(tttGames, K.tttGames) } }
 
     /// Lifetime tally for the Clicker fidget. Never reset — not even by
     /// "Clear all app data".
@@ -74,6 +82,9 @@ final class AppModel {
         zenHighScore = d.integer(forKey: K.zenHigh)
         clickPenCount = d.integer(forKey: K.clickPen)
         clickerMuted = d.bool(forKey: K.clickerMuted)
+        flowLevel = d.integer(forKey: K.flowLevel)
+        popClearCount = d.integer(forKey: K.popClears)
+        tttGames = d.integer(forKey: K.tttGames)
         if let raw = d.array(forKey: K.pinned) as? [String] {
             let restored = raw.compactMap(ActivityModule.init(rawValue:))
             pinnedModules = restored.isEmpty ? AppModel.defaultPinned : restored
@@ -103,6 +114,9 @@ final class AppModel {
         doodle.clear()
         runnerHighScore = 0
         zenHighScore = 0
+        flowLevel = 0
+        popClearCount = 0
+        tttGames = 0
         layout = .top
         module = .doodle
         pinnedModules = AppModel.defaultPinned

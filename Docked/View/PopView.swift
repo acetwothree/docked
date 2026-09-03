@@ -9,6 +9,7 @@
 import SwiftUI
 
 struct PopView: View {
+    @Environment(AppModel.self) private var app
     @State private var popped: Set<Int> = []
     @State private var resetting = false
 
@@ -35,6 +36,12 @@ struct PopView: View {
                                   y: oy + CGFloat(r) * (diameter + gap) + diameter / 2)
                         .onTapGesture { pop(i, total: total) }
                 }
+
+                Text("SHEETS CLEARED  \(app.popClearCount)")
+                    .font(.system(size: 10, weight: .heavy)).tracking(1.5)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 6)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .sensoryFeedback(.impact(weight: .medium), trigger: popped.count)
@@ -49,6 +56,7 @@ struct PopView: View {
         }
         if popped.count >= total {
             resetting = true
+            app.popClearCount += 1
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 withAnimation(.easeOut(duration: 0.35)) { popped.removeAll() }
                 resetting = false

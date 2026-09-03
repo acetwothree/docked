@@ -11,6 +11,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct RootView: View {
     @Environment(AppModel.self) private var app
@@ -44,13 +45,15 @@ struct RootView: View {
                     .clipShape(RoundedRectangle(cornerRadius: moduleCorner, style: .continuous))
                     .position(x: s.content.midX, y: s.content.midY)
 
-                // tab bar — activity chooser + Layout toggle + Settings
+                // tab bar — Move · activity chooser · Settings · Plus
                 TabBarView(isHeader: s.tabIsHeader,
                            onLayout: {
+                               endEditing()
                                withAnimation(Theme.layoutAnimation) { app.layout = app.layout.toggled }
                            },
-                           onPicker: { showPicker = true },
-                           onSettings: { showSettings = true })
+                           onPicker: { endEditing(); showPicker = true },
+                           onSettings: { endEditing(); showSettings = true },
+                           onPlus: { endEditing(); showPlus = true })
                     .frame(width: s.tab.width, height: s.tab.height)
                     .position(x: s.tab.midX, y: s.tab.midY)
 
@@ -129,6 +132,11 @@ struct RootView: View {
         (app.module == .zen || app.module == .pop) ? 0 : 20
     }
 
+    private func endEditing() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
     private var settingsDetents: Set<PresentationDetent> {
         app.layout == .bottom ? [.large] : [.medium, .large]
     }
@@ -159,6 +167,9 @@ struct RootView: View {
                 .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
         case .click:
             ZStack { Theme.paper; ClickPenView() }
+                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
+        case .tictactoe:
+            ZStack { Theme.paper; TicTacToeView() }
                 .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
         }
     }

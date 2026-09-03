@@ -48,11 +48,12 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
     case create = "Create"
     case play = "Play"
     case fidget = "Fidget"
+    case versus = "2 Player"
     var id: String { rawValue }
 }
 
 enum ActivityModule: String, CaseIterable, Identifiable {
-    case doodle, notes, game, zen, flow, pop, click
+    case doodle, notes, game, zen, flow, pop, click, tictactoe
     var id: String { rawValue }
 
     var category: ActivityCategory {
@@ -60,6 +61,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .doodle, .notes: .create
         case .game, .zen, .flow: .play
         case .pop, .click: .fidget
+        case .tictactoe: .versus
         }
     }
 
@@ -72,6 +74,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .flow: "Flow"
         case .pop: "Pop"
         case .click: "Clicker"
+        case .tictactoe: "Tic-Tac-Toe"
         }
     }
     var systemImage: String {
@@ -83,6 +86,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .flow: "point.3.connected.trianglepath.dotted"
         case .pop: "circle.hexagongrid.fill"
         case .click: "hand.tap.fill"
+        case .tictactoe: "number"
         }
     }
 }

@@ -3,9 +3,10 @@
 //  Docked
 //
 //  A thin screen bezel drawn around the floating video. The opening has the
-//  same rounded corners as an iOS PiP window, so the border hugs it. Until a
-//  video is parked there the opening shows faint "no-signal" colour bars
-//  behind the "drag your video here" prompt.
+//  same rounded corners as an iOS PiP window, so the border hugs it. The
+//  "screen" is just the app's own background colour, so whatever a PiP source
+//  doesn't fill (Prime Video is a touch shorter than 16:9, etc.) reads as
+//  ordinary TV letterbox bars in both light and dark mode.
 //
 
 import SwiftUI
@@ -14,12 +15,6 @@ struct VideoFrameView: View {
     /// The opening, in this view's local coordinates.
     var hole: CGRect
     var dimHint: Bool
-
-    private let barColors: [Color] = [
-        Color(hex: "C7C7C7"), Color(hex: "C8C84A"), Color(hex: "4AC8C8"),
-        Color(hex: "4AC85A"), Color(hex: "C84AC0"), Color(hex: "C85050"),
-        Color(hex: "5060C8"),
-    ]
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -68,24 +63,11 @@ struct VideoFrameView: View {
         let outerPath = Path(roundedRect: CGRect(x: 0, y: 0, width: w, height: h), cornerRadius: outerR)
         let innerPath = Path(roundedRect: innerRect, cornerRadius: innerR)
 
-        // --- faint "no-signal" colour bars inside the opening ---
-        var screen = ctx
-        screen.clip(to: innerPath)
-        screen.fill(innerPath, with: .color(Theme.TV.glass))
-        let bw = innerRect.width / CGFloat(barColors.count)
-        for (i, col) in barColors.enumerated() {
-            let bar = CGRect(x: innerRect.minX + CGFloat(i) * bw, y: innerRect.minY,
-                             width: bw + 1, height: innerRect.height)
-            screen.fill(Path(bar), with: .color(col.opacity(0.15)))
-        }
-        var y = innerRect.minY
-        while y < innerRect.maxY {
-            screen.fill(Path(CGRect(x: innerRect.minX, y: y, width: innerRect.width, height: 1)),
-                        with: .color(.black.opacity(0.14)))
-            y += 4
-        }
+        // The screen = the app background, so unfilled PiP area looks like
+        // plain letterbox bars.
+        ctx.fill(innerPath, with: .color(Theme.backdrop))
 
-        // --- the bezel: a rounded donut (outer minus inner), even-odd fill ---
+        // The bezel: a rounded donut (outer minus inner), even-odd fill.
         var donut = outerPath
         donut.addPath(innerPath)
         ctx.fill(donut,

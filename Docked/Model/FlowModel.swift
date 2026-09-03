@@ -37,15 +37,17 @@ final class FlowModel {
     /// bumps whenever a level is completed (a haptic trigger)
     private(set) var completions = 0
 
-    var reached: Int
-
     /// Cells covered so far / total — the level completes only at 100%.
     var cellCount: Int { size * size }
     var filledCount: Int { paths.values.reduce(0) { $0 + $1.count } }
 
-    init(reached: Int) {
-        self.reached = reached
+    init() {
         load(0)
+    }
+
+    /// Jump to a saved level (used to restore progress on reopen).
+    func resume(at index: Int) {
+        load(max(0, index))
     }
 
     // MARK: Levels
@@ -86,6 +88,39 @@ final class FlowModel {
             (2, FlowCell(r: 4, c: 0), FlowCell(r: 4, c: 6)),
             (3, FlowCell(r: 5, c: 0), FlowCell(r: 6, c: 3)),
             (4, FlowCell(r: 5, c: 3), FlowCell(r: 6, c: 6)),
+        ]),
+        // 6 — 5×5, vertical thirds.
+        FlowLevel(size: 5, pairs: [
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 4, c: 1)),
+            (1, FlowCell(r: 0, c: 2), FlowCell(r: 4, c: 2)),
+            (2, FlowCell(r: 0, c: 3), FlowCell(r: 4, c: 4)),
+        ]),
+        // 7 — 6×6, three horizontal 2-row combs.
+        FlowLevel(size: 6, pairs: [
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 0, c: 5)),
+            (1, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 5)),
+            (2, FlowCell(r: 4, c: 0), FlowCell(r: 4, c: 5)),
+        ]),
+        // 8 — 6×6, three vertical 2-col combs.
+        FlowLevel(size: 6, pairs: [
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 5, c: 0)),
+            (1, FlowCell(r: 0, c: 2), FlowCell(r: 5, c: 2)),
+            (2, FlowCell(r: 0, c: 4), FlowCell(r: 5, c: 4)),
+        ]),
+        // 9 — 7×7, three combs + a straight bottom row.
+        FlowLevel(size: 7, pairs: [
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 1, c: 6)),
+            (1, FlowCell(r: 2, c: 0), FlowCell(r: 3, c: 6)),
+            (2, FlowCell(r: 4, c: 0), FlowCell(r: 5, c: 6)),
+            (3, FlowCell(r: 6, c: 0), FlowCell(r: 6, c: 6)),
+        ]),
+        // 10 — 7×7, two combs, a row, and two bottom combs.
+        FlowLevel(size: 7, pairs: [
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 1, c: 6)),
+            (1, FlowCell(r: 2, c: 0), FlowCell(r: 3, c: 6)),
+            (2, FlowCell(r: 4, c: 0), FlowCell(r: 4, c: 6)),
+            (3, FlowCell(r: 5, c: 0), FlowCell(r: 5, c: 3)),
+            (4, FlowCell(r: 5, c: 4), FlowCell(r: 6, c: 6)),
         ]),
     ]
 
@@ -168,7 +203,6 @@ final class FlowModel {
         guard filled == size * size else { return }
 
         completions += 1
-        reached = max(reached, levelIndex + 1)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) { [weak self] in
             guard let self else { return }
             self.load(self.levelIndex + 1)

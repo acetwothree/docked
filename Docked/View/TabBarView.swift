@@ -14,13 +14,17 @@ struct TabBarView: View {
     var onLayout: () -> Void
     var onPicker: () -> Void
     var onSettings: () -> Void
+    var onPlus: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
+            control(app.layout.moveIcon, "Move", action: onLayout)
+
             Button(action: onPicker) {
                 HStack(spacing: 8) {
                     Image(systemName: app.module.systemImage).font(.system(size: 17, weight: .semibold))
                     Text(app.module.title).font(.system(size: 15, weight: .heavy))
+                        .lineLimit(1).minimumScaleFactor(0.8)
                     Image(systemName: "chevron.up.chevron.down").font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.secondary)
                 }
@@ -32,10 +36,20 @@ struct TabBarView: View {
             }
             .buttonStyle(.plain)
 
-            control(app.layout.moveIcon, "Move", action: onLayout)
             control("gearshape.fill", "Settings", action: onSettings)
+
+            // Low-key Docked Plus entry.
+            Button(action: onPlus) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 15))
+                    .frame(width: 30, height: 46)
+                    .foregroundStyle(.tertiary)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Docked Plus")
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.elevated)
         .overlay(alignment: isHeader ? .bottom : .top) {
@@ -49,7 +63,7 @@ struct TabBarView: View {
                 Image(systemName: icon).font(.system(size: 18))
                 Text(label).font(.system(size: 8.5, weight: .bold))
             }
-            .frame(width: 52, height: 46)
+            .frame(width: 48, height: 46)
             .foregroundStyle(Color.secondary)
             .contentShape(Rectangle())
         }
@@ -83,17 +97,20 @@ struct ActivityPickerPanel: View {
     private let cols = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
     private let soon: [ComingSoon] = [
-        // create — one extra slot
+        // create
         .init(title: "Mind Map",  systemImage: "brain",                     category: .create),
-        // play — three extra slots
+        // play
         .init(title: "2048",      systemImage: "square.grid.3x3.fill",      category: .play),
         .init(title: "Solitaire", systemImage: "suit.spade.fill",          category: .play),
-        .init(title: "Mahjong",   systemImage: "rectangle.grid.2x2.fill",  category: .play),
-        // fidget — four extra slots
+        .init(title: "Idle Farm", systemImage: "leaf.fill",                category: .play),
+        // fidget — viral-y, satisfying
+        .init(title: "Sand Sort",   systemImage: "circle.grid.3x3.fill",   category: .fidget),
+        .init(title: "Scratcher",   systemImage: "rectangle.dashed",       category: .fidget),
         .init(title: "Spinner",     systemImage: "fan.fill",               category: .fidget),
-        .init(title: "Worry Beads", systemImage: "circle.grid.3x3.fill",   category: .fidget),
         .init(title: "Zen Sand",    systemImage: "wind",                   category: .fidget),
-        .init(title: "Fidget Cube", systemImage: "cube.fill",              category: .fidget),
+        // 2 player (same phone)
+        .init(title: "Connect 4",    systemImage: "circle.grid.cross.fill", category: .versus),
+        .init(title: "Dots & Boxes", systemImage: "square.grid.4x3.fill",   category: .versus),
     ]
 
     private var closeToBottom: Bool { solved.occupiesTop }   // tab bar is the footer
