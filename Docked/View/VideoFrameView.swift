@@ -2,19 +2,22 @@
 //  VideoFrameView.swift
 //  Docked
 //
-//  A thin screen bezel drawn around the floating video. The opening has the
-//  same rounded corners as an iOS PiP window, so the border hugs it. The
-//  "screen" is just the app's own background colour, so whatever a PiP source
-//  doesn't fill (Prime Video is a touch shorter than 16:9, etc.) reads as
-//  ordinary TV letterbox bars in both light and dark mode.
+//  The whole TV set, drawn as one wood cabinet: the screen opening near the
+//  top (the app background shows through, so unfilled PiP area reads as
+//  letterbox bars) and a console strip along the bottom with a speaker grille,
+//  the "DOCKED" name and three recessed knob wells. RootView drops the real
+//  knob buttons onto the wells.
 //
 
 import SwiftUI
 
 struct VideoFrameView: View {
-    /// The opening, in this view's local coordinates.
+    /// Screen opening, in this view's local coordinates.
     var hole: CGRect
+    /// Console strip, in this view's local coordinates.
+    var consoleRect: CGRect
     var dimHint: Bool
+    var palette: TVPalette
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -33,14 +36,11 @@ struct VideoFrameView: View {
 
     @ViewBuilder private var hintView: some View {
         VStack(spacing: 6) {
-            Image(systemName: "tv.fill")
-                .font(.system(size: 20))
+            Image(systemName: "tv.fill").font(.system(size: 20))
             Text("DRAG YOUR VIDEO HERE")
-                .font(.system(size: 11, weight: .heavy))
-                .tracking(2.2)
+                .font(.system(size: 11, weight: .heavy)).tracking(2.2)
             Text("your video turns the screen on")
-                .font(.system(size: 9.5))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 9.5)).foregroundStyle(.secondary)
         }
         .foregroundStyle(Theme.accent)
         .shadow(color: .black.opacity(0.6), radius: 3)
@@ -51,42 +51,80 @@ struct VideoFrameView: View {
 
     private func draw(_ ctx: GraphicsContext, size: CGSize) {
         let w = size.width, h = size.height
-        let outerR: CGFloat = 13
+        let outerR: CGFloat = 16
         let innerR: CGFloat = min(14, hole.width / 6, hole.height / 6)
 
-        // Pull the opening a hair tighter than the measured PiP rect — kills the
-        // sliver of black that otherwise shows between the parked video and the
-        // border on the left / right (and a touch more off the bottom).
         let innerRect = CGRect(x: hole.minX + 2.5, y: hole.minY + 1,
                                width: hole.width - 5, height: hole.height - 3.5)
 
-        let outerPath = Path(roundedRect: CGRect(x: 0, y: 0, width: w, height: h), cornerRadius: outerR)
-        let innerPath = Path(roundedRect: innerRect, cornerRadius: innerR)
+        let cabinet = Path(roundedRect: CGRect(x: 0, y: 0, width: w, height: h), cornerRadius: outerR)
+        let screen = Path(roundedRect: innerRect, cornerRadius: innerR)
 
-        // The screen = the app background, so unfilled PiP area looks like
-        // plain letterbox bars.
-        ctx.fill(innerPath, with: .color(Theme.backdrop))
+        // --- wood cabinet fill ---
+        ctx.fill(cabinet, with: .linearGradient(
+            Gradient(colors: [palette.hi.opacity(0.9), palette.tan, palette.lo]),
+            startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: 0, y: h)))
 
-        // The bezel: a rounded donut (outer minus inner), even-odd fill.
-        var donut = outerPath
-        donut.addPath(innerPath)
-        ctx.fill(donut,
-                 with: .linearGradient(
-                    Gradient(colors: [Theme.TV.hi, Theme.TV.tan, Theme.TV.lo]),
-                    startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: 0, y: h)),
-                 style: FillStyle(eoFill: true))
+        // subtle vertical wood streaks
+        var streakX: CGFloat = 8
+        while streakX < w - 8 {
+            ctx.fill(Path(CGRect(x: streakX, y: 4, width: 1, height: h - 8)),
+                     with: .color(palette.key.opacity(0.05)))
+            streakX += 13
+        }
 
-        // dark keylines: inside the opening + around the outer edge
-        ctx.stroke(innerPath, with: .color(Theme.TV.key), lineWidth: 2)
-        ctx.stroke(outerPath, with: .color(Theme.TV.key.opacity(0.9)), lineWidth: 1.5)
+        // --- the screen opening: app background shows through ---
+        ctx.fill(screen, with: .color(Theme.backdrop))
 
-        // four corner rivets
-        for p in [CGPoint(x: 11, y: 11), CGPoint(x: w - 11, y: 11),
-                  CGPoint(x: 11, y: h - 11), CGPoint(x: w - 11, y: h - 11)] {
+        // recess shadow around the screen
+        ctx.stroke(screen, with: .color(palette.key.opacity(0.85)), lineWidth: 2.5)
+        ctx.stroke(Path(roundedRect: innerRect.insetBy(dx: -3, dy: -3), cornerRadius: innerR + 3),
+                   with: .color(palette.hi.opacity(0.35)), lineWidth: 1)
+
+        // --- ridge line between screen area and console ---
+        let ridgeY = consoleRect.minY - 2
+        ctx.fill(Path(CGRect(x: 6, y: ridgeY, width: w - 12, height: 1.5)),
+                 with: .color(palette.key.opacity(0.5)))
+        ctx.fill(Path(CGRect(x: 6, y: ridgeY + 1.5, width: w - 12, height: 1)),
+                 with: .color(palette.hi.opacity(0.3)))
+
+        // --- speaker grille (left of the console) ---
+        let grilleTop = consoleRect.minY + 10
+        let grilleBottom = consoleRect.maxY - 10
+        var gx = consoleRect.minX + 14
+        for _ in 0..<8 {
+            ctx.fill(Path(roundedRect: CGRect(x: gx, y: grilleTop, width: 3, height: grilleBottom - grilleTop),
+                                       cornerRadius: 1.5),
+                     with: .color(palette.key.opacity(0.32)))
+            gx += 6
+        }
+
+        // --- "DOCKED" engraved into the console ---
+        ctx.draw(Text("DOCKED")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundColor(palette.key.opacity(0.55)),
+                 at: CGPoint(x: gx + 12, y: consoleRect.midY + 0.5), anchor: .leading)
+        ctx.draw(Text("DOCKED")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundColor(palette.hi.opacity(0.35)),
+                 at: CGPoint(x: gx + 12, y: consoleRect.midY - 0.5), anchor: .leading)
+
+        // --- knob wells ---
+        for c in LayoutSolver.knobCenters(inConsole: consoleRect) {
+            let d = LayoutSolver.knobDiameter + 8
+            ctx.fill(Path(ellipseIn: CGRect(x: c.x - d/2, y: c.y - d/2, width: d, height: d)),
+                     with: .color(palette.deep.opacity(0.5)))
+            ctx.stroke(Path(ellipseIn: CGRect(x: c.x - d/2, y: c.y - d/2, width: d, height: d)),
+                       with: .color(palette.key.opacity(0.4)), lineWidth: 1)
+        }
+
+        // cabinet keyline + corner rivets
+        ctx.stroke(cabinet, with: .color(palette.key.opacity(0.9)), lineWidth: 1.5)
+        for p in [CGPoint(x: 12, y: 12), CGPoint(x: w - 12, y: 12)] {
             ctx.fill(Path(ellipseIn: CGRect(x: p.x - 2.5, y: p.y - 2.5, width: 5, height: 5)),
-                     with: .color(Theme.TV.deep))
+                     with: .color(palette.deep))
             ctx.fill(Path(ellipseIn: CGRect(x: p.x - 1, y: p.y - 1, width: 2, height: 2)),
-                     with: .color(Theme.TV.hi))
+                     with: .color(palette.hi))
         }
     }
 }

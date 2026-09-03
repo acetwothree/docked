@@ -77,8 +77,8 @@ struct OnboardingView: View {
     }
 
     private var page3: some View {
-        card(emoji: "⧉", title: "Place it & go") {
-            Text("Tap **Move** any time to flip your video between the top and bottom of the screen. Then drag the floating window into the TV frame. That's it.")
+        card(emoji: "📺", title: "Place it & go") {
+            Text("Drag the floating video window up into the TV screen at the top. Everything you do lives in the space below it, clear of your thumbs. That's it.")
         }
     }
 

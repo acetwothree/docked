@@ -2,114 +2,109 @@
 //  ScratchGameView.swift
 //  Docked
 //
-//  A scratch-off card. Drag across the foil to rub it away; once enough is
-//  gone the prize reveals and is added to your lifetime total. "New card"
-//  deals another. Lifetime winnings persist.
+//  A branded "Docked" scratch-off. Rub away the foil to reveal three symbols —
+//  match all three to win, richer symbols pay more. Win or lose, a fresh card
+//  deals itself. Lifetime winnings persist.
 //
 
 import SwiftUI
 
 struct ScratchGameView: View {
     @AppStorage("docked.scratch.total") private var total: Int = 0
-    @AppStorage("docked.scratch.cards") private var cards: Int = 0
 
-    @State private var prize = -1
+    // symbol index 0..<6, richer = higher
+    @State private var symbols: [Int] = [0, 1, 2]
     @State private var scratched: Set<Int> = []
     @State private var revealed = false
+    @State private var dealing = false
 
-    private let colsN = 18
-    private let rowsN = 12
+    private let colsN = 21
+    private let rowsN = 10
+    private let icons = ["🍒", "🍋", "🔔", "⭐", "💎", "7️⃣"]
+    private let payouts = [25, 50, 100, 200, 500, 1000]
+
+    private var isWin: Bool { revealed && symbols[0] == symbols[1] && symbols[1] == symbols[2] }
+    private var prize: Int { isWin ? payouts[symbols[0]] : 0 }
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
+            Text("DOCKED · LUCKY SCRATCH")
+                .font(.system(size: 12, weight: .black, design: .rounded)).tracking(2)
+                .foregroundStyle(Theme.accent)
+
             GeometryReader { geo in
                 let cardW = geo.size.width
-                let cardH = min(geo.size.height, cardW * 0.6)
+                let cardH = geo.size.height
                 let cw = cardW / CGFloat(colsN)
                 let ch = cardH / CGFloat(rowsN)
 
                 ZStack {
-                    prizeFace
+                    // prize row
+                    HStack(spacing: 10) {
+                        ForEach(Array(0..<3), id: \.self) { i in
+                            Text(icons[symbols[i] % icons.count])
+                                .font(.system(size: min(cardW / 4.5, cardH * 0.62)))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(Theme.paper, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                    }
+                    .padding(10)
 
+                    // foil
                     Canvas { ctx, _ in
                         guard !revealed else { return }
                         for r in 0..<rowsN {
                             for c in 0..<colsN {
                                 if scratched.contains(r * colsN + c) { continue }
                                 let rect = CGRect(x: CGFloat(c) * cw, y: CGFloat(r) * ch,
-                                                  width: cw + 0.7, height: ch + 0.7)
+                                                  width: cw + 0.8, height: ch + 0.8)
                                 ctx.fill(Path(rect), with: .color(Theme.TV.mid))
                             }
                         }
                     }
                     .allowsHitTesting(false)
 
-                    if !revealed {
-                        Text("SCRATCH HERE")
-                            .font(.system(size: 12, weight: .heavy)).tracking(2)
-                            .foregroundStyle(Theme.TV.key.opacity(0.55))
+                    if !revealed && scratched.isEmpty {
+                        VStack(spacing: 4) {
+                            Image(systemName: "hand.draw.fill").font(.system(size: 22))
+                            Text("SCRATCH").font(.system(size: 12, weight: .heavy)).tracking(3)
+                        }
+                        .foregroundStyle(Theme.TV.key.opacity(0.5))
                     }
                 }
                 .frame(width: cardW, height: cardH)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.hairline))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.hairline, lineWidth: 1.5))
                 .contentShape(Rectangle())
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { v in rub(at: v.location, cw: cw, ch: ch) }
                 )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
 
-            HStack {
-                Text("WON  \(total)")
-                    .font(.system(size: 11, weight: .heavy)).tracking(1)
-                    .foregroundStyle(.tertiary)
-                Spacer()
-                Button {
-                    newCard()
-                } label: {
-                    Label("New card", systemImage: "arrow.counterclockwise")
-                        .font(.system(size: 12, weight: .heavy))
-                        .foregroundStyle(Theme.accent)
-                }
-                .buttonStyle(.plain)
-            }
+            Text(bannerText)
+                .font(.system(size: 15, weight: .heavy))
+                .foregroundStyle(isWin ? Color.green : Color.secondary)
+                .frame(height: 22)
+
+            Text("LIFETIME WINNINGS  \(total)")
+                .font(.system(size: 10, weight: .heavy)).tracking(1)
+                .foregroundStyle(.tertiary)
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sensoryFeedback(.success, trigger: revealed) { _, now in now }
-        .onAppear { if prize < 0 { rollPrize() } }
+        .onAppear { if scratched.isEmpty && !revealed { deal() } }
     }
 
-    private var prizeFace: some View {
-        ZStack {
-            LinearGradient(colors: [Theme.accent.opacity(0.28), Theme.accent.opacity(0.12)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-            VStack(spacing: 6) {
-                Text(prizeEmoji)
-                    .font(.system(size: 44))
-                Text(prizeText)
-                    .font(.system(size: 22, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-            }
-        }
-    }
-
-    private var prizeEmoji: String {
-        if prize <= 0 { return "🍀" }
-        if prize >= 1000 { return "💎" }
-        return "💰"
-    }
-
-    private var prizeText: String {
-        if prize <= 0 { return "No win" }
-        if prize >= 1000 { return "JACKPOT \(prize)" }
-        return "+\(prize)"
+    private var bannerText: String {
+        if !revealed { return "Match 3 to win" }
+        if isWin { return "MATCH!  +\(prize)" }
+        return "No match — new card…"
     }
 
     private func rub(at p: CGPoint, cw: CGFloat, ch: CGFloat) {
-        guard !revealed else { return }
+        guard !revealed, !dealing else { return }
         let c = Int(p.x / cw)
         let r = Int(p.y / ch)
         for dr in -1...1 {
@@ -120,28 +115,47 @@ struct ScratchGameView: View {
                 }
             }
         }
-        if Double(scratched.count) >= Double(rowsN * colsN) * 0.5 { reveal() }
+        if Double(scratched.count) >= Double(rowsN * colsN) * 0.55 {
+            finish()
+        }
     }
 
-    private func reveal() {
+    private func finish() {
         guard !revealed else { return }
         revealed = true
-        if prize > 0 { total += prize }
-        cards += 1
+        total += prize
+        dealing = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            deal()
+        }
     }
 
-    private func rollPrize() {
-        let roll = Int.random(in: 0..<100)
-        if roll < 52 { prize = 0 }
-        else if roll < 80 { prize = 25 }
-        else if roll < 93 { prize = 75 }
-        else if roll < 99 { prize = 250 }
-        else { prize = 1500 }
-    }
-
-    private func newCard() {
+    private func deal() {
+        symbols = rollSymbols()
         scratched = []
         revealed = false
-        rollPrize()
+        dealing = false
+    }
+
+    private func rollSymbols() -> [Int] {
+        // ~1 in 5 cards is a winner; cheaper symbols win more often.
+        if Int.random(in: 0..<100) < 20 {
+            let weights = [34, 26, 18, 12, 7, 3]
+            var roll = Int.random(in: 0..<weights.reduce(0, +))
+            var idx = 0
+            for (i, wt) in weights.enumerated() {
+                if roll < wt { idx = i; break }
+                roll -= wt
+            }
+            return [idx, idx, idx]
+        }
+        // guaranteed non-matching triple
+        var trio: [Int] = []
+        while trio.count < 3 {
+            let x = Int.random(in: 0..<icons.count)
+            if trio.filter({ $0 == x }).count < 2 { trio.append(x) }
+        }
+        if trio[0] == trio[1] && trio[1] == trio[2] { trio[2] = (trio[2] + 1) % icons.count }
+        return trio
     }
 }

@@ -2,10 +2,10 @@
 //  VideoLayout.swift
 //  Docked
 //
-//  Where the iOS Picture-in-Picture window rests: a large band pinned to the
-//  top edge or the bottom edge. (The four small-corner positions were removed —
-//  the band is the only size worth designing around, and a single tap now just
-//  flips between the two.)
+//  The video always rests in a large band at the top of the screen — that's
+//  the ergonomic spot (your thumbs never cover it). The `.bottom` case is kept
+//  only so the geometry code can be re-enabled later if ever needed; nothing
+//  in the UI selects it.
 //
 
 import SwiftUI
@@ -15,33 +15,8 @@ enum VideoLayout: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var label: String {
-        switch self {
-        case .top: "Top"
-        case .bottom: "Bottom"
-        }
-    }
-
     /// The video is in the top half — app content flows to the bottom.
     var occupiesTop: Bool { self == .top }
-
-    /// The other layout — tapping the Layout button toggles to this.
-    var toggled: VideoLayout { self == .top ? .bottom : .top }
-
-    /// Icon for the toggle button — points the way the video will move.
-    var moveIcon: String {
-        self == .top ? "arrow.down.to.line" : "arrow.up.to.line"
-    }
-    var moveLabel: String {
-        self == .top ? "Move down" : "Move up"
-    }
-
-    var systemImage: String {
-        switch self {
-        case .top: "rectangle.topthird.inset.filled"
-        case .bottom: "rectangle.bottomthird.inset.filled"
-        }
-    }
 }
 
 enum ActivityCategory: String, CaseIterable, Identifiable {
@@ -53,14 +28,14 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
 }
 
 enum ActivityModule: String, CaseIterable, Identifiable {
-    case doodle, notes, game, zen, flow, idle, pop, click, scratch, sand, tictactoe
+    case doodle, notes, game, zen, flow, idle, sand, pop, click, scratch, tictactoe
     var id: String { rawValue }
 
     var category: ActivityCategory {
         switch self {
         case .doodle, .notes: .create
-        case .game, .zen, .flow, .idle: .play
-        case .pop, .click, .scratch, .sand: .fidget
+        case .game, .zen, .flow, .idle, .sand: .play
+        case .pop, .click, .scratch: .fidget
         case .tictactoe: .versus
         }
     }
@@ -72,11 +47,11 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .game: "Runner"
         case .zen: "Blocks"
         case .flow: "Flow"
-        case .idle: "Reactor"
+        case .idle: "Garden"
+        case .sand: "Sand Sort"
         case .pop: "Pop"
         case .click: "Clicker"
         case .scratch: "Scratcher"
-        case .sand: "Sand Sort"
         case .tictactoe: "Tic-Tac-Toe"
         }
     }
@@ -87,11 +62,11 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .game: "figure.run"
         case .zen: "square.grid.2x2.fill"
         case .flow: "point.3.connected.trianglepath.dotted"
-        case .idle: "bolt.fill"
+        case .idle: "leaf.fill"
+        case .sand: "chart.bar.fill"
         case .pop: "circle.hexagongrid.fill"
         case .click: "hand.tap.fill"
         case .scratch: "rectangle.dashed"
-        case .sand: "chart.bar.fill"
         case .tictactoe: "number"
         }
     }

@@ -2,86 +2,44 @@
 //  TabBarView.swift
 //  Docked
 //
-//  The activity chooser (current activity + a categorised picker panel) plus
-//  a Layout toggle (flips the video top ⇄ bottom in one tap) and Settings.
+//  The footer: a single centred button showing the current activity, which
+//  opens the categorised picker panel. Settings / Plus / Theme live on the TV
+//  console instead.
 //
 
 import SwiftUI
 
 struct TabBarView: View {
     @Environment(AppModel.self) private var app
-    var isHeader: Bool
-    var compact: Bool = false
-    var onLayout: () -> Void
     var onPicker: () -> Void
-    var onSettings: () -> Void
-    var onPlus: () -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
-            if !compact {
-                control(app.layout.moveIcon, "Move", action: onLayout)
+        HStack {
+            Spacer(minLength: 0)
+            Button(action: onPicker) {
+                HStack(spacing: 8) {
+                    Image(systemName: app.module.systemImage).font(.system(size: 17, weight: .semibold))
+                    Text(app.module.title).font(.system(size: 15, weight: .heavy))
+                        .lineLimit(1).minimumScaleFactor(0.8)
+                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 22)
+                .frame(height: 44)
+                .frame(maxWidth: 320)
+                .background(Theme.accent.opacity(0.16), in: Capsule())
+                .foregroundStyle(Theme.accent)
+                .contentShape(Capsule())
             }
-
-            chooserButton
-
-            if !compact {
-                control("gearshape.fill", "Settings", action: onSettings)
-            }
-
-            plusButton
+            .buttonStyle(.plain)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.elevated)
-        .overlay(alignment: isHeader ? .bottom : .top) {
+        .overlay(alignment: .top) {
             Rectangle().fill(Theme.hairline).frame(height: 1)
         }
-    }
-
-    private var chooserButton: some View {
-        Button(action: onPicker) {
-            HStack(spacing: 8) {
-                Image(systemName: app.module.systemImage).font(.system(size: 17, weight: .semibold))
-                Text(app.module.title).font(.system(size: 15, weight: .heavy))
-                    .lineLimit(1).minimumScaleFactor(0.8)
-                Image(systemName: "chevron.up.chevron.down").font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 46)
-            .background(Theme.accent.opacity(0.16), in: Capsule())
-            .foregroundStyle(Theme.accent)
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-
-    // Low-key Docked Plus entry.
-    private var plusButton: some View {
-        Button(action: onPlus) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 15))
-                .frame(width: 30, height: 46)
-                .foregroundStyle(.tertiary)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Docked Plus")
-    }
-
-    private func control(_ icon: String, _ label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 2) {
-                Image(systemName: icon).font(.system(size: 18))
-                Text(label).font(.system(size: 8.5, weight: .bold))
-            }
-            .frame(width: 48, height: 46)
-            .foregroundStyle(Color.secondary)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
     }
 }
 
@@ -163,13 +121,15 @@ struct ActivityPickerPanel: View {
             .padding(.bottom, 10)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 14) {
                     ForEach(ActivityCategory.allCases) { section($0) }
+                    Color.clear.frame(height: 8)
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+                .padding(.bottom, 20)
             }
             .scrollIndicators(.visible)
+            .overlay(alignment: .bottom) { scrollHint }
 
             if closeToBottom { grabBar }
         }
@@ -177,6 +137,21 @@ struct ActivityPickerPanel: View {
         .background(Theme.elevated)
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(Theme.hairline))
+    }
+
+    /// Fade + chevron so it's obvious the list scrolls to more categories.
+    private var scrollHint: some View {
+        VStack(spacing: 0) {
+            LinearGradient(colors: [Theme.elevated.opacity(0), Theme.elevated],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: 30)
+            Image(systemName: "chevron.compact.down")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 2)
+                .background(Theme.elevated)
+        }
+        .allowsHitTesting(false)
     }
 
     /// The only thing that carries the swipe-to-close gesture, so it never

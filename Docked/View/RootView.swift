@@ -2,12 +2,10 @@
 //  RootView.swift
 //  Docked
 //
-//  The single screen. A GeometryReader hands the safe-area size to
-//  `LayoutSolver`, which lays every region out in safe-area coordinates. Only
-//  the video border ignores the safe area, so it can nudge a few points past
-//  the edge to meet the real PiP window; the tab bar and content stay fully
-//  inside the safe area so nothing hides under a system bar. The Layout button
-//  just flips top ⇄ bottom.
+//  The single screen. Nested GeometryReaders give a full-screen coordinate
+//  space; `LayoutSolver` places the TV cabinet at the top, a centred activity
+//  chooser at the bottom, and the module in between. Settings / Theme / Plus
+//  live on the console knobs.
 //
 
 import SwiftUI
@@ -45,29 +43,21 @@ struct RootView: View {
                     .clipShape(RoundedRectangle(cornerRadius: moduleCorner, style: .continuous))
                     .position(x: s.content.midX, y: s.content.midY)
 
-                // tab bar — in the top layout it's just the activity chooser +
-                // Plus; Move / Settings live on the TV console instead.
-                TabBarView(isHeader: s.tabIsHeader,
-                           compact: s.occupiesTop,
-                           onLayout: { endEditing(); toggleLayout() },
-                           onPicker: { endEditing(); showPicker = true },
-                           onSettings: { endEditing(); showSettings = true },
-                           onPlus: { endEditing(); showPlus = true })
+                // footer — just the activity chooser, centred
+                TabBarView(onPicker: { endEditing(); showPicker = true })
                     .frame(width: s.tab.width, height: s.tab.height)
                     .position(x: s.tab.midX, y: s.tab.midY)
 
-                // pixel-art TV frame
-                VideoFrameView(hole: s.holeInFrame, dimHint: hintDim)
+                // the TV set — one wood cabinet, screen + console
+                VideoFrameView(hole: s.holeInFrame,
+                               consoleRect: s.consoleInFrame,
+                               dimHint: hintDim,
+                               palette: app.tvTheme.palette)
                     .frame(width: s.video.width, height: s.video.height)
                     .position(x: s.video.midX, y: s.video.midY)
 
-                if s.occupiesTop {
-                    TVConsoleView(moveIcon: app.layout.moveIcon,
-                                  onMove: { endEditing(); toggleLayout() },
-                                  onSettings: { endEditing(); showSettings = true })
-                        .frame(width: s.console.width, height: s.console.height)
-                        .position(x: s.console.midX, y: s.console.midY)
-                }
+                // real knob buttons, dropped onto the drawn wells
+                consoleKnobs(s)
 
                 if app.debugOverlay {
                     DebugOverlay(solved: s)
@@ -98,7 +88,6 @@ struct RootView: View {
                     .zIndex(20)
                 }
                 }
-                .animation(Theme.layoutAnimation, value: app.layout)
                 .animation(.easeInOut(duration: 0.25), value: app.module)
                 .animation(.easeInOut(duration: 0.22), value: showPicker)
                 .animation(.easeInOut(duration: 0.3), value: showOnboarding)
@@ -111,7 +100,7 @@ struct RootView: View {
                 showSettings = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showPlus = true }
             })
-            .presentationDetents(settingsDetents)
+            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showPlus) {
@@ -119,7 +108,7 @@ struct RootView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
-        .task(id: app.layout) {
+        .task {
             hintDim = false
             try? await Task.sleep(for: .seconds(5))
             hintDim = true
@@ -144,12 +133,30 @@ struct RootView: View {
             #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    private func toggleLayout() {
-        withAnimation(Theme.layoutAnimation) { app.layout = app.layout.toggled }
-    }
+    /// The three console knobs, positioned over the wells drawn by VideoFrameView.
+    @ViewBuilder
+    private func consoleKnobs(_ s: SolvedLayout) -> some View {
+        let centers = LayoutSolver.knobCenters(inConsole: s.console)
+        let pal = app.tvTheme.palette
+        ZStack {
+            if centers.count == 3 {
+                TVKnob(icon: "gearshape.fill", palette: pal) {
+                    endEditing(); showSettings = true
+                }
+                .position(centers[0])
 
-    private var settingsDetents: Set<PresentationDetent> {
-        app.layout == .bottom ? [.large] : [.medium, .large]
+                TVKnob(icon: "paintpalette.fill", palette: pal) {
+                    withAnimation(.easeInOut(duration: 0.25)) { app.tvTheme = app.tvTheme.next }
+                }
+                .position(centers[1])
+
+                TVKnob(icon: "sparkles", palette: pal) {
+                    endEditing(); showPlus = true
+                }
+                .position(centers[2])
+            }
+        }
+        .allowsHitTesting(true)
     }
 
     @ViewBuilder

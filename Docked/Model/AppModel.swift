@@ -24,7 +24,7 @@ enum AppTheme: String, CaseIterable, Identifiable {
 final class AppModel {
 
     private enum K {
-        static let layout = "docked.layout"
+        static let tvTheme = "docked.tvTheme"
         static let module = "docked.module"
         static let hint = "docked.showHint"
         static let theme = "docked.theme"
@@ -41,7 +41,11 @@ final class AppModel {
         static let tttGames = "docked.ttt.games"
     }
 
-    var layout: VideoLayout { didSet { store(layout.rawValue, K.layout) } }
+    /// The video always sits in the top band now — kept as a constant so the
+    /// layout code keeps working without a UI toggle.
+    let layout: VideoLayout = .top
+
+    var tvTheme: TVTheme { didSet { store(tvTheme.rawValue, K.tvTheme) } }
     var module: ActivityModule { didSet { store(module.rawValue, K.module) } }
     var showHint: Bool { didSet { store(showHint, K.hint) } }
     var theme: AppTheme { didSet { store(theme.rawValue, K.theme) } }
@@ -71,7 +75,7 @@ final class AppModel {
 
     init() {
         let d = UserDefaults.standard
-        layout = VideoLayout(rawValue: d.string(forKey: K.layout) ?? "") ?? .top
+        tvTheme = TVTheme(rawValue: d.string(forKey: K.tvTheme) ?? "") ?? .walnut
         module = ActivityModule(rawValue: d.string(forKey: K.module) ?? "") ?? .doodle
         showHint = (d.object(forKey: K.hint) as? Bool) ?? true
         theme = AppTheme(rawValue: d.string(forKey: K.theme) ?? "") ?? .system
@@ -117,7 +121,6 @@ final class AppModel {
         flowLevel = 0
         popClearCount = 0
         tttGames = 0
-        layout = .top
         module = .doodle
         pinnedModules = AppModel.defaultPinned
         showHint = true

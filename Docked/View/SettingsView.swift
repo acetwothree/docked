@@ -58,16 +58,6 @@ struct SettingsView: View {
                                 trailing: { chevron })
                         }
                         divider
-                        row(icon: "rectangle.on.rectangle.angled", "Video position") {
-                            Picker("", selection: $app.layout) {
-                                Text("Top").tag(VideoLayout.top)
-                                Text("Bottom").tag(VideoLayout.bottom)
-                            }
-                            .pickerStyle(.segmented)
-                            .labelsHidden()
-                            .frame(width: 150)
-                        }
-                        divider
                         row(icon: "tv", "Show “drag here” hint") {
                             Toggle("", isOn: $app.showHint).labelsHidden()
                         }
