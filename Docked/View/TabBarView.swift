@@ -2,8 +2,8 @@
 //  TabBarView.swift
 //  Docked
 //
-//  Pinned activity tabs fill the leading space; a compact "More" opens a
-//  clean sheet with the rest. Layout / Settings sit snug at the trailing end.
+//  One activity chooser (current activity + a grid picker) plus Layout and
+//  Settings. Scales to any number of activities without crowding.
 //
 
 import SwiftUI
@@ -14,123 +14,99 @@ struct TabBarView: View {
     var onLayout: () -> Void
     var onSettings: () -> Void
 
-    @State private var showMore = false
-
-    private var pinned: [ActivityModule] {
-        var list = ActivityModule.allCases.filter { app.pinnedModules.contains($0) }
-        if !list.contains(app.module) { list.append(app.module) }
-        return list
-    }
-    private var overflow: [ActivityModule] {
-        ActivityModule.allCases.filter { !pinned.contains($0) }
-    }
+    @State private var showPicker = false
 
     var body: some View {
-        HStack(spacing: 3) {
-            ForEach(pinned) { mod in
-                tab(mod.systemImage, mod.title, tint: app.module == mod, fills: true) {
-                    withAnimation(.snappy(duration: 0.24)) { app.module = mod }
+        HStack(spacing: 8) {
+            Button { showPicker = true } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: app.module.systemImage).font(.system(size: 17, weight: .semibold))
+                    Text(app.module.title).font(.system(size: 15, weight: .heavy))
+                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
                 }
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .background(Theme.accent.opacity(0.16), in: Capsule())
+                .foregroundStyle(Theme.accent)
+                .contentShape(Capsule())
             }
-            if !overflow.isEmpty {
-                tab("ellipsis", "More", tint: false, fills: false) { showMore = true }
-            }
+            .buttonStyle(.plain)
 
-            Rectangle().fill(Theme.hairline).frame(width: 1, height: 32).padding(.horizontal, 3)
-
-            tab("rectangle.on.rectangle.angled", "Layout", tint: app.isEditingLayout, fills: false, action: onLayout)
-            tab("gearshape.fill", "Settings", tint: false, fills: false, action: onSettings)
+            control("rectangle.on.rectangle.angled", "Layout", active: app.isEditingLayout, action: onLayout)
+            control("gearshape.fill", "Settings", active: false, action: onSettings)
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.elevated)
         .overlay(alignment: isHeader ? .bottom : .top) {
             Rectangle().fill(Theme.hairline).frame(height: 1)
         }
-        .sheet(isPresented: $showMore) {
-            MoreSheet(
-                hidden: overflow,
-                onPick: { picked in
-                    withAnimation(.snappy(duration: 0.24)) { app.module = picked }
-                    showMore = false
-                },
-                onManage: { showMore = false; onSettings() }
-            )
-            .presentationDetents([.height(CGFloat(max(overflow.count, 1)) * 62 + 150)])
+        .sheet(isPresented: $showPicker) {
+            ActivityPickerSheet(current: app.module) { picked in
+                withAnimation(.snappy(duration: 0.24)) { app.module = picked }
+                showPicker = false
+            }
+            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
             .presentationBackground(Theme.elevated)
         }
     }
 
-    private func tab(_ icon: String, _ text: String, tint: Bool, fills: Bool,
-                     action: @escaping () -> Void) -> some View {
+    private func control(_ icon: String, _ label: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 19))
-                Text(text)
-                    .font(.system(size: 9, weight: .bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+            VStack(spacing: 2) {
+                Image(systemName: icon).font(.system(size: 18))
+                Text(label).font(.system(size: 8.5, weight: .bold))
             }
-            .frame(maxWidth: fills ? .infinity : nil, minHeight: 52)
-            .frame(width: fills ? nil : 52)
-            .padding(.vertical, 4)
-            .background {
-                if tint {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Theme.accent.opacity(0.16))
-                }
-            }
-            .foregroundStyle(tint ? Theme.accent : Color.secondary)
+            .frame(width: 52, height: 46)
+            .foregroundStyle(active ? Theme.accent : Color.secondary)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(text)
+        .accessibilityLabel(label)
     }
 }
 
-/// The "More" sheet — bigger, cleaner rows than a stock context menu.
-struct MoreSheet: View {
-    var hidden: [ActivityModule]
+struct ActivityPickerSheet: View {
+    var current: ActivityModule
     var onPick: (ActivityModule) -> Void
-    var onManage: () -> Void
+
+    private let cols = [GridItem(.adaptive(minimum: 104), spacing: 12)]
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("More activities")
+            Text("Choose an activity")
                 .font(.system(size: 16, weight: .heavy))
-                .padding(.top, 20).padding(.bottom, 12)
+                .padding(.top, 20).padding(.bottom, 14)
 
-            ForEach(hidden) { mod in
-                Button { onPick(mod) } label: {
-                    HStack(spacing: 14) {
-                        Image(systemName: mod.systemImage)
-                            .font(.system(size: 18, weight: .semibold))
-                            .frame(width: 44, height: 44)
-                            .background(Theme.accent.opacity(0.16),
-                                        in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-                            .foregroundStyle(Theme.accent)
-                        Text(mod.title).font(.system(size: 16, weight: .semibold))
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(.tertiary)
+            ScrollView {
+                LazyVGrid(columns: cols, spacing: 12) {
+                    ForEach(ActivityModule.allCases) { mod in
+                        let on = mod == current
+                        Button { onPick(mod) } label: {
+                            VStack(spacing: 8) {
+                                Image(systemName: mod.systemImage)
+                                    .font(.system(size: 26, weight: .semibold))
+                                Text(mod.title).font(.system(size: 13, weight: .bold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 96)
+                            .background(on ? AnyShapeStyle(Theme.accent.opacity(0.9)) : AnyShapeStyle(Theme.paper),
+                                       in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(on ? Color.clear : Theme.hairline)
+                            }
+                            .foregroundStyle(on ? Color(red: 0.11, green: 0.08, blue: 0.02) : Color.primary)
+                            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, 22).padding(.vertical, 9)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 24)
             }
-
-            Button(action: onManage) {
-                Label("Choose which tabs show", systemImage: "slider.horizontal.3")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 16)
-            }
-            .buttonStyle(.plain)
-
-            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
     }

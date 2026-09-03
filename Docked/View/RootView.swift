@@ -83,6 +83,11 @@ struct RootView: View {
             hintDim = true
         }
         .onAppear { showOnboarding = !app.hasOnboarded }
+        .onChange(of: app.hasOnboarded) { _, done in
+            // "Replay onboarding" from Settings flips this while RootView is
+            // already on screen, so react to it here (not just in onAppear).
+            if !done { showOnboarding = true }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { doodle.saveNow() }
         }
@@ -108,6 +113,9 @@ struct RootView: View {
             )
         case .pop:
             ZStack { Theme.paper; PopView() }
+                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
+        case .flow:
+            ZStack { Theme.paper; FlowView() }
                 .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
         }
     }
