@@ -133,7 +133,7 @@ struct RootView: View {
     }
 
     private func endEditing() {
-        UIApplication.shared.sendAction(
+        _ = UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 

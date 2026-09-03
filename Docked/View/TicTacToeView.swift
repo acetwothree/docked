@@ -2,9 +2,8 @@
 //  TicTacToeView.swift
 //  Docked
 //
-//  Pass-the-phone tic-tac-toe. X always starts; the loser (or X after a draw)
-//  goes first next round. Keeps a session score and a lifetime games-played
-//  tally.
+//  Pass-the-phone tic-tac-toe. X starts the first game; the loser (or X after
+//  a draw) starts the next. Session score + a lifetime games-played tally.
 //
 
 import SwiftUI
@@ -12,13 +11,15 @@ import SwiftUI
 struct TicTacToeView: View {
     @Environment(AppModel.self) private var app
 
-    @State private var board: [String?] = Array(repeating: nil, count: 9)
-    @State private var xTurn = true
-    @State private var winner: String? = nil      // "X", "O", or "-" for a draw
-    @State private var winLine: [Int]? = nil
+    // 0 = empty, 1 = X, 2 = O
+    @State private var board: [Int] = Array(repeating: 0, count: 9)
+    @State private var turn = 1
+    @State private var outcome = 0            // 0 = playing, 1 = X won, 2 = O won, 3 = draw
+    @State private var winLine: [Int] = []
     @State private var xScore = 0
     @State private var oScore = 0
     @State private var moveTick = 0
+    @State private var winTick = 0
 
     private let lines: [[Int]] = [
         [0, 1, 2], [3, 4, 5], [6, 7, 8],
@@ -31,77 +32,66 @@ struct TicTacToeView: View {
             header
 
             GeometryReader { geo in
-                let side = min(geo.size.width, geo.size.height)
-                grid(cell: (side - 16) / 3)
-                    .frame(width: side, height: side)
+                let s = min(geo.size.width, geo.size.height)
+                grid(cell: (s - 16) / 3)
+                    .frame(width: s, height: s)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
-            footer
+            Button {
+                withAnimation { newRound() }
+            } label: {
+                let title = outcome == 0 ? "Restart" : "Play again"
+                Label(title, systemImage: "arrow.counterclockwise")
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundStyle(Theme.accent)
+            }
+            .buttonStyle(.plain)
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sensoryFeedback(.impact(weight: .light), trigger: moveTick)
-        .sensoryFeedback(.success, trigger: winner) { _, new in new == "X" || new == "O" }
+        .sensoryFeedback(.success, trigger: winTick)
     }
 
     private var header: some View {
         HStack {
-            score("X", xScore, active: winner == nil && xTurn)
+            scorePill("X", xScore, active: outcome == 0 && turn == 1)
             Spacer()
             Text(statusText)
                 .font(.system(size: 14, weight: .heavy))
                 .foregroundStyle(.secondary)
             Spacer()
-            score("O", oScore, active: winner == nil && !xTurn)
+            scorePill("O", oScore, active: outcome == 0 && turn == 2)
         }
     }
 
-    private func score(_ mark: String, _ n: Int, active: Bool) -> some View {
+    private func scorePill(_ label: String, _ n: Int, active: Bool) -> some View {
         VStack(spacing: 1) {
-            Text(mark).font(.system(size: 15, weight: .black))
+            Text(label).font(.system(size: 15, weight: .black))
             Text("\(n)").font(.system(size: 12, weight: .bold)).foregroundStyle(.secondary)
         }
         .foregroundStyle(active ? Theme.accent : Color.primary)
-        .padding(.horizontal, 10).padding(.vertical, 4)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
         .background(active ? Theme.accent.opacity(0.14) : Color.clear, in: Capsule())
     }
 
     private var statusText: String {
-        switch winner {
-        case "X": "X wins"
-        case "O": "O wins"
-        case "-": "Draw"
-        default: xTurn ? "X to move" : "O to move"
+        switch outcome {
+        case 1: return "X wins"
+        case 2: return "O wins"
+        case 3: return "Draw"
+        default: return turn == 1 ? "X to move" : "O to move"
         }
     }
 
     private func grid(cell: CGFloat) -> some View {
         VStack(spacing: 8) {
-            ForEach(0..<3, id: \.self) { r in
+            ForEach(Array(0..<3), id: \.self) { row in
                 HStack(spacing: 8) {
-                    ForEach(0..<3, id: \.self) { c in
-                        let i = r * 3 + c
-                        Button { tap(i) } label: {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(Theme.paper)
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                            .stroke((winLine?.contains(i) ?? false) ? Theme.accent : Theme.hairline,
-                                                    lineWidth: (winLine?.contains(i) ?? false) ? 3 : 1)
-                                    }
-                                if let mark = board[i] {
-                                    Text(mark)
-                                        .font(.system(size: cell * 0.5, weight: .black, design: .rounded))
-                                        .foregroundStyle(mark == "X" ? Theme.accent : Color.primary)
-                                        .transition(.scale.combined(with: .opacity))
-                                }
-                            }
-                            .frame(width: cell, height: cell)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(board[i] != nil || winner != nil)
+                    ForEach(Array(0..<3), id: \.self) { col in
+                        cellButton(index: row * 3 + col, cell: cell)
                     }
                 }
             }
@@ -109,46 +99,64 @@ struct TicTacToeView: View {
         .animation(.snappy(duration: 0.18), value: board)
     }
 
-    private var footer: some View {
-        Button {
-            withAnimation { newRound() }
+    private func cellButton(index: Int, cell: CGFloat) -> some View {
+        let value = board[index]
+        let highlighted = winLine.contains(index)
+        return Button {
+            play(index)
         } label: {
-            Label(winner == nil ? "Restart" : "Play again", systemImage: "arrow.counterclockwise")
-                .font(.system(size: 13, weight: .heavy))
-                .foregroundStyle(Theme.accent)
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Theme.paper)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(highlighted ? Theme.accent : Theme.hairline,
+                                  lineWidth: highlighted ? 3 : 1)
+                if value != 0 {
+                    Text(value == 1 ? "X" : "O")
+                        .font(.system(size: cell * 0.5, weight: .black, design: .rounded))
+                        .foregroundStyle(value == 1 ? Theme.accent : Color.primary)
+                }
+            }
+            .frame(width: cell, height: cell)
         }
         .buttonStyle(.plain)
+        .disabled(value != 0 || outcome != 0)
     }
 
     // MARK: logic
 
-    private func tap(_ i: Int) {
-        guard board[i] == nil, winner == nil else { return }
-        board[i] = xTurn ? "X" : "O"
+    private func play(_ i: Int) {
+        guard board[i] == 0, outcome == 0 else { return }
+        board[i] = turn
         moveTick += 1
 
-        if let line = lines.first(where: { l in
-            let m = board[l[0]]
-            return m != nil && m == board[l[1]] && m == board[l[2]]
-        }) {
-            winner = board[line[0]]
-            winLine = line
-            if winner == "X" { xScore += 1 } else { oScore += 1 }
-            app.tttGames += 1
-        } else if !board.contains(where: { $0 == nil }) {
-            winner = "-"
-            app.tttGames += 1
-        } else {
-            xTurn.toggle()
+        for line in lines {
+            if board[line[0]] != 0,
+               board[line[0]] == board[line[1]],
+               board[line[1]] == board[line[2]] {
+                outcome = board[line[0]]
+                winLine = line
+                winTick += 1
+                if outcome == 1 { xScore += 1 } else { oScore += 1 }
+                app.tttGames += 1
+                return
+            }
         }
+
+        if !board.contains(0) {
+            outcome = 3
+            app.tttGames += 1
+            return
+        }
+
+        turn = turn == 1 ? 2 : 1
     }
 
     private func newRound() {
-        // Loser starts; after a draw, X starts.
-        let xStarts = (winner == "O") || (winner != "X")
-        board = Array(repeating: nil, count: 9)
-        winner = nil
-        winLine = nil
-        xTurn = xStarts
+        let loserStarts = outcome == 2 ? 1 : (outcome == 1 ? 2 : 1)
+        board = Array(repeating: 0, count: 9)
+        winLine = []
+        outcome = 0
+        turn = loserStarts
     }
 }
