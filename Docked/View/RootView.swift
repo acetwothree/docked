@@ -91,7 +91,7 @@ struct RootView: View {
         .preferredColorScheme(app.theme.colorScheme)
         .sheet(isPresented: $showSettings) {
             SettingsView()
-                .presentationDetents(app.layout == .bottom ? [.large] : [.medium, .large])
+                .presentationDetents(settingsDetents)
                 .presentationDragIndicator(.visible)
         }
         .task(id: app.layout) {
@@ -112,6 +112,10 @@ struct RootView: View {
 
     private var moduleCorner: CGFloat {
         (app.module == .zen || app.module == .pop) ? 0 : 20
+    }
+
+    private var settingsDetents: Set<PresentationDetent> {
+        app.layout == .bottom ? [.large] : [.medium, .large]
     }
 
     @ViewBuilder

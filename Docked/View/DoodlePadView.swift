@@ -27,10 +27,7 @@ struct DoodlePadView: View {
             let strokeCount = store.strokes.count
 
             ZStack(alignment: .bottom) {
-                DoodleCanvas(strokes: store.strokes,
-                             live: currentPoints.count > 1
-                                 ? .init(points: currentPoints, colorHex: colorHex, width: lineWidth)
-                                 : nil)
+                DoodleCanvas(strokes: store.strokes, live: liveStroke)
                     .id(strokeCount)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
@@ -95,6 +92,11 @@ struct DoodlePadView: View {
                 }
                 currentPoints = []
             }
+    }
+
+    private var liveStroke: DoodleCanvas.Live? {
+        guard currentPoints.count > 1 else { return nil }
+        return DoodleCanvas.Live(points: currentPoints, colorHex: colorHex, width: lineWidth)
     }
 
     @MainActor private func refreshExport() {

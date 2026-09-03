@@ -29,7 +29,7 @@ struct FlowView: View {
                         .foregroundStyle(.secondary)
                     Text("\(model.filledCount)/\(model.cellCount)")
                         .font(.system(size: 11, weight: .heavy)).monospacedDigit()
-                        .foregroundStyle(model.filledCount == model.cellCount ? Color.green : .tertiary)
+                        .foregroundStyle(model.filledCount == model.cellCount ? Color.green : Color.secondary)
                     Spacer()
                     Button { model.restart(); active = nil } label: {
                         Image(systemName: "arrow.counterclockwise")

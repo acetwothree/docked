@@ -88,7 +88,7 @@ struct OnboardingView: View {
 
     private var page3: some View {
         card(emoji: "⧉", title: "Place it & go") {
-            Text("Tap **Layout** any time to pick where your video sits — four corners, or a big top / bottom slot. Then drag the floating window into the TV frame. That's it.")
+            Text("Tap **Move** any time to flip your video between the top and bottom of the screen. Then drag the floating window into the TV frame. That's it.")
         }
     }
 
@@ -143,10 +143,10 @@ struct OnboardingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    private func step(_ n: String, _ text: String) -> some View {
+    private func step(_ n: String, _ text: LocalizedStringKey) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(n).fontWeight(.heavy).foregroundStyle(Theme.accent)
-            Text(.init(text))
+            Text(text)
         }
         .font(.system(size: 12.5))
         .multilineTextAlignment(.leading)
