@@ -11,6 +11,7 @@ import SwiftUI
 struct TabBarView: View {
     @Environment(AppModel.self) private var app
     var isHeader: Bool
+    var compact: Bool = false
     var onLayout: () -> Void
     var onPicker: () -> Void
     var onSettings: () -> Void
@@ -18,36 +19,17 @@ struct TabBarView: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            control(app.layout.moveIcon, "Move", action: onLayout)
-
-            Button(action: onPicker) {
-                HStack(spacing: 8) {
-                    Image(systemName: app.module.systemImage).font(.system(size: 17, weight: .semibold))
-                    Text(app.module.title).font(.system(size: 15, weight: .heavy))
-                        .lineLimit(1).minimumScaleFactor(0.8)
-                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 46)
-                .background(Theme.accent.opacity(0.16), in: Capsule())
-                .foregroundStyle(Theme.accent)
-                .contentShape(Capsule())
+            if !compact {
+                control(app.layout.moveIcon, "Move", action: onLayout)
             }
-            .buttonStyle(.plain)
 
-            control("gearshape.fill", "Settings", action: onSettings)
+            chooserButton
 
-            // Low-key Docked Plus entry.
-            Button(action: onPlus) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 15))
-                    .frame(width: 30, height: 46)
-                    .foregroundStyle(.tertiary)
-                    .contentShape(Rectangle())
+            if !compact {
+                control("gearshape.fill", "Settings", action: onSettings)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Docked Plus")
+
+            plusButton
         }
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -55,6 +37,37 @@ struct TabBarView: View {
         .overlay(alignment: isHeader ? .bottom : .top) {
             Rectangle().fill(Theme.hairline).frame(height: 1)
         }
+    }
+
+    private var chooserButton: some View {
+        Button(action: onPicker) {
+            HStack(spacing: 8) {
+                Image(systemName: app.module.systemImage).font(.system(size: 17, weight: .semibold))
+                Text(app.module.title).font(.system(size: 15, weight: .heavy))
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
+            .background(Theme.accent.opacity(0.16), in: Capsule())
+            .foregroundStyle(Theme.accent)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // Low-key Docked Plus entry.
+    private var plusButton: some View {
+        Button(action: onPlus) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 15))
+                .frame(width: 30, height: 46)
+                .foregroundStyle(.tertiary)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Docked Plus")
     }
 
     private func control(_ icon: String, _ label: String, action: @escaping () -> Void) -> some View {
@@ -102,12 +115,9 @@ struct ActivityPickerPanel: View {
         // play
         .init(title: "2048",      systemImage: "square.grid.3x3.fill",      category: .play),
         .init(title: "Solitaire", systemImage: "suit.spade.fill",          category: .play),
-        .init(title: "Idle Farm", systemImage: "leaf.fill",                category: .play),
-        // fidget — viral-y, satisfying
-        .init(title: "Sand Sort",   systemImage: "circle.grid.3x3.fill",   category: .fidget),
-        .init(title: "Scratcher",   systemImage: "rectangle.dashed",       category: .fidget),
+        // fidget
         .init(title: "Spinner",     systemImage: "fan.fill",               category: .fidget),
-        .init(title: "Zen Sand",    systemImage: "wind",                   category: .fidget),
+        .init(title: "Kinetic Sand", systemImage: "hand.draw.fill",        category: .fidget),
         // 2 player (same phone)
         .init(title: "Connect 4",    systemImage: "circle.grid.cross.fill", category: .versus),
         .init(title: "Dots & Boxes", systemImage: "square.grid.4x3.fill",   category: .versus),

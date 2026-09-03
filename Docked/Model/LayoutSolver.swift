@@ -14,6 +14,7 @@ import CoreGraphics
 struct SolvedLayout {
     var pip: CGRect           // approximate PiP window footprint (the opening)
     var video: CGRect         // the pixel border — pip grown by a bezel
+    var console: CGRect       // retro knob panel under the video (top layout only; .zero otherwise)
     var tab: CGRect
     var tabIsHeader: Bool
     var content: CGRect       // module area — a clean rect away from the video
@@ -40,8 +41,9 @@ enum LayoutSolver {
     //      · bandAspect      — video width / height (smaller = taller) ----
     static let bandSideInset: CGFloat = 12
     static let topBorderGap: CGFloat = -5      // .top: border top vs the island bottom
-    static let bottomBorderGap: CGFloat = 24   // .bottom: gap up from the physical bottom
+    static let bottomBorderGap: CGFloat = 27   // .bottom: gap up from the physical bottom
     static let bandAspect: CGFloat = 1.82
+    static let consoleHeight: CGFloat = 58     // retro knob panel under a top video
 
     /// `size` is the FULL screen size; `insetTop` / `insetBottom` are the
     /// safe-area insets.
@@ -57,11 +59,15 @@ enum LayoutSolver {
 
         let pip: CGRect
         let video: CGRect
+        var console = CGRect.zero
         if occupiesTop {
             let vMinY = insetTop + topBorderGap   // just under the status bar / island
             video = CGRect(x: bandSideInset - bezel, y: vMinY,
                            width: bw + bezel * 2, height: vH)
             pip = CGRect(x: bandSideInset, y: vMinY + bezelOuter, width: bw, height: bh)
+            // knob panel, tucked under the border and slightly narrower
+            console = CGRect(x: video.minX + 14, y: video.maxY - 6,
+                             width: video.width - 28, height: consoleHeight)
         } else {
             let vMaxY = H - bottomBorderGap       // just above the physical bottom
             video = CGRect(x: bandSideInset - bezel, y: vMaxY - vH,
@@ -74,14 +80,14 @@ enum LayoutSolver {
             ? CGRect(x: 0, y: H - insetBottom - TAB, width: W, height: TAB)
             : CGRect(x: 0, y: insetTop, width: W, height: TAB)
 
-        // Content = a clean full-width rect between the video and the tab bar.
+        // Content = a clean full-width rect between the video (+console) and the tab bar.
         let G: CGFloat = 8
-        let cTop = occupiesTop ? video.maxY + G : tab.maxY + G
+        let cTop = occupiesTop ? console.maxY + G : tab.maxY + G
         let cBot = occupiesTop ? tab.minY - G : video.minY - G
         let content = CGRect(x: 8, y: cTop, width: W - 16, height: max(80, cBot - cTop))
 
         return SolvedLayout(
-            pip: pip, video: video, tab: tab, tabIsHeader: !occupiesTop,
+            pip: pip, video: video, console: console, tab: tab, tabIsHeader: !occupiesTop,
             content: content, occupiesTop: occupiesTop
         )
     }

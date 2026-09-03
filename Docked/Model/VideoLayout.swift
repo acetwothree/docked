@@ -53,14 +53,14 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
 }
 
 enum ActivityModule: String, CaseIterable, Identifiable {
-    case doodle, notes, game, zen, flow, pop, click, tictactoe
+    case doodle, notes, game, zen, flow, idle, pop, click, scratch, sand, tictactoe
     var id: String { rawValue }
 
     var category: ActivityCategory {
         switch self {
         case .doodle, .notes: .create
-        case .game, .zen, .flow: .play
-        case .pop, .click: .fidget
+        case .game, .zen, .flow, .idle: .play
+        case .pop, .click, .scratch, .sand: .fidget
         case .tictactoe: .versus
         }
     }
@@ -72,8 +72,11 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .game: "Runner"
         case .zen: "Blocks"
         case .flow: "Flow"
+        case .idle: "Reactor"
         case .pop: "Pop"
         case .click: "Clicker"
+        case .scratch: "Scratcher"
+        case .sand: "Sand Sort"
         case .tictactoe: "Tic-Tac-Toe"
         }
     }
@@ -84,8 +87,11 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .game: "figure.run"
         case .zen: "square.grid.2x2.fill"
         case .flow: "point.3.connected.trianglepath.dotted"
+        case .idle: "bolt.fill"
         case .pop: "circle.hexagongrid.fill"
         case .click: "hand.tap.fill"
+        case .scratch: "rectangle.dashed"
+        case .sand: "chart.bar.fill"
         case .tictactoe: "number"
         }
     }

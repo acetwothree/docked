@@ -45,12 +45,11 @@ struct RootView: View {
                     .clipShape(RoundedRectangle(cornerRadius: moduleCorner, style: .continuous))
                     .position(x: s.content.midX, y: s.content.midY)
 
-                // tab bar — Move · activity chooser · Settings · Plus
+                // tab bar — in the top layout it's just the activity chooser +
+                // Plus; Move / Settings live on the TV console instead.
                 TabBarView(isHeader: s.tabIsHeader,
-                           onLayout: {
-                               endEditing()
-                               withAnimation(Theme.layoutAnimation) { app.layout = app.layout.toggled }
-                           },
+                           compact: s.occupiesTop,
+                           onLayout: { endEditing(); toggleLayout() },
                            onPicker: { endEditing(); showPicker = true },
                            onSettings: { endEditing(); showSettings = true },
                            onPlus: { endEditing(); showPlus = true })
@@ -61,6 +60,14 @@ struct RootView: View {
                 VideoFrameView(hole: s.holeInFrame, dimHint: hintDim)
                     .frame(width: s.video.width, height: s.video.height)
                     .position(x: s.video.midX, y: s.video.midY)
+
+                if s.occupiesTop {
+                    TVConsoleView(moveIcon: app.layout.moveIcon,
+                                  onMove: { endEditing(); toggleLayout() },
+                                  onSettings: { endEditing(); showSettings = true })
+                        .frame(width: s.console.width, height: s.console.height)
+                        .position(x: s.console.midX, y: s.console.midY)
+                }
 
                 if app.debugOverlay {
                     DebugOverlay(solved: s)
@@ -137,6 +144,10 @@ struct RootView: View {
             #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
+    private func toggleLayout() {
+        withAnimation(Theme.layoutAnimation) { app.layout = app.layout.toggled }
+    }
+
     private var settingsDetents: Set<PresentationDetent> {
         app.layout == .bottom ? [.large] : [.medium, .large]
     }
@@ -165,8 +176,17 @@ struct RootView: View {
         case .flow:
             ZStack { Theme.paper; FlowView() }
                 .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
+        case .idle:
+            ZStack { Theme.paper; IdleGameView() }
+                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
         case .click:
             ZStack { Theme.paper; ClickPenView() }
+                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
+        case .scratch:
+            ZStack { Theme.paper; ScratchGameView() }
+                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
+        case .sand:
+            ZStack { Theme.paper; SandSortView() }
                 .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
         case .tictactoe:
             ZStack { Theme.paper; TicTacToeView() }
@@ -182,6 +202,7 @@ private struct DebugOverlay: View {
         ZStack(alignment: .topLeading) {
             box(solved.pip, "pip", .orange)
             box(solved.video, "frame", .red)
+            box(solved.console, "console", .yellow)
             box(solved.content, "content", .green)
             box(solved.tab, "tab", .blue)
         }
