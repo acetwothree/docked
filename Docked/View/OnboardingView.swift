@@ -3,23 +3,20 @@
 //  Docked
 //
 //  A floating card shown over the (dimmed) app on first launch: what Docked
-//  is, how to turn on Picture-in-Picture, and how to place the video.
-//  Presented as an in-app overlay — not its own screen — so the dashboard
-//  stays visible behind it.
+//  is, how to turn on Picture-in-Picture, how to place the video, and a note
+//  that the app is free. Presented as an in-app overlay, not its own screen.
 //
 
 import SwiftUI
-import UIKit
 
 struct OnboardingView: View {
     var onDone: () -> Void
 
-    @Environment(\.openURL) private var openURL
     @State private var page = 0
+    private let pageCount = 4
 
     var body: some View {
         ZStack {
-            // dim + blur the live app behind the card
             Color.black.opacity(0.55)
                 .ignoresSafeArea()
                 .transition(.opacity)
@@ -37,51 +34,44 @@ struct OnboardingView: View {
                 page1.tag(0)
                 page2.tag(1)
                 page3.tag(2)
+                page4.tag(3)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 340)
+            .frame(height: 296)
 
             controls
         }
         .background(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Theme.elevated)
+            RoundedRectangle(cornerRadius: 26, style: .continuous).fill(Theme.elevated)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(Theme.hairline)
+            RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(Theme.hairline)
         )
-        .shadow(color: .black.opacity(0.5), radius: 30, y: 12)
+        .shadow(color: .black.opacity(0.5), radius: 28, y: 12)
     }
 
     // MARK: pages
 
     private var page1: some View {
         card(emoji: "🧩", title: "Meet Docked") {
-            Text("Watch anything in a floating window while you doodle, take notes, or play. Docked reshapes itself around your video so nothing is ever hidden underneath it.")
+            Text("Watch anything in a floating window while you doodle, take notes, or play. Docked reshapes itself around your video so nothing is hidden underneath it.")
         }
     }
 
     private var page2: some View {
         card(emoji: "📺", title: "Turn on Picture-in-Picture") {
-            VStack(alignment: .leading, spacing: 10) {
-                step("1", "Turn on **Start PiP Automatically** in iPhone Settings ▸ General ▸ Picture in Picture.")
+            VStack(alignment: .leading, spacing: 9) {
+                step("1", "In **Settings ▸ General ▸ Picture in Picture**, turn on **Start PiP Automatically**.")
                 step("2", "Play a video full-screen in YouTube, Netflix, Safari…")
                 step("3", "Swipe up to the Home Screen — the video becomes a floating window.")
 
-                Button {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-                } label: {
-                    Label("Open iPhone Settings", systemImage: "arrow.up.forward.app.fill")
-                        .font(.system(size: 13, weight: .heavy))
+                Button { PiPSettings.open() } label: {
+                    Label("Open General settings", systemImage: "arrow.up.forward.app.fill")
+                        .font(.system(size: 12.5, weight: .heavy))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Theme.accent)
                 .padding(.top, 2)
-
-                Text("Opens Settings at Docked — tap ‹ Settings, then General ▸ Picture in Picture.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
             }
         }
     }
@@ -89,6 +79,12 @@ struct OnboardingView: View {
     private var page3: some View {
         card(emoji: "⧉", title: "Place it & go") {
             Text("Tap **Move** any time to flip your video between the top and bottom of the screen. Then drag the floating window into the TV frame. That's it.")
+        }
+    }
+
+    private var page4: some View {
+        card(emoji: "✨", title: "Free, no ads") {
+            Text("Docked is free with no ads or tracking. If you want extra games and want to support development, check out **Docked Plus** in Settings — one small monthly subscription, and the core app always stays free.")
         }
     }
 
@@ -101,7 +97,7 @@ struct OnboardingView: View {
             Spacer()
 
             HStack(spacing: 6) {
-                ForEach(0..<3) { i in
+                ForEach(0..<pageCount, id: \.self) { i in
                     Capsule()
                         .fill(i == page ? Theme.accent : Color.white.opacity(0.15))
                         .frame(width: i == page ? 18 : 7, height: 7)
@@ -111,17 +107,17 @@ struct OnboardingView: View {
             Spacer()
 
             Button {
-                if page < 2 { withAnimation { page += 1 } } else { onDone() }
+                if page < pageCount - 1 { withAnimation { page += 1 } } else { onDone() }
             } label: {
-                Text(page == 2 ? "Get started" : "Next")
+                Text(page == pageCount - 1 ? "Get started" : "Next")
             }
             .fontWeight(.heavy)
-            .padding(.vertical, 10).padding(.horizontal, 20)
+            .padding(.vertical, 9).padding(.horizontal, 18)
             .background(Theme.accent, in: Capsule())
             .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     private func card<Content: View>(
@@ -129,18 +125,18 @@ struct OnboardingView: View {
         title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(spacing: 14) {
-            Text(emoji).font(.system(size: 46))
-            Text(title).font(.system(size: 20, weight: .heavy))
+        VStack(spacing: 12) {
+            Text(emoji).font(.system(size: 40))
+            Text(title).font(.system(size: 19, weight: .heavy))
                 .multilineTextAlignment(.center)
             content()
-                .font(.system(size: 13.5))
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
-        .padding(.horizontal, 26)
-        .padding(.top, 26)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 22)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func step(_ n: String, _ text: LocalizedStringKey) -> some View {
@@ -148,7 +144,7 @@ struct OnboardingView: View {
             Text(n).fontWeight(.heavy).foregroundStyle(Theme.accent)
             Text(text)
         }
-        .font(.system(size: 12.5))
+        .font(.system(size: 12))
         .multilineTextAlignment(.leading)
     }
 }

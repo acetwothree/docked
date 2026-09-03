@@ -34,6 +34,7 @@ final class AppModel {
         static let highScore = "docked.runner.highScore"
         static let zenHigh = "docked.zen.highScore"
         static let pinned = "docked.pinnedModules"
+        static let clickPen = "docked.clickPen.count"
     }
 
     var layout: VideoLayout { didSet { store(layout.rawValue, K.layout) } }
@@ -45,6 +46,10 @@ final class AppModel {
     var debugOverlay: Bool { didSet { store(debugOverlay, K.debug) } }
     var runnerHighScore: Int { didSet { store(runnerHighScore, K.highScore) } }
     var zenHighScore: Int { didSet { store(zenHighScore, K.zenHigh) } }
+
+    /// Lifetime tally for the Clicker fidget. Never reset — not even by
+    /// "Clear all app data".
+    var clickPenCount: Int { didSet { store(clickPenCount, K.clickPen) } }
 
     /// Which modules show directly in the bar; the rest live under "More".
     var pinnedModules: [ActivityModule] {
@@ -64,6 +69,7 @@ final class AppModel {
         debugOverlay = d.bool(forKey: K.debug)
         runnerHighScore = d.integer(forKey: K.highScore)
         zenHighScore = d.integer(forKey: K.zenHigh)
+        clickPenCount = d.integer(forKey: K.clickPen)
         if let raw = d.array(forKey: K.pinned) as? [String] {
             let restored = raw.compactMap(ActivityModule.init(rawValue:))
             pinnedModules = restored.isEmpty ? AppModel.defaultPinned : restored

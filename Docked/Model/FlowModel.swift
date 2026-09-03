@@ -15,6 +15,10 @@ struct FlowLevel {
     let size: Int
     /// (colour index, endpoint A, endpoint B)
     let pairs: [(Int, FlowCell, FlowCell)]
+    /// When true the level also needs every cell covered (classic Flow rule).
+    /// The first couple of levels leave this off so new players just learn to
+    /// connect the dots.
+    var fill: Bool = false
 }
 
 enum FlowPalette {
@@ -50,47 +54,47 @@ final class FlowModel {
 
     // MARK: Levels
 
-    // Every level below is built from a hand-traced solution that covers
-    // EVERY cell, so each is guaranteed solvable and the "fill the whole
-    // grid" win condition is always reachable.
+    // Levels 1–2 just ask you to connect the pairs (gentle intro). Levels 3+
+    // also need every cell covered — each of those is built from a hand-traced
+    // solution that tiles the whole grid, so the fill is always reachable.
     static let levels: [FlowLevel] = [
-        // 5×5 — 3 pairs. Rows 0-1 comb / row 2 / rows 3-4 comb.
+        // 1 — 4×4, connect only. Two edge runs + a short middle.
+        FlowLevel(size: 4, pairs: [
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 0, c: 3)),
+            (1, FlowCell(r: 3, c: 0), FlowCell(r: 3, c: 3)),
+            (2, FlowCell(r: 1, c: 1), FlowCell(r: 2, c: 2)),
+        ]),
+        // 2 — 5×5, connect only.
         FlowLevel(size: 5, pairs: [
-            (0, FlowCell(r: 0, c: 0), FlowCell(r: 1, c: 4)),
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 4, c: 0)),
+            (1, FlowCell(r: 0, c: 4), FlowCell(r: 4, c: 4)),
+            (2, FlowCell(r: 2, c: 1), FlowCell(r: 2, c: 3)),
+        ]),
+        // 3 — 5×5, fill. Three simple hairpins: trace row 0-1, row 2, row 3-4.
+        FlowLevel(size: 5, pairs: [
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 1, c: 0)),
             (1, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 4)),
-            (2, FlowCell(r: 3, c: 0), FlowCell(r: 4, c: 4)),
-        ]),
-        // 5×5 — 4 pairs.
-        FlowLevel(size: 5, pairs: [
-            (0, FlowCell(r: 0, c: 0), FlowCell(r: 0, c: 4)),
-            (1, FlowCell(r: 1, c: 0), FlowCell(r: 2, c: 2)),
-            (2, FlowCell(r: 2, c: 0), FlowCell(r: 4, c: 1)),
-            (3, FlowCell(r: 4, c: 2), FlowCell(r: 3, c: 4)),
-        ]),
-        // 6×6 — 4 pairs. Two combs on top, two combs on the bottom.
+            (2, FlowCell(r: 3, c: 0), FlowCell(r: 4, c: 0)),
+        ], fill: true),
+        // 4 — 6×6, fill. Two 2-row combs on top, two on the bottom.
         FlowLevel(size: 6, pairs: [
             (0, FlowCell(r: 0, c: 0), FlowCell(r: 0, c: 5)),
             (1, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 5)),
             (2, FlowCell(r: 4, c: 0), FlowCell(r: 5, c: 2)),
             (3, FlowCell(r: 5, c: 3), FlowCell(r: 4, c: 5)),
-        ]),
-        // 6×6 — 5 pairs.
-        FlowLevel(size: 6, pairs: [
-            (0, FlowCell(r: 0, c: 0), FlowCell(r: 0, c: 5)),
-            (1, FlowCell(r: 3, c: 0), FlowCell(r: 2, c: 2)),
-            (2, FlowCell(r: 3, c: 3), FlowCell(r: 2, c: 5)),
-            (3, FlowCell(r: 4, c: 0), FlowCell(r: 5, c: 2)),
-            (4, FlowCell(r: 5, c: 3), FlowCell(r: 4, c: 5)),
-        ]),
-        // 7×7 — 5 pairs.
+        ], fill: true),
+        // 5 — 7×7, fill.
         FlowLevel(size: 7, pairs: [
             (0, FlowCell(r: 0, c: 0), FlowCell(r: 1, c: 6)),
             (1, FlowCell(r: 2, c: 0), FlowCell(r: 3, c: 6)),
             (2, FlowCell(r: 4, c: 0), FlowCell(r: 4, c: 6)),
             (3, FlowCell(r: 5, c: 0), FlowCell(r: 6, c: 3)),
             (4, FlowCell(r: 5, c: 3), FlowCell(r: 6, c: 6)),
-        ]),
+        ], fill: true),
     ]
+
+    /// Does the current level need the whole grid covered?
+    var requiresFill: Bool { Self.levels[levelIndex % Self.levels.count].fill }
 
     private func load(_ idx: Int) {
         levelIndex = idx
@@ -165,16 +169,18 @@ final class FlowModel {
             return (path.first == a && path.last == b) || (path.first == b && path.last == a)
         }
         guard linked else { return }
-        // Classic Flow rule: every cell must be covered. Paths never overlap
+        // Later levels also need every cell covered. Paths never overlap
         // (extend() forbids it), so summing their lengths is enough.
-        let filled = paths.values.reduce(0) { $0 + $1.count }
-        if filled == size * size {
-            completions += 1
-            reached = max(reached, levelIndex + 1)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) { [weak self] in
-                guard let self else { return }
-                self.load(self.levelIndex + 1)
-            }
+        if requiresFill {
+            let filled = paths.values.reduce(0) { $0 + $1.count }
+            guard filled == size * size else { return }
+        }
+
+        completions += 1
+        reached = max(reached, levelIndex + 1)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) { [weak self] in
+            guard let self else { return }
+            self.load(self.levelIndex + 1)
         }
     }
 

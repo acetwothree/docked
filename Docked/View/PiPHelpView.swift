@@ -6,22 +6,19 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct PiPHelpView: View {
-    @Environment(\.openURL) private var openURL
-
     var body: some View {
         List {
             Section("Enable Picture-in-Picture on iPhone") {
                 Text("Open **Settings ▸ General ▸ Picture in Picture** and turn on **Start PiP Automatically**.")
                 Button {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                    PiPSettings.open()
                 } label: {
-                    Label("Open iPhone Settings", systemImage: "arrow.up.forward.app.fill")
+                    Label("Open General settings", systemImage: "arrow.up.forward.app.fill")
                         .font(.subheadline.weight(.semibold))
                 }
-                Text("iOS only lets apps open Settings at their own page — from there tap ‹ Settings, then **General ▸ Picture in Picture**.")
+                Text("Takes you to **Settings ▸ General** — tap **Picture in Picture** there. (If iOS opens Docked's own page instead, tap ‹ Settings ▸ General.)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -44,7 +41,7 @@ struct PiPHelpView: View {
                 fix("PiP toggle is greyed out", "Re-check Settings ▸ General ▸ Picture in Picture.")
                 fix("The app blocks PiP", "Some free tiers disable it — play the video in Safari or another app instead.")
                 fix("Window slid off the edge", "Swipe inward from that edge to pull it back on screen.")
-                fix("Frame doesn't line up", "Tap ⧉ in Docked, pick the matching spot, then nudge the window to fit.")
+                fix("Frame doesn't line up", "Tap Move in Docked to match top / bottom, then nudge the window to fit.")
                 fix("Black window or audio only", "Close the video and start it again, then re-trigger PiP.")
             }
         }

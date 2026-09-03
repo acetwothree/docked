@@ -3,15 +3,13 @@
 //  Docked
 //
 //  Pure geometry. `pip` is roughly the footprint the iOS Picture-in-Picture
-//  window takes; `video` is a thin pixel-art screen border drawn around it so
-//  the border stays visible once the user parks their video in the opening.
+//  window takes; `video` is a thin pixel-art screen border drawn around it.
 //
-//  Coordinates are the app's safe-area space (y = 0 at the safe-area top).
-//  BUT the real PiP window floats at the physical screen edge — outside the
-//  safe area — so for a top / bottom band `pip` and `video` are pushed past
-//  the safe-area edge by the given inset. RootView draws the video layer with
-//  `.ignoresSafeArea()` so that overhang is visible; the tab bar and content
-//  stay wholly inside the safe area.
+//  Everything is in FULL-SCREEN coordinates (y = 0 is the physical top of the
+//  display). RootView feeds a full-screen-sized ZStack and passes the
+//  safe-area insets so the tab bar clears the Dynamic Island / home indicator
+//  while the video border can still reach right to the screen edge where the
+//  real PiP window floats.
 //
 
 import CoreGraphics
@@ -33,25 +31,26 @@ struct SolvedLayout {
 
 enum LayoutSolver {
 
-    static let tabHeight: CGFloat = 68
+    static let tabHeight: CGFloat = 66
 
-    // Border thickness: thin on the three inner sides, thicker on the side that
-    // faces the screen edge so none of it hides behind the video / Dynamic
-    // Island / home indicator.
+    // Border thickness: thin on the three inner sides, a little more on the
+    // side that faces the screen edge.
     static let bezel: CGFloat = 7
-    static let bezelOuter: CGFloat = 16
+    static let bezelOuter: CGFloat = 11
 
     // ---- iPhone PiP band, calibrated from on-device screenshots. Nudge:
-    //      · bandEdgeOverhang — how far past the physical edge the video sits
-    //                           (bigger = video/border start closer to the edge)
-    //      · bezelOuter       — how much border shows past the video on that edge
-    //      · bandAspect       — trims dead space above/below (bigger = shorter) ----
-    static let bandSideInset: CGFloat = 13      // gap from the screen side edge
-    static let bandEdgeOverhang: CGFloat = 12   // physical-edge gap to the video's outer edge
-    static let bandAspect: CGFloat = 1.90       // video  width / height
+    //      · topBorderY     — Y of the border's top edge for the .top layout
+    //                         (just under the status bar / Dynamic Island)
+    //      · bottomBorderGap— gap from the physical bottom to the border's
+    //                         bottom edge for the .bottom layout
+    //      · bandAspect     — video width / height (bigger = shorter) ----
+    static let bandSideInset: CGFloat = 12
+    static let topBorderExtraDrop: CGFloat = 4   // extra push below the safe-area top
+    static let bottomBorderGap: CGFloat = 3      // border bottom this far off the physical edge
+    static let bandAspect: CGFloat = 1.92
 
     static func solve(_ layout: VideoLayout, size: CGSize,
-                      topInset: CGFloat, bottomInset: CGFloat) -> SolvedLayout {
+                      safeTop: CGFloat, safeBottom: CGFloat) -> SolvedLayout {
         let W = size.width, H = size.height
         let TAB = tabHeight
         let occupiesTop = layout == .top
@@ -59,23 +58,29 @@ enum LayoutSolver {
         let bw = (W - bandSideInset * 2).rounded()
         let bh = (bw / bandAspect).rounded()
 
-        // PiP footprint. `y` is in safe-area space, so a top band starts at a
-        // negative y (above the safe area) and a bottom band ends below it.
-        let pip: CGRect = occupiesTop
-            ? CGRect(x: bandSideInset, y: -topInset + bandEdgeOverhang, width: bw, height: bh)
-            : CGRect(x: bandSideInset, y: H + bottomInset - bandEdgeOverhang - bh, width: bw, height: bh)
+        // The border's outer edge on the screen-edge side.
+        let borderEdgeY: CGFloat = occupiesTop
+            ? safeTop + topBorderExtraDrop          // just under the island
+            : H - bottomBorderGap                   // just above the physical bottom
 
-        // Border: bezel on the inner sides, bezelOuter on the screen-edge side.
-        let video: CGRect = occupiesTop
-            ? CGRect(x: pip.minX - bezel, y: pip.minY - bezelOuter,
-                     width: pip.width + bezel * 2, height: pip.height + bezelOuter + bezel)
-            : CGRect(x: pip.minX - bezel, y: pip.minY - bezel,
-                     width: pip.width + bezel * 2, height: pip.height + bezel + bezelOuter)
+        let pip: CGRect
+        let video: CGRect
+        if occupiesTop {
+            let vy = borderEdgeY
+            video = CGRect(x: bandSideInset - bezel, y: vy,
+                           width: bw + bezel * 2, height: bh + bezelOuter + bezel)
+            pip = CGRect(x: bandSideInset, y: vy + bezelOuter, width: bw, height: bh)
+        } else {
+            let vMaxY = borderEdgeY
+            video = CGRect(x: bandSideInset - bezel, y: vMaxY - (bh + bezelOuter + bezel),
+                           width: bw + bezel * 2, height: bh + bezelOuter + bezel)
+            pip = CGRect(x: bandSideInset, y: vMaxY - bezelOuter - bh, width: bw, height: bh)
+        }
 
-        // Tab bar hugs the safe-area edge the video doesn't.
+        // Tab bar hugs the safe-area edge the video doesn't, inside the inset.
         let tab = occupiesTop
-            ? CGRect(x: 0, y: H - TAB, width: W, height: TAB)
-            : CGRect(x: 0, y: 0, width: W, height: TAB)
+            ? CGRect(x: 0, y: H - safeBottom - TAB, width: W, height: TAB)
+            : CGRect(x: 0, y: safeTop, width: W, height: TAB)
 
         // Content = a clean full-width rect between the video and the tab bar.
         let G: CGFloat = 8

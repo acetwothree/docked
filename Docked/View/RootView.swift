@@ -19,16 +19,20 @@ struct RootView: View {
     @State private var showSettings = false
     @State private var showOnboarding = false
     @State private var showPicker = false
+    @State private var showPlus = false
     @State private var hintDim = false
 
     var body: some View {
         GeometryReader { geo in
             let insets = geo.safeAreaInsets
-            let s = LayoutSolver.solve(app.layout, size: geo.size,
-                                       topInset: insets.top, bottomInset: insets.bottom)
+            let fullW = geo.size.width + insets.leading + insets.trailing
+            let fullH = geo.size.height + insets.top + insets.bottom
+            let s = LayoutSolver.solve(app.layout,
+                                       size: CGSize(width: fullW, height: fullH),
+                                       safeTop: insets.top, safeBottom: insets.bottom)
 
             ZStack(alignment: .topLeading) {
-                Theme.backdrop.ignoresSafeArea()
+                Theme.backdrop
 
                 // module content
                 moduleHost(solved: s)
@@ -46,13 +50,12 @@ struct RootView: View {
                     .frame(width: s.tab.width, height: s.tab.height)
                     .position(x: s.tab.midX, y: s.tab.midY)
 
-                // pixel-art TV frame — allowed past the safe area so the
+                // pixel-art TV frame — positioned in full-screen coords so the
                 // border's outer edge reaches the physical screen edge where
                 // the real PiP window floats.
                 VideoFrameView(hole: s.holeInFrame, dimHint: hintDim)
                     .frame(width: s.video.width, height: s.video.height)
                     .position(x: s.video.midX, y: s.video.midY)
-                    .ignoresSafeArea()
 
                 if app.debugOverlay {
                     DebugOverlay(solved: s)
@@ -83,6 +86,9 @@ struct RootView: View {
                     .zIndex(20)
                 }
             }
+            .padding(EdgeInsets(top: -insets.top, leading: -insets.leading,
+                                bottom: -insets.bottom, trailing: -insets.trailing))
+            .ignoresSafeArea()
             .animation(Theme.layoutAnimation, value: app.layout)
             .animation(.easeInOut(duration: 0.25), value: app.module)
             .animation(.easeInOut(duration: 0.22), value: showPicker)
@@ -90,8 +96,16 @@ struct RootView: View {
         }
         .preferredColorScheme(app.theme.colorScheme)
         .sheet(isPresented: $showSettings) {
-            SettingsView()
-                .presentationDetents(settingsDetents)
+            SettingsView(onShowPlus: {
+                showSettings = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showPlus = true }
+            })
+            .presentationDetents(settingsDetents)
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showPlus) {
+            PlusSheet()
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
         .task(id: app.layout) {
@@ -141,6 +155,9 @@ struct RootView: View {
                 .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
         case .flow:
             ZStack { Theme.paper; FlowView() }
+                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
+        case .click:
+            ZStack { Theme.paper; ClickPenView() }
                 .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
         }
     }

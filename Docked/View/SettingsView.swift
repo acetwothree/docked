@@ -14,8 +14,14 @@ struct SettingsView: View {
     @Environment(DoodleStore.self) private var doodle
     @Environment(\.dismiss) private var dismiss
 
+    private let onShowPlus: () -> Void
+
     @State private var confirmWipe = false
     @State private var showDev = false
+
+    init(onShowPlus: @escaping () -> Void = {}) {
+        self.onShowPlus = onShowPlus
+    }
 
     var body: some View {
         @Bindable var app = app
@@ -23,6 +29,28 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 22) {
+
+                    Button(action: onShowPlus) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Theme.accent)
+                                .frame(width: 22)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Docked Plus").font(.system(size: 15, weight: .semibold))
+                                Text("Free app · optional premium activities")
+                                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 8)
+                            chevron
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 12)
+                        .frame(minHeight: 46)
+                        .background(Theme.paper, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.hairline))
+                        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
 
                     card("Picture-in-Picture") {
                         NavigationLink { PiPHelpView() } label: {

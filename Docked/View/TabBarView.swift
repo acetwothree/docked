@@ -89,11 +89,10 @@ struct ActivityPickerPanel: View {
         .init(title: "2048",      systemImage: "square.grid.3x3.fill",      category: .play),
         .init(title: "Solitaire", systemImage: "suit.spade.fill",          category: .play),
         .init(title: "Mahjong",   systemImage: "rectangle.grid.2x2.fill",  category: .play),
-        // fidget — five extra slots
+        // fidget — four extra slots
         .init(title: "Spinner",     systemImage: "fan.fill",               category: .fidget),
         .init(title: "Worry Beads", systemImage: "circle.grid.3x3.fill",   category: .fidget),
         .init(title: "Zen Sand",    systemImage: "wind",                   category: .fidget),
-        .init(title: "Click Pen",   systemImage: "pencil.tip",             category: .fidget),
         .init(title: "Fidget Cube", systemImage: "cube.fill",              category: .fidget),
     ]
 
@@ -101,7 +100,7 @@ struct ActivityPickerPanel: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.45)
+            Color.black.opacity(0.5)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onClose)
@@ -117,12 +116,24 @@ struct ActivityPickerPanel: View {
 
     private var panel: some View {
         VStack(spacing: 0) {
-            if !closeToBottom { handle }
+            if !closeToBottom { grabBar }
 
-            Text("Choose an activity")
-                .font(.system(size: 15, weight: .heavy))
-                .padding(.top, closeToBottom ? 14 : 2)
-                .padding(.bottom, 10)
+            HStack {
+                Text("Choose an activity")
+                    .font(.system(size: 15, weight: .heavy))
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.secondary)
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close")
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, closeToBottom ? 14 : 4)
+            .padding(.bottom, 10)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -131,36 +142,36 @@ struct ActivityPickerPanel: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
             }
+            .scrollIndicators(.visible)
 
-            if closeToBottom { handle }
+            if closeToBottom { grabBar }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.elevated)
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(Theme.hairline))
-        .contentShape(Rectangle())
-        .gesture(closeDrag)
     }
 
-    private var handle: some View {
-        Capsule().fill(Color.secondary.opacity(0.5))
-            .frame(width: 40, height: 5)
-            .padding(.vertical, 12)
+    /// The only thing that carries the swipe-to-close gesture, so it never
+    /// fights the scroll view. Also closes on tap.
+    private var grabBar: some View {
+        Capsule().fill(Color.secondary.opacity(0.55))
+            .frame(width: 44, height: 5)
             .frame(maxWidth: .infinity)
+            .frame(height: 34)
             .contentShape(Rectangle())
             .onTapGesture(perform: onClose)
-    }
-
-    private var closeDrag: some Gesture {
-        DragGesture(minimumDistance: 8)
-            .onChanged { v in
-                dragOffset = closeToBottom ? max(0, v.translation.height) : min(0, v.translation.height)
-            }
-            .onEnded { v in
-                let past = closeToBottom ? v.translation.height > 60 : v.translation.height < -60
-                if past { onClose() }
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { dragOffset = 0 }
-            }
+            .gesture(
+                DragGesture(minimumDistance: 4)
+                    .onChanged { v in
+                        dragOffset = closeToBottom ? max(0, v.translation.height) : min(0, v.translation.height)
+                    }
+                    .onEnded { v in
+                        let past = closeToBottom ? v.translation.height > 48 : v.translation.height < -48
+                        if past { onClose() }
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { dragOffset = 0 }
+                    }
+            )
     }
 
     @ViewBuilder
