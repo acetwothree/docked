@@ -1,13 +1,22 @@
 name: TestFlight Deploy
 
-# Every push to main builds, archives, signs and uploads a new build to
-# TestFlight — no Mac required. Same pipeline as the StepMates project.
-# Manual runs are available from the Actions tab (workflow_dispatch).
+# Every push to main builds & archives (fast "does it compile" feedback).
+# The archive is only exported and UPLOADED to TestFlight when you either:
+#   - run this workflow manually from the Actions tab (workflow_dispatch), or
+#   - put "[deploy]" anywhere in the commit message.
+# This keeps routine commits from burning App Store Connect's per-app daily
+# upload limit (error 90382). No Mac required.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
+# Only build the newest commit; if you push several times in a row the
+# earlier runs are cancelled instead of stacking up.
+concurrency:
+  group: testflight
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
@@ -20,6 +29,9 @@ jobs:
       PROJECT: Docked.xcodeproj
       ARCHIVE_PATH: ${{ github.workspace }}/build/Docked.xcarchive
       EXPORT_PATH: ${{ github.workspace }}/build/export
+      # "true" only for manual runs or commits whose message contains [deploy];
+      # otherwise the run stops after archiving and does not upload.
+      DO_UPLOAD: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[deploy]') }}
 
     steps:
       - name: Checkout repository
@@ -142,7 +154,15 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      - name: Skipping TestFlight upload
+        if: env.DO_UPLOAD != 'true'
+        run: |
+          echo "::notice::Built & archived only. To upload to TestFlight, re-run"
+          echo "::notice::this workflow from the Actions tab, or push a commit whose"
+          echo "::notice::message contains [deploy]."
+
       - name: Write App Store Connect API key
+        if: env.DO_UPLOAD == 'true'
         env:
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
@@ -154,6 +174,7 @@ jobs:
           EOF
 
       - name: Export & upload to TestFlight
+        if: env.DO_UPLOAD == 'true'
         env:
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
