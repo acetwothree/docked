@@ -24,14 +24,22 @@ struct RootView: View {
     @State private var hintDim = false
 
     var body: some View {
-        GeometryReader { geo in
-            let s = LayoutSolver.solve(app.layout, size: geo.size)
+        GeometryReader { safeGeo in
+            // Outer reader = safe-area frame → real safe-area insets.
+            let insets = safeGeo.safeAreaInsets
 
-            ZStack(alignment: .topLeading) {
-                Theme.backdrop.ignoresSafeArea()
+            GeometryReader { fullGeo in
+                // Inner reader ignores the safe area → full-screen size, origin
+                // at the physical top-left. Everything below lays out in that
+                // one coordinate space.
+                let s = LayoutSolver.solve(app.layout, size: fullGeo.size,
+                                           insetTop: insets.top, insetBottom: insets.bottom)
 
-                // module content
-                moduleHost(solved: s)
+                ZStack(alignment: .topLeading) {
+                    Theme.backdrop
+
+                    // module content
+                    moduleHost(solved: s)
                     .frame(width: s.content.width, height: s.content.height)
                     .clipShape(RoundedRectangle(cornerRadius: moduleCorner, style: .continuous))
                     .position(x: s.content.midX, y: s.content.midY)
@@ -46,12 +54,10 @@ struct RootView: View {
                     .frame(width: s.tab.width, height: s.tab.height)
                     .position(x: s.tab.midX, y: s.tab.midY)
 
-                // pixel-art TV frame — the one layer allowed a few points past
-                // the safe edge so its border can meet the real PiP window.
+                // pixel-art TV frame
                 VideoFrameView(hole: s.holeInFrame, dimHint: hintDim)
                     .frame(width: s.video.width, height: s.video.height)
                     .position(x: s.video.midX, y: s.video.midY)
-                    .ignoresSafeArea()
 
                 if app.debugOverlay {
                     DebugOverlay(solved: s)
@@ -81,11 +87,13 @@ struct RootView: View {
                     }
                     .zIndex(20)
                 }
+                }
+                .animation(Theme.layoutAnimation, value: app.layout)
+                .animation(.easeInOut(duration: 0.25), value: app.module)
+                .animation(.easeInOut(duration: 0.22), value: showPicker)
+                .animation(.easeInOut(duration: 0.3), value: showOnboarding)
             }
-            .animation(Theme.layoutAnimation, value: app.layout)
-            .animation(.easeInOut(duration: 0.25), value: app.module)
-            .animation(.easeInOut(duration: 0.22), value: showPicker)
-            .animation(.easeInOut(duration: 0.3), value: showOnboarding)
+            .ignoresSafeArea()
         }
         .preferredColorScheme(app.theme.colorScheme)
         .sheet(isPresented: $showSettings) {

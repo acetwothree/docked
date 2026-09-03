@@ -2,12 +2,11 @@
 //  LayoutSolver.swift
 //  Docked
 //
-//  Pure geometry, in the app's SAFE-AREA coordinate space (y = 0 is the top of
-//  the safe area, just under the status bar / Dynamic Island; y = H is the top
-//  of the home-indicator strip). The tab bar always sits fully inside the safe
-//  area so its controls are never under a system bar. Only the video border is
-//  allowed to nudge a few points past the safe edge (RootView gives that one
-//  layer `.ignoresSafeArea()`), so it can meet the real PiP window.
+//  Pure geometry, in FULL-SCREEN coordinates (y = 0 is the physical top of the
+//  display). RootView feeds a full-screen ZStack (an inner GeometryReader with
+//  `.ignoresSafeArea()`) and passes the safe-area insets, so the tab bar can be
+//  kept inside the safe area while the video border reaches the screen edge
+//  where the real PiP window floats.
 //
 
 import CoreGraphics
@@ -36,17 +35,18 @@ enum LayoutSolver {
     static let bezelOuter: CGFloat = 12
 
     // ---- iPhone PiP band, calibrated from on-device screenshots. Nudge:
-    //      · topBorderInset    — Y of the border's top edge for .top (small +ve
-    //                            keeps it under the status bar / island)
-    //      · bottomBorderBleed — how far the border's bottom edge sits past the
-    //                            safe-area bottom for .bottom (toward the home bar)
-    //      · bandAspect        — video width / height (smaller = taller) ----
+    //      · topBorderGap    — gap below the status bar / island to the border
+    //      · bottomBorderGap — gap from the physical bottom to the border
+    //      · bandAspect      — video width / height (smaller = taller) ----
     static let bandSideInset: CGFloat = 12
-    static let topBorderInset: CGFloat = 2
-    static let bottomBorderBleed: CGFloat = 8
+    static let topBorderGap: CGFloat = 4
+    static let bottomBorderGap: CGFloat = 4
     static let bandAspect: CGFloat = 1.82
 
-    static func solve(_ layout: VideoLayout, size: CGSize) -> SolvedLayout {
+    /// `size` is the FULL screen size; `insetTop` / `insetBottom` are the
+    /// safe-area insets.
+    static func solve(_ layout: VideoLayout, size: CGSize,
+                      insetTop: CGFloat, insetBottom: CGFloat) -> SolvedLayout {
         let W = size.width, H = size.height
         let TAB = tabHeight
         let occupiesTop = layout == .top
@@ -58,11 +58,12 @@ enum LayoutSolver {
         let pip: CGRect
         let video: CGRect
         if occupiesTop {
-            video = CGRect(x: bandSideInset - bezel, y: topBorderInset,
+            let vMinY = insetTop + topBorderGap   // just under the status bar / island
+            video = CGRect(x: bandSideInset - bezel, y: vMinY,
                            width: bw + bezel * 2, height: vH)
-            pip = CGRect(x: bandSideInset, y: topBorderInset + bezelOuter, width: bw, height: bh)
+            pip = CGRect(x: bandSideInset, y: vMinY + bezelOuter, width: bw, height: bh)
         } else {
-            let vMaxY = H + bottomBorderBleed
+            let vMaxY = H - bottomBorderGap       // just above the physical bottom
             video = CGRect(x: bandSideInset - bezel, y: vMaxY - vH,
                            width: bw + bezel * 2, height: vH)
             pip = CGRect(x: bandSideInset, y: vMaxY - bezelOuter - bh, width: bw, height: bh)
@@ -70,8 +71,8 @@ enum LayoutSolver {
 
         // Tab bar hugs the safe-area edge the video doesn't — always tappable.
         let tab = occupiesTop
-            ? CGRect(x: 0, y: H - TAB, width: W, height: TAB)
-            : CGRect(x: 0, y: 0, width: W, height: TAB)
+            ? CGRect(x: 0, y: H - insetBottom - TAB, width: W, height: TAB)
+            : CGRect(x: 0, y: insetTop, width: W, height: TAB)
 
         // Content = a clean full-width rect between the video and the tab bar.
         let G: CGFloat = 8
