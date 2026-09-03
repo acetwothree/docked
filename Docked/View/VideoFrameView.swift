@@ -61,11 +61,15 @@ struct VideoFrameView: View {
 
     private func draw(_ ctx: GraphicsContext, size: CGSize) {
         let w = size.width, h = size.height
-        let outerR: CGFloat = 11
+        let outerR: CGFloat = 12
         let innerR: CGFloat = min(14, hole.width / 6, hole.height / 6)
 
+        // Fill the whole view (Canvas clips to its own bounds, so the bezel
+        // reaches every edge) and pull the opening ~1pt tighter than the real
+        // PiP rect so an anti-aliased seam never shows a black hairline where
+        // the parked video meets the border.
         let outerPath = Path(roundedRect: CGRect(x: 0, y: 0, width: w, height: h), cornerRadius: outerR)
-        let innerPath = Path(roundedRect: hole, cornerRadius: innerR)
+        let innerPath = Path(roundedRect: hole.insetBy(dx: 1, dy: 1), cornerRadius: innerR)
 
         // --- faint "no-signal" colour bars inside the opening ---
         var screen = ctx

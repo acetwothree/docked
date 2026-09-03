@@ -63,19 +63,29 @@ struct RootView: View {
                     )
                     .transition(.opacity)
                 }
+
+                // First-run onboarding — an overlay, so the live dashboard
+                // stays visible (dimmed) behind it.
+                if showOnboarding {
+                    OnboardingView {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            app.hasOnboarded = true
+                            showOnboarding = false
+                        }
+                    }
+                    .zIndex(20)
+                }
             }
             .animation(Theme.layoutAnimation, value: app.layout)
             .animation(.easeInOut(duration: 0.2), value: app.isEditingLayout)
             .animation(.easeInOut(duration: 0.25), value: app.module)
+            .animation(.easeInOut(duration: 0.3), value: showOnboarding)
         }
         .preferredColorScheme(app.theme.colorScheme)
         .sheet(isPresented: $showSettings) {
             SettingsView()
-                .presentationDetents([.large])
+                .presentationDetents(app.layout == .bottom ? [.large] : [.medium, .large])
                 .presentationDragIndicator(.visible)
-        }
-        .fullScreenCover(isPresented: $showOnboarding) {
-            OnboardingView { app.hasOnboarded = true; showOnboarding = false }
         }
         .task(id: app.layout) {
             hintDim = false

@@ -39,7 +39,7 @@ struct NotesView: View {
     }
 
     private var footer: some View {
-        HStack {
+        HStack(spacing: 14) {
             Text("\(wordCount) words · \(store.text.count) chars")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -47,6 +47,12 @@ struct NotesView: View {
             if focused {
                 Button("Done") { focused = false }.font(.callout.weight(.semibold))
             }
+            ShareLink(item: store.text) {
+                Image(systemName: "square.and.arrow.up")
+            }
+            .font(.system(size: 15, weight: .semibold))
+            .disabled(store.text.isEmpty)
+
             Button(role: .destructive) { store.text = "" } label: { Image(systemName: "trash") }
                 .font(.system(size: 15, weight: .semibold))
                 .disabled(store.text.isEmpty)

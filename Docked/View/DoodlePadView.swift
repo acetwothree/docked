@@ -5,9 +5,11 @@
 //  Smooth freehand sketching on a `Canvas` + a zero-distance `DragGesture`.
 //  Fills the whole content area; the tool bar floats along the bottom.
 //  Strokes are stored normalised so a doodle survives layout changes.
+//  The share button renders the strokes to a PNG (Save to Photos / Files).
 //
 
 import SwiftUI
+import UIKit
 
 struct DoodlePadView: View {
     @Environment(DoodleStore.self) private var store
@@ -15,6 +17,7 @@ struct DoodlePadView: View {
     @State private var currentPoints: [CGPoint] = []
     @State private var colorHex = "F2B950"
     @State private var lineWidth: Double = 5
+    @State private var exportImage: Image?
 
     private let palette = ["F2B950", "FF6B6B", "4ECDC4", "6C8EFF", "C792EA"]
 
@@ -24,25 +27,19 @@ struct DoodlePadView: View {
             let strokeCount = store.strokes.count
 
             ZStack(alignment: .bottom) {
-                Canvas { ctx, canvasSize in
-                    for stroke in store.strokes {
-                        ctx.stroke(smoothPath(stroke.points, canvasSize),
-                                   with: .color(Color(hex: stroke.colorHex)),
-                                   style: style(stroke.width))
-                    }
-                    if currentPoints.count > 1 {
-                        ctx.stroke(smoothPath(currentPoints, canvasSize),
-                                   with: .color(Color(hex: colorHex)),
-                                   style: style(lineWidth))
-                    }
-                }
-                .id(strokeCount)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .gesture(drawGesture(in: size))
+                DoodleCanvas(strokes: store.strokes,
+                             live: currentPoints.count > 1
+                                 ? .init(points: currentPoints, colorHex: colorHex, width: lineWidth)
+                                 : nil)
+                    .id(strokeCount)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(drawGesture(in: size))
 
                 toolbar
             }
+            .onAppear { refreshExport() }
+            .onChange(of: strokeCount) { _, _ in refreshExport() }
         }
     }
 
@@ -57,8 +54,20 @@ struct DoodlePadView: View {
                     .onTapGesture { colorHex = hex }
             }
             Slider(value: $lineWidth, in: 2...22)
-                .frame(maxWidth: 74)
+                .frame(maxWidth: 64)
             Spacer(minLength: 2)
+
+            if let exportImage {
+                ShareLink(item: exportImage,
+                          preview: SharePreview("Doodle", image: exportImage)) {
+                    Image(systemName: "square.and.arrow.up").frame(width: 38, height: 38).contentShape(Rectangle())
+                }
+            } else {
+                Image(systemName: "square.and.arrow.up")
+                    .frame(width: 38, height: 38)
+                    .foregroundStyle(.tertiary)
+            }
+
             Button { store.undo() } label: {
                 Image(systemName: "arrow.uturn.backward").frame(width: 38, height: 38).contentShape(Rectangle())
             }
@@ -69,7 +78,7 @@ struct DoodlePadView: View {
             .disabled(store.strokes.isEmpty)
         }
         .font(.system(size: 16, weight: .semibold))
-        .padding(.leading, 14).padding(.trailing, 18).padding(.vertical, 6)
+        .padding(.leading, 14).padding(.trailing, 16).padding(.vertical, 6)
         .background(.ultraThinMaterial)
     }
 
@@ -88,11 +97,48 @@ struct DoodlePadView: View {
             }
     }
 
-    private func style(_ w: Double) -> StrokeStyle {
+    @MainActor private func refreshExport() {
+        guard !store.strokes.isEmpty else { exportImage = nil; return }
+        let renderer = ImageRenderer(
+            content: DoodleCanvas(strokes: store.strokes, live: nil)
+                .frame(width: 1400, height: 1400)
+                .background(Color.white)
+        )
+        renderer.scale = 1
+        if let ui = renderer.uiImage {
+            exportImage = Image(uiImage: ui)
+        }
+    }
+}
+
+/// The strokes, drawn. Shared by the live pad and the PNG export so what you
+/// save is exactly what you see.
+struct DoodleCanvas: View {
+    struct Live { var points: [CGPoint]; var colorHex: String; var width: Double }
+
+    var strokes: [DoodleStroke]
+    var live: Live?
+
+    var body: some View {
+        Canvas { ctx, size in
+            for stroke in strokes {
+                ctx.stroke(Self.smoothPath(stroke.points, size),
+                           with: .color(Color(hex: stroke.colorHex)),
+                           style: Self.style(stroke.width))
+            }
+            if let live, live.points.count > 1 {
+                ctx.stroke(Self.smoothPath(live.points, size),
+                           with: .color(Color(hex: live.colorHex)),
+                           style: Self.style(live.width))
+            }
+        }
+    }
+
+    static func style(_ w: Double) -> StrokeStyle {
         StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round)
     }
 
-    private func smoothPath(_ pts: [CGPoint], _ size: CGSize) -> Path {
+    static func smoothPath(_ pts: [CGPoint], _ size: CGSize) -> Path {
         var path = Path()
         guard let first = pts.first else { return path }
         func d(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x * size.width, y: p.y * size.height) }

@@ -2,49 +2,93 @@
 //  OnboardingView.swift
 //  Docked
 //
-//  Three quick cards on first launch: what Docked is, how to turn on
-//  Picture-in-Picture, and how to place the video.
+//  A floating card shown over the (dimmed) app on first launch: what Docked
+//  is, how to turn on Picture-in-Picture, and how to place the video.
+//  Presented as an in-app overlay — not its own screen — so the dashboard
+//  stays visible behind it.
 //
 
 import SwiftUI
+import UIKit
 
 struct OnboardingView: View {
     var onDone: () -> Void
+
+    @Environment(\.openURL) private var openURL
     @State private var page = 0
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color(red: 0.14, green: 0.14, blue: 0.19), Color(red: 0.05, green: 0.05, blue: 0.07)],
-                startPoint: .top, endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            // dim + blur the live app behind the card
+            Color.black.opacity(0.55)
+                .ignoresSafeArea()
+                .transition(.opacity)
 
-            VStack(spacing: 0) {
-                TabView(selection: $page) {
-                    card(emoji: "🧩", title: "Meet Docked") {
-                        Text("Watch anything in a floating window while you doodle, take notes, or play. Docked reshapes itself around your video so nothing is ever hidden underneath it.")
-                    }
-                    .tag(0)
+            cardShell
+                .frame(maxWidth: 360)
+                .padding(.horizontal, 22)
+                .transition(.scale(scale: 0.92).combined(with: .opacity))
+        }
+    }
 
-                    card(emoji: "📺", title: "Turn on Picture-in-Picture") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            step("1", "iOS Settings ▸ General ▸ Picture in Picture → turn on “Start PiP Automatically”.")
-                            step("2", "Play a video full-screen in YouTube, Netflix, Hulu, Safari…")
-                            step("3", "Swipe up to the Home Screen — the video becomes a floating window.")
-                        }
-                    }
-                    .tag(1)
-
-                    card(emoji: "⧉", title: "Place it & go") {
-                        Text("Tap **⧉** any time to pick where your video sits — four corners, or a big top / bottom slot. Then drag the floating window into the TV frame. That's it.")
-                    }
-                    .tag(2)
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-
-                controls
+    private var cardShell: some View {
+        VStack(spacing: 0) {
+            TabView(selection: $page) {
+                page1.tag(0)
+                page2.tag(1)
+                page3.tag(2)
             }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: 340)
+
+            controls
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(Theme.elevated)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(Theme.hairline)
+        )
+        .shadow(color: .black.opacity(0.5), radius: 30, y: 12)
+    }
+
+    // MARK: pages
+
+    private var page1: some View {
+        card(emoji: "🧩", title: "Meet Docked") {
+            Text("Watch anything in a floating window while you doodle, take notes, or play. Docked reshapes itself around your video so nothing is ever hidden underneath it.")
+        }
+    }
+
+    private var page2: some View {
+        card(emoji: "📺", title: "Turn on Picture-in-Picture") {
+            VStack(alignment: .leading, spacing: 10) {
+                step("1", "Turn on **Start PiP Automatically** in iPhone Settings ▸ General ▸ Picture in Picture.")
+                step("2", "Play a video full-screen in YouTube, Netflix, Safari…")
+                step("3", "Swipe up to the Home Screen — the video becomes a floating window.")
+
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                } label: {
+                    Label("Open iPhone Settings", systemImage: "arrow.up.forward.app.fill")
+                        .font(.system(size: 13, weight: .heavy))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Theme.accent)
+                .padding(.top, 2)
+
+                Text("Opens Settings at Docked — tap ‹ Settings, then General ▸ Picture in Picture.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private var page3: some View {
+        card(emoji: "⧉", title: "Place it & go") {
+            Text("Tap **Layout** any time to pick where your video sits — four corners, or a big top / bottom slot. Then drag the floating window into the TV frame. That's it.")
         }
     }
 
@@ -76,8 +120,8 @@ struct OnboardingView: View {
             .background(Theme.accent, in: Capsule())
             .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
         }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 16)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
     }
 
     private func card<Content: View>(
@@ -85,25 +129,26 @@ struct OnboardingView: View {
         title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(spacing: 16) {
-            Text(emoji).font(.system(size: 54))
-            Text(title).font(.system(size: 22, weight: .heavy))
+        VStack(spacing: 14) {
+            Text(emoji).font(.system(size: 46))
+            Text(title).font(.system(size: 20, weight: .heavy))
+                .multilineTextAlignment(.center)
             content()
-                .font(.system(size: 14))
+                .font(.system(size: 13.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 330)
         }
-        .padding(.horizontal, 30)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 26)
+        .padding(.top, 26)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private func step(_ n: String, _ text: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(n).fontWeight(.heavy).foregroundStyle(Theme.accent)
-            Text(text)
+            Text(.init(text))
         }
-        .font(.system(size: 13))
+        .font(.system(size: 12.5))
         .multilineTextAlignment(.leading)
     }
 }

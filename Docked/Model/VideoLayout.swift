@@ -60,9 +60,24 @@ enum VideoLayout: String, CaseIterable, Identifiable {
     }
 }
 
+enum ActivityCategory: String, CaseIterable, Identifiable {
+    case create = "Create"
+    case play = "Play"
+    case focus = "Focus"        // reserved — timers, breathing, etc.
+    var id: String { rawValue }
+}
+
 enum ActivityModule: String, CaseIterable, Identifiable {
     case doodle, notes, game, zen, pop, flow
     var id: String { rawValue }
+
+    var category: ActivityCategory {
+        switch self {
+        case .doodle, .notes: .create
+        case .game, .zen, .pop, .flow: .play
+        }
+    }
+
     var title: String {
         switch self {
         case .doodle: "Doodle"

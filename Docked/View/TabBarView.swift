@@ -47,7 +47,7 @@ struct TabBarView: View {
                 withAnimation(.snappy(duration: 0.24)) { app.module = picked }
                 showPicker = false
             }
-            .presentationDetents([.medium, .large])
+            .presentationDetents(app.layout == .bottom ? [.large] : [.medium, .large])
             .presentationDragIndicator(.visible)
             .presentationBackground(Theme.elevated)
         }
@@ -68,11 +68,30 @@ struct TabBarView: View {
     }
 }
 
+/// A not-yet-built activity, shown greyed with a "SOON" tag so the roadmap
+/// is visible inside the picker.
+private struct ComingSoon: Identifiable {
+    let id = UUID()
+    let title: String
+    let systemImage: String
+    let category: ActivityCategory
+}
+
 struct ActivityPickerSheet: View {
     var current: ActivityModule
     var onPick: (ActivityModule) -> Void
 
     private let cols = [GridItem(.adaptive(minimum: 104), spacing: 12)]
+
+    private let soon: [ComingSoon] = [
+        .init(title: "Journal",  systemImage: "book.closed.fill",     category: .create),
+        .init(title: "Mind Map", systemImage: "brain.head.profile",   category: .create),
+        .init(title: "2048",     systemImage: "square.grid.2x2.fill", category: .play),
+        .init(title: "Solitaire", systemImage: "suit.spade.fill",     category: .play),
+        .init(title: "Timer",    systemImage: "timer",                    category: .focus),
+        .init(title: "Breathe",  systemImage: "wind",                     category: .focus),
+        .init(title: "Pomodoro", systemImage: "hourglass",               category: .focus),
+    ]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -81,27 +100,9 @@ struct ActivityPickerSheet: View {
                 .padding(.top, 20).padding(.bottom, 14)
 
             ScrollView {
-                LazyVGrid(columns: cols, spacing: 12) {
-                    ForEach(ActivityModule.allCases) { mod in
-                        let on = mod == current
-                        Button { onPick(mod) } label: {
-                            VStack(spacing: 8) {
-                                Image(systemName: mod.systemImage)
-                                    .font(.system(size: 26, weight: .semibold))
-                                Text(mod.title).font(.system(size: 13, weight: .bold))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 96)
-                            .background(on ? AnyShapeStyle(Theme.accent.opacity(0.9)) : AnyShapeStyle(Theme.paper),
-                                       in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .stroke(on ? Color.clear : Theme.hairline)
-                            }
-                            .foregroundStyle(on ? Color(red: 0.11, green: 0.08, blue: 0.02) : Color.primary)
-                            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
+                VStack(alignment: .leading, spacing: 22) {
+                    ForEach(ActivityCategory.allCases) { cat in
+                        section(cat)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -109,5 +110,69 @@ struct ActivityPickerSheet: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func section(_ cat: ActivityCategory) -> some View {
+        let mods = ActivityModule.allCases.filter { $0.category == cat }
+        let placeholders = soon.filter { $0.category == cat }
+
+        VStack(alignment: .leading, spacing: 10) {
+            Text(cat.rawValue.uppercased())
+                .font(.system(size: 11, weight: .heavy)).tracking(1)
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: cols, spacing: 12) {
+                ForEach(mods) { mod in
+                    liveCard(mod)
+                }
+                ForEach(placeholders) { item in
+                    soonCard(item)
+                }
+            }
+        }
+    }
+
+    private func liveCard(_ mod: ActivityModule) -> some View {
+        let on = mod == current
+        return Button { onPick(mod) } label: {
+            VStack(spacing: 8) {
+                Image(systemName: mod.systemImage)
+                    .font(.system(size: 26, weight: .semibold))
+                Text(mod.title).font(.system(size: 13, weight: .bold))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 96)
+            .background(on ? AnyShapeStyle(Theme.accent.opacity(0.9)) : AnyShapeStyle(Theme.paper),
+                       in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(on ? Color.clear : Theme.hairline)
+            }
+            .foregroundStyle(on ? Color(red: 0.11, green: 0.08, blue: 0.02) : Color.primary)
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func soonCard(_ item: ComingSoon) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: item.systemImage)
+                .font(.system(size: 26, weight: .semibold))
+            Text(item.title).font(.system(size: 13, weight: .bold))
+            Text("SOON")
+                .font(.system(size: 8, weight: .heavy)).tracking(1.5)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(Theme.hairline, in: Capsule())
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 96)
+        .background(Theme.paper.opacity(0.5), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Theme.hairline, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+        }
+        .foregroundStyle(.tertiary)
+        .accessibilityLabel("\(item.title), coming soon")
     }
 }

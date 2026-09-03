@@ -6,12 +6,24 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct PiPHelpView: View {
+    @Environment(\.openURL) private var openURL
+
     var body: some View {
         List {
             Section("Enable Picture-in-Picture on iPhone") {
                 Text("Open **Settings ▸ General ▸ Picture in Picture** and turn on **Start PiP Automatically**.")
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                } label: {
+                    Label("Open iPhone Settings", systemImage: "arrow.up.forward.app.fill")
+                        .font(.subheadline.weight(.semibold))
+                }
+                Text("iOS only lets apps open Settings at their own page — from there tap ‹ Settings, then **General ▸ Picture in Picture**.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Start a floating video") {
