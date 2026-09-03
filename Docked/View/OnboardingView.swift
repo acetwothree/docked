@@ -66,8 +66,10 @@ struct OnboardingView: View {
 
             Spacer()
 
-            Button(page == 2 ? "Get started" : "Next") {
+            Button {
                 if page < 2 { withAnimation { page += 1 } } else { onDone() }
+            } label: {
+                Text(page == 2 ? "Get started" : "Next")
             }
             .fontWeight(.heavy)
             .padding(.vertical, 10).padding(.horizontal, 20)

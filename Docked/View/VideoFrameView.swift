@@ -80,39 +80,38 @@ struct VideoFrameView: View {
             guard ww > 0, hh > 0 else { return }
             ctx.fill(Path(CGRect(x: x, y: y, width: ww, height: hh)), with: .color(c))
         }
-        typealias T = Theme.TV
 
         // base plate + body
-        fill(0, 0, w, h, T.key)
-        fill(K, K, w - 2*K, h - 2*K, T.tan)
+        fill(0, 0, w, h, Theme.TV.key)
+        fill(K, K, w - 2*K, h - 2*K, Theme.TV.tan)
 
         // bevel highlights / shades
-        fill(K, K, w - 2*K, K, T.hi)
-        fill(K, K, K, h - 2*K, T.hi)
-        fill(K, h - 2*K, w - 2*K, K, T.lo)
-        fill(w - 2*K, K, K, h - 2*K, T.lo)
+        fill(K, K, w - 2*K, K, Theme.TV.hi)
+        fill(K, K, K, h - 2*K, Theme.TV.hi)
+        fill(K, h - 2*K, w - 2*K, K, Theme.TV.lo)
+        fill(w - 2*K, K, K, h - 2*K, Theme.TV.lo)
 
         // inner mid-tone band
-        fill(2*K, 2*K, w - 4*K, B - 2*K, T.mid)
-        fill(2*K, h - CHIN, w - 4*K, K, T.mid)
-        fill(2*K, 2*K, B - 2*K, h - 2*K - CHIN, T.mid)
-        fill(w - B, 2*K, B - 2*K, h - 2*K - CHIN, T.mid)
+        fill(2*K, 2*K, w - 4*K, B - 2*K, Theme.TV.mid)
+        fill(2*K, h - CHIN, w - 4*K, K, Theme.TV.mid)
+        fill(2*K, 2*K, B - 2*K, h - 2*K - CHIN, Theme.TV.mid)
+        fill(w - B, 2*K, B - 2*K, h - 2*K - CHIN, Theme.TV.mid)
 
         // screen recess ring
         let sx = B, sy = B, sxr = w - B, syb = h - CHIN
-        fill(sx - K, sy - K, sxr - sx + 2*K, K, T.key)
-        fill(sx - K, syb, sxr - sx + 2*K, K, T.key)
-        fill(sx - K, sy - K, K, syb - sy + 2*K, T.key)
-        fill(sxr, sy - K, K, syb - sy + 2*K, T.key)
-        fill(sx - 2, sy - 2, sxr - sx + 4, 2, T.deep)
+        fill(sx - K, sy - K, sxr - sx + 2*K, K, Theme.TV.key)
+        fill(sx - K, syb, sxr - sx + 2*K, K, Theme.TV.key)
+        fill(sx - K, sy - K, K, syb - sy + 2*K, Theme.TV.key)
+        fill(sxr, sy - K, K, syb - sy + 2*K, Theme.TV.key)
+        fill(sx - 2, sy - 2, sxr - sx + 4, 2, Theme.TV.deep)
         // dark glass so the empty slot reads as a screen
-        fill(sx, sy, sxr - sx, syb - sy, T.glass)
+        fill(sx, sy, sxr - sx, syb - sy, Theme.TV.glass)
 
         // chunky stepped corners
         func notch(_ cx: CGFloat, _ cy: CGFloat, _ dx: CGFloat, _ dy: CGFloat) {
-            fill(cx, cy, 3*K, 3*K, T.key)
-            fill(cx + dx*K, cy + dy*K, 2*K, 2*K, T.tan)
-            fill(cx + dx*2*K, cy + dy*2*K, K, K, T.tan)
+            fill(cx, cy, 3*K, 3*K, Theme.TV.key)
+            fill(cx + dx*K, cy + dy*K, 2*K, 2*K, Theme.TV.tan)
+            fill(cx + dx*2*K, cy + dy*2*K, K, K, Theme.TV.tan)
         }
         notch(0, 0, 1, 1)
         notch(w - 3*K, 0, -1, 1)
@@ -121,9 +120,9 @@ struct VideoFrameView: View {
 
         // corner screws
         func screw(_ x: CGFloat, _ y: CGFloat) {
-            fill(x, y, 2*K, 2*K, T.deep)
-            fill(x, y, K, K, T.hi)
-            fill(x + K, y + K, K, K, T.lo)
+            fill(x, y, 2*K, 2*K, Theme.TV.deep)
+            fill(x, y, K, K, Theme.TV.hi)
+            fill(x + K, y + K, K, K, Theme.TV.lo)
         }
         let so: CGFloat = isSmall ? 3 : 4
         screw(so, so); screw(w - so - 2*K, so)
@@ -133,15 +132,15 @@ struct VideoFrameView: View {
         if !isSmall {
             for i in 0..<7 {
                 for j in 0..<2 {
-                    fill(8 + CGFloat(i)*3, h - CHIN + 7 + CGFloat(j)*4, K, K, T.deep)
+                    fill(8 + CGFloat(i)*3, h - CHIN + 7 + CGFloat(j)*4, K, K, Theme.TV.deep)
                 }
             }
-            fill(w - 15, h - CHIN + 8, 3*K, 3*K, T.led)
-            fill(w - 14, h - CHIN + 9, K, K, T.ledHi)
-            fill(w/2 - 6, h - 4, 12, K, T.lo)
+            fill(w - 15, h - CHIN + 8, 3*K, 3*K, Theme.TV.led)
+            fill(w - 14, h - CHIN + 9, K, K, Theme.TV.ledHi)
+            fill(w/2 - 6, h - 4, 12, K, Theme.TV.lo)
         } else {
-            fill(w - 9, h - CHIN + 4, 2*K, 2*K, T.led)
-            fill(w - 8, h - CHIN + 5, K, K, T.ledHi)
+            fill(w - 9, h - CHIN + 4, 2*K, 2*K, Theme.TV.led)
+            fill(w - 8, h - CHIN + 5, K, K, Theme.TV.ledHi)
         }
     }
 }

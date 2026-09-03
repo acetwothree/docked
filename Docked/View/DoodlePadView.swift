@@ -71,10 +71,9 @@ struct DoodlePadView: View {
     private func drawGesture(in size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { v in
-                currentPoints.append(CGPoint(
-                    x: (v.location.x / max(size.width, 1)).clamped01(),
-                    y: (v.location.y / max(size.height, 1)).clamped01()
-                ))
+                let nx = min(max(v.location.x / max(size.width, 1), 0), 1)
+                let ny = min(max(v.location.y / max(size.height, 1), 0), 1)
+                currentPoints.append(CGPoint(x: nx, y: ny))
             }
             .onEnded { _ in
                 if currentPoints.count > 1 {
@@ -100,8 +99,4 @@ struct DoodlePadView: View {
         }
         return path
     }
-}
-
-private extension CGFloat {
-    func clamped01() -> CGFloat { min(max(self, 0), 1) }
 }
