@@ -35,6 +35,22 @@ struct SettingsView: View {
                     LabeledContent("Currently", value: app.layout.label)
                 }
 
+                // MARK: Tabs
+                Section {
+                    ForEach(ActivityModule.allCases) { mod in
+                        Toggle(isOn: Binding(
+                            get: { app.pinnedModules.contains(mod) },
+                            set: { _ in app.togglePinned(mod) }
+                        )) {
+                            Label(mod.title, systemImage: mod.systemImage)
+                        }
+                    }
+                } header: {
+                    Text("Tabs in the bar")
+                } footer: {
+                    Text("Modules you turn off here still work — they move into the “More” menu.")
+                }
+
                 // MARK: Appearance
                 Section("Appearance") {
                     Picker("Theme", selection: $app.theme) {

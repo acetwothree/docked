@@ -2,8 +2,9 @@
 //  TabBarView.swift
 //  Docked
 //
-//  The module switcher plus the two labelled controls (Layout, Settings).
-//  Header or footer depending on where the video sits.
+//  Pinned modules + a "More" menu for the rest, then the two labelled
+//  controls (Layout, Settings). Header or footer depending on where the
+//  video sits.
 //
 
 import SwiftUI
@@ -14,14 +15,37 @@ struct TabBarView: View {
     var onLayout: () -> Void
     var onSettings: () -> Void
 
+    private var pinned: [ActivityModule] {
+        var list = ActivityModule.allCases.filter { app.pinnedModules.contains($0) }
+        if !list.contains(app.module) { list.insert(app.module, at: 0) }
+        return list
+    }
+    private var overflow: [ActivityModule] {
+        ActivityModule.allCases.filter { !pinned.contains($0) }
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(ActivityModule.allCases) { mod in
+            ForEach(pinned) { mod in
                 modeButton(mod)
             }
-            Rectangle().fill(Theme.hairline).frame(width: 1, height: 34).padding(.horizontal, 4)
-            iconButton("rectangle.on.rectangle.angled", "Layout",
-                       active: app.isEditingLayout, action: onLayout)
+            if !overflow.isEmpty {
+                Menu {
+                    ForEach(overflow) { mod in
+                        Button {
+                            withAnimation(.snappy(duration: 0.24)) { app.module = mod }
+                        } label: {
+                            Label(mod.title, systemImage: mod.systemImage)
+                        }
+                    }
+                } label: {
+                    cell(icon: "ellipsis.circle.fill", text: "More", tint: false)
+                }
+            }
+
+            Rectangle().fill(Theme.hairline).frame(width: 1, height: 34).padding(.horizontal, 3)
+
+            iconButton("rectangle.on.rectangle.angled", "Layout", active: app.isEditingLayout, action: onLayout)
             iconButton("gearshape.fill", "Settings", active: false, action: onSettings)
         }
         .padding(.horizontal, 4)
@@ -56,7 +80,7 @@ struct TabBarView: View {
             Text(text)
                 .font(.system(size: 9, weight: .bold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, minHeight: 52)
         .padding(.vertical, 4)

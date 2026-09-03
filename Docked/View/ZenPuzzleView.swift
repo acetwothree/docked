@@ -2,10 +2,9 @@
 //  ZenPuzzleView.swift
 //  Docked
 //
-//  "Blocks" — renders `ZenPuzzleModel`. A clean rectangular grid fills the
-//  space between the video and the tab bar; a 3-slot dock hugs the tab-bar
-//  edge. Drag a piece onto the grid; full rows / columns clear; out of moves
-//  auto-resets. No greyed cells — the grid never overlaps the video.
+//  "Blocks" — a 7x7 grid between the video and the tab bar, a 3-slot dock
+//  hugging the tab-bar edge, drag-to-place with a live ghost, and a soft
+//  flash when a line clears. Out of moves auto-resets.
 //
 
 import SwiftUI
@@ -14,7 +13,6 @@ struct ZenPuzzleView: View {
     @Environment(AppModel.self) private var app
 
     var tabsAreHeader: Bool
-    /// Changes whenever the video layout changes — triggers a run reset.
     var layoutKey: VideoLayout
 
     @State private var model: ZenPuzzleModel
@@ -32,7 +30,7 @@ struct ZenPuzzleView: View {
         var location: CGPoint
     }
 
-    private let dockH: CGFloat = 88
+    private let dockH: CGFloat = 94
 
     var body: some View {
         GeometryReader { geo in
@@ -41,6 +39,8 @@ struct ZenPuzzleView: View {
             ZStack(alignment: .topLeading) {
                 Color.clear
                 Canvas { ctx, _ in draw(&ctx, g: g) }
+
+                clearFlash(g)
 
                 dockBar(g)
                     .frame(maxWidth: .infinity, maxHeight: .infinity,
@@ -71,61 +71,87 @@ struct ZenPuzzleView: View {
             }
         }
         .onChange(of: model.highScore) { _, v in app.zenHighScore = v }
+        .sensoryFeedback(.impact(weight: .medium), trigger: model.clearEvents)
     }
 
     private struct ConfigKey: Equatable { var size: CGSize; var header: Bool }
 
+    // MARK: Line-clear flash (lowkey)
+
+    @ViewBuilder private func clearFlash(_ g: ZenGeom) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(model.clearing), id: \.self) { key in
+                let p = key.split(separator: ",").compactMap { Int($0) }
+                if p.count == 2 {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.white.opacity(0.5))
+                        .blendMode(.plusLighter)
+                        .frame(width: g.cell, height: g.cell)
+                        .position(x: g.ox + CGFloat(p[1]) * (g.cell + g.gap) + g.cell / 2,
+                                  y: g.oy + CGFloat(p[0]) * (g.cell + g.gap) + g.cell / 2)
+                        .transition(.scale(scale: 1.25).combined(with: .opacity))
+                }
+            }
+        }
+        .animation(.easeOut(duration: 0.3), value: model.clearing)
+        .allowsHitTesting(false)
+    }
+
     // MARK: Dock
 
     private func dockBar(_ g: ZenGeom) -> some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Text("\(model.score)")
-                    .font(.system(size: 19, weight: .black)).monospacedDigit()
-                Text("· Best \(max(model.highScore, model.score))")
-                    .font(.system(size: 12, weight: .bold)).monospacedDigit()
+        VStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Text("\(model.score)").font(.system(size: 20, weight: .black)).monospacedDigit()
+                Text("BEST \(max(model.highScore, model.score))")
+                    .font(.system(size: 11, weight: .heavy)).monospacedDigit()
                     .foregroundStyle(.secondary)
+                    .padding(.top, 3)
             }
-            HStack(spacing: 0) {
-                dockSlot(0, g)
-                Spacer(minLength: 0)
-                dockSlot(1, g)
-                Spacer(minLength: 0)
-                dockSlot(2, g)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+
+            HStack(spacing: 10) {
+                ForEach(0..<3, id: \.self) { i in
+                    dockSlot(i, g)
+                    if i < 2 { Spacer(minLength: 0) }
+                }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
         }
-        .padding(.vertical, 8)
+        .padding(.top, 8).padding(.bottom, 6)
         .frame(height: dockH)
         .frame(maxWidth: .infinity)
-        .background(Theme.elevated.opacity(0.9))
+        .background(Theme.elevated.opacity(0.92))
     }
 
     private func dockSlot(_ i: Int, _ g: ZenGeom) -> some View {
-        ZStack {
+        let slotW: CGFloat = 104, slotH: CGFloat = 60
+        return ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Theme.paper)
                 .overlay {
                     RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.hairline)
                 }
             if let shape = model.dock[i], drag?.slot != i {
-                thumbnail(shape)
+                thumbnail(shape, maxW: slotW - 18, maxH: slotH - 16)
             }
         }
-        .frame(width: 98, height: 62)
-        .opacity(model.dock[i] == nil || drag?.slot == i ? 0.28 : 1)
+        .frame(width: slotW, height: slotH)
+        .opacity(model.dock[i] == nil || drag?.slot == i ? 0.26 : 1)
         .contentShape(Rectangle())
         .gesture(dragGesture(slot: i, g: g))
     }
 
-    private func thumbnail(_ shape: ZenShape) -> some View {
-        let dot: CGFloat = 11, gap: CGFloat = 3
+    private func thumbnail(_ shape: ZenShape, maxW: CGFloat, maxH: CGFloat) -> some View {
+        let gap: CGFloat = 2.5
+        let dot = min(maxW / CGFloat(shape.width), maxH / CGFloat(shape.height), 22) - gap
         let filled = Set(shape.cells.map { "\($0.0),\($0.1)" })
         return VStack(spacing: gap) {
             ForEach(Array(0..<shape.height), id: \.self) { r in
                 HStack(spacing: gap) {
                     ForEach(Array(0..<shape.width), id: \.self) { c in
-                        RoundedRectangle(cornerRadius: 3)
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
                             .fill(filled.contains("\(r),\(c)") ? AnyShapeStyle(shape.gradient) : AnyShapeStyle(Color.clear))
                             .frame(width: dot, height: dot)
                     }
@@ -151,27 +177,25 @@ struct ZenPuzzleView: View {
     }
 
     private func sprite(for d: DragState, g: ZenGeom) -> some View {
-        let w = CGFloat(d.shape.width) * g.cell
-        let h = CGFloat(d.shape.height) * g.cell
-        let originX = d.location.x - w / 2
-        let originY = d.location.y - h - 18
+        let w = CGFloat(d.shape.width) * (g.cell + g.gap) - g.gap
+        let h = CGFloat(d.shape.height) * (g.cell + g.gap) - g.gap
         let anchor = Self.anchorCell(location: d.location, shape: d.shape, g: g)
         let ok = model.canPlace(d.shape, atRow: anchor.row, col: anchor.col)
         let filled = Set(d.shape.cells.map { "\($0.0),\($0.1)" })
-        return VStack(spacing: 2) {
+        return VStack(spacing: g.gap) {
             ForEach(Array(0..<d.shape.height), id: \.self) { r in
-                HStack(spacing: 2) {
+                HStack(spacing: g.gap) {
                     ForEach(Array(0..<d.shape.width), id: \.self) { c in
-                        RoundedRectangle(cornerRadius: 5)
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
                             .fill(filled.contains("\(r),\(c)") ? AnyShapeStyle(d.shape.gradient) : AnyShapeStyle(Color.clear))
-                            .frame(width: g.cell - 2, height: g.cell - 2)
+                            .frame(width: g.cell, height: g.cell)
                     }
                 }
             }
         }
         .frame(width: w, height: h)
         .opacity(ok ? 0.95 : 0.55)
-        .position(x: originX + w / 2, y: originY + h / 2)
+        .position(x: d.location.x, y: d.location.y - h / 2 - 18)
         .allowsHitTesting(false)
     }
 
@@ -180,10 +204,10 @@ struct ZenPuzzleView: View {
     private func draw(_ ctx: inout GraphicsContext, g: ZenGeom) {
         for r in 0..<g.rows {
             for c in 0..<g.cols {
-                let rect = CGRect(x: g.ox + CGFloat(c) * (g.cell + 3),
-                                  y: g.oy + CGFloat(r) * (g.cell + 3),
+                let rect = CGRect(x: g.ox + CGFloat(c) * (g.cell + g.gap),
+                                  y: g.oy + CGFloat(r) * (g.cell + g.gap),
                                   width: g.cell, height: g.cell)
-                let path = Path(roundedRect: rect, cornerRadius: 5)
+                let path = Path(roundedRect: rect, cornerRadius: 6)
                 let cleared = model.clearing.contains("\(r),\(c)")
 
                 if model.board.indices.contains(r), model.board[r].indices.contains(c),
@@ -208,10 +232,10 @@ struct ZenPuzzleView: View {
             for (dr, dc) in d.shape.cells {
                 let r = anchor.row + dr, c = anchor.col + dc
                 guard r >= 0, c >= 0, r < g.rows, c < g.cols else { continue }
-                let rect = CGRect(x: g.ox + CGFloat(c) * (g.cell + 3),
-                                  y: g.oy + CGFloat(r) * (g.cell + 3),
+                let rect = CGRect(x: g.ox + CGFloat(c) * (g.cell + g.gap),
+                                  y: g.oy + CGFloat(r) * (g.cell + g.gap),
                                   width: g.cell, height: g.cell)
-                ctx.stroke(Path(roundedRect: rect, cornerRadius: 5),
+                ctx.stroke(Path(roundedRect: rect, cornerRadius: 6),
                            with: .color(ok ? Color(hex: "3ECF7A") : Color(hex: "FF6B6B")),
                            lineWidth: 3)
             }
@@ -221,36 +245,34 @@ struct ZenPuzzleView: View {
     // MARK: Geometry
 
     struct ZenGeom: Equatable {
-        var cols = 0, rows = 0
-        var cell: CGFloat = 44, ox: CGFloat = 0, oy: CGFloat = 0
+        var cols = 7, rows = 7
+        var cell: CGFloat = 44, gap: CGFloat = 4, ox: CGFloat = 0, oy: CGFloat = 0
     }
 
     static func anchorCell(location: CGPoint, shape: ZenShape, g: ZenGeom) -> (row: Int, col: Int) {
-        let w = CGFloat(shape.width) * g.cell
-        let h = CGFloat(shape.height) * g.cell
+        let w = CGFloat(shape.width) * (g.cell + g.gap) - g.gap
+        let h = CGFloat(shape.height) * (g.cell + g.gap) - g.gap
         let topLeftX = location.x - w / 2
         let topLeftY = location.y - h - 18
-        let col = Int(((topLeftX - g.ox) / (g.cell + 3)).rounded())
-        let row = Int(((topLeftY - g.oy) / (g.cell + 3)).rounded())
+        let col = Int(((topLeftX - g.ox) / (g.cell + g.gap)).rounded())
+        let row = Int(((topLeftY - g.oy) / (g.cell + g.gap)).rounded())
         return (row, col)
     }
 
-    /// The grid fills the module rect minus the dock strip (which hugs the
-    /// tab-bar edge). ~6 columns of big cells.
+    /// A 7x7 grid, sized to fit both the width and the height of the space
+    /// between the dock and the video.
     static func geom(size: CGSize, dockH: CGFloat, dockAtTop: Bool) -> ZenGeom {
         let W = size.width, H = size.height
         let pad: CGFloat = 8
         let top = dockAtTop ? dockH + pad : pad
         let bot = dockAtTop ? H - pad : H - dockH - pad
         let gw = W - 12, gh = max(40, bot - top)
-
-        let cell = min(max((min(gw / 6.3, gh / 11)).rounded(), 44), 66)
-        let cols = max(3, Int((gw + 3) / (cell + 3)))
-        let rows = max(3, Int((gh + 3) / (cell + 3)))
-        let usedW = CGFloat(cols) * cell + CGFloat(cols - 1) * 3
-        let usedH = CGFloat(rows) * cell + CGFloat(rows - 1) * 3
-        let ox = (W - usedW) / 2
-        let oy = top + (gh - usedH) / 2
-        return ZenGeom(cols: cols, rows: rows, cell: cell, ox: ox, oy: oy)
+        let n: CGFloat = 7
+        let gap: CGFloat = 4
+        let cell = min(max((min((gw - (n - 1) * gap) / n, (gh - (n - 1) * gap) / n)).rounded(.down), 34), 58)
+        let used = n * cell + (n - 1) * gap
+        let ox = (W - used) / 2
+        let oy = top + (gh - used) / 2
+        return ZenGeom(cols: 7, rows: 7, cell: cell, gap: gap, ox: ox, oy: max(top, oy))
     }
 }

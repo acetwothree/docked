@@ -45,6 +45,8 @@ final class ZenPuzzleModel {
     private(set) var phase: Phase = .play
     /// Set of "r,c" keys currently animating out from a line clear.
     private(set) var clearing: Set<String> = []
+    /// Bumps every time one or more lines clear — a haptic trigger.
+    private(set) var clearEvents = 0
 
     var highScore: Int
 
@@ -146,6 +148,7 @@ final class ZenPuzzleModel {
             if p.count == 2 { board[p[0]][p[1]] = nil }
         }
         clearing = keys
+        clearEvents += 1
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.clearing.removeAll()
         }

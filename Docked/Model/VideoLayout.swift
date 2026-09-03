@@ -77,8 +77,8 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .doodle: "scribble.variable"
         case .notes: "note.text"
         case .game: "figure.run"
-        case .zen: "square.grid.3x3.fill"
-        case .pop: "circle.grid.3x3.fill"
+        case .zen: "puzzlepiece.fill"
+        case .pop: "circle.hexagongrid.fill"
         }
     }
 }

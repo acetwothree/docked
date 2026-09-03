@@ -33,6 +33,7 @@ final class AppModel {
         static let debug = "docked.debugOverlay"
         static let highScore = "docked.runner.highScore"
         static let zenHigh = "docked.zen.highScore"
+        static let pinned = "docked.pinnedModules"
     }
 
     var layout: VideoLayout { didSet { store(layout.rawValue, K.layout) } }
@@ -45,8 +46,15 @@ final class AppModel {
     var runnerHighScore: Int { didSet { store(runnerHighScore, K.highScore) } }
     var zenHighScore: Int { didSet { store(zenHighScore, K.zenHigh) } }
 
+    /// Which modules show directly in the bar; the rest live under "More".
+    var pinnedModules: [ActivityModule] {
+        didSet { store(pinnedModules.map(\.rawValue), K.pinned) }
+    }
+
     /// Transient — true while the tap-to-place layout editor is open.
     var isEditingLayout = false
+
+    static let defaultPinned: [ActivityModule] = [.doodle, .zen, .pop]
 
     init() {
         let d = UserDefaults.standard
@@ -59,6 +67,20 @@ final class AppModel {
         debugOverlay = d.bool(forKey: K.debug)
         runnerHighScore = d.integer(forKey: K.highScore)
         zenHighScore = d.integer(forKey: K.zenHigh)
+        if let raw = d.array(forKey: K.pinned) as? [String] {
+            let restored = raw.compactMap(ActivityModule.init(rawValue:))
+            pinnedModules = restored.isEmpty ? AppModel.defaultPinned : restored
+        } else {
+            pinnedModules = AppModel.defaultPinned
+        }
+    }
+
+    func togglePinned(_ mod: ActivityModule) {
+        if let i = pinnedModules.firstIndex(of: mod) {
+            if pinnedModules.count > 1 { pinnedModules.remove(at: i) }
+        } else {
+            pinnedModules.append(mod)
+        }
     }
 
     private func store(_ value: Any, _ key: String) {
@@ -76,6 +98,7 @@ final class AppModel {
         zenHighScore = 0
         layout = .top
         module = .doodle
+        pinnedModules = AppModel.defaultPinned
         showHint = true
         debugOverlay = false
         hasOnboarded = false

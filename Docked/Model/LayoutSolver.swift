@@ -28,36 +28,40 @@ struct SolvedLayout {
 
 enum LayoutSolver {
 
-    static let sideMargin: CGFloat = 12
-    static let endMargin: CGFloat = 8
-    static let gap: CGFloat = 16               // breathing room from the video / tab bar
     static let tabHeight: CGFloat = 68
-    static let bezel: CGFloat = 6              // thin border on every side
+    static let bezel: CGFloat = 5              // thin border on every side
+
+    // ---- iPhone PiP presets (only two sizes exist). Calibrated from
+    //      on-device screenshots; nudge these until the border wraps snug. ----
+    static let bandEdgeInset: CGFloat = 9      // large PiP: gap from the screen side edge
+    static let bandTopInset: CGFloat = 2       // large PiP: gap from the safe-area top/bottom
+    static let bandAspect: CGFloat = 1.78      // large PiP  width / height (≈16:9)
+    static let cornerWidthFrac: CGFloat = 0.50 // small PiP: fraction of screen width
+    static let cornerEdgeInset: CGFloat = 10   // small PiP: gap from the screen edge
+    static let cornerAspect: CGFloat = 1.78    // small PiP  width / height (≈16:9)
 
     static func solve(_ layout: VideoLayout, size: CGSize) -> SolvedLayout {
         let W = size.width, H = size.height
-        let MX = sideMargin, MY = endMargin, G = gap, TAB = tabHeight
         let B = bezel
+        let TAB = tabHeight
 
-        // PiP footprints, sized generously so app content always clears the
-        // real floating window (better a small gap than an overlap).
-        let cornerW = min(max(W * 0.42, 150), 188)
-        let cornerH = (cornerW / 1.55).rounded()
-        let bandW = W - MX * 2 - B * 2
-        let bandH = (bandW / 1.5).rounded()            // ~3:2, matches real large-PiP screenshots
+        let cw = (W * cornerWidthFrac).rounded()
+        let chh = (cw / cornerAspect).rounded()
+        let bw = (W - bandEdgeInset * 2).rounded()
+        let bh = (bw / bandAspect).rounded()
 
         let occupiesTop = layout.occupiesTop
         let isCorner = layout.isCorner
 
-        // PiP footprint (nudged in from the edge by the border thickness).
+        // PiP footprint — the actual floating-window rectangle.
         let pip: CGRect
         switch layout {
-        case .topLeft:     pip = CGRect(x: MX + B, y: MY + B, width: cornerW, height: cornerH)
-        case .topRight:    pip = CGRect(x: W - MX - B - cornerW, y: MY + B, width: cornerW, height: cornerH)
-        case .bottomLeft:  pip = CGRect(x: MX + B, y: H - MY - B - cornerH, width: cornerW, height: cornerH)
-        case .bottomRight: pip = CGRect(x: W - MX - B - cornerW, y: H - MY - B - cornerH, width: cornerW, height: cornerH)
-        case .top:         pip = CGRect(x: MX + B, y: MY + B, width: bandW, height: bandH)
-        case .bottom:      pip = CGRect(x: MX + B, y: H - MY - B - bandH, width: bandW, height: bandH)
+        case .topLeft:     pip = CGRect(x: cornerEdgeInset, y: cornerEdgeInset, width: cw, height: chh)
+        case .topRight:    pip = CGRect(x: W - cornerEdgeInset - cw, y: cornerEdgeInset, width: cw, height: chh)
+        case .bottomLeft:  pip = CGRect(x: cornerEdgeInset, y: H - cornerEdgeInset - chh, width: cw, height: chh)
+        case .bottomRight: pip = CGRect(x: W - cornerEdgeInset - cw, y: H - cornerEdgeInset - chh, width: cw, height: chh)
+        case .top:         pip = CGRect(x: bandEdgeInset, y: bandTopInset, width: bw, height: bh)
+        case .bottom:      pip = CGRect(x: bandEdgeInset, y: H - bandTopInset - bh, width: bw, height: bh)
         }
 
         let video = pip.insetBy(dx: -B, dy: -B)
@@ -67,9 +71,10 @@ enum LayoutSolver {
             : CGRect(x: 0, y: 0, width: W, height: TAB)
 
         // Content = a clean full-width rect between the video and the tab bar.
+        let G: CGFloat = 8
         let cTop = occupiesTop ? video.maxY + G : tab.maxY + G
         let cBot = occupiesTop ? tab.minY - G : video.minY - G
-        let content = CGRect(x: MX, y: cTop, width: W - MX * 2, height: max(60, cBot - cTop))
+        let content = CGRect(x: 8, y: cTop, width: W - 16, height: max(60, cBot - cTop))
 
         return SolvedLayout(
             pip: pip, video: video, tab: tab, tabIsHeader: !occupiesTop,
@@ -87,7 +92,7 @@ enum LayoutSolver {
     /// vertical half the current PiP window is NOT covering.
     static func editTargets(size: CGSize, current: VideoLayout) -> [EditTarget] {
         let W = size.width, H = size.height
-        let MX = sideMargin
+        let MX: CGFloat = 12
         let colGap: CGFloat = 10, rowGap: CGFloat = 12
         let cw = (W - 2 * MX - 2 * colGap) / 3
         let ch = min(max(cw * 0.82, 92), 128)
