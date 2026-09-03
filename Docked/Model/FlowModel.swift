@@ -39,6 +39,10 @@ final class FlowModel {
 
     var reached: Int
 
+    /// Cells covered so far / total — the level completes only at 100%.
+    var cellCount: Int { size * size }
+    var filledCount: Int { paths.values.reduce(0) { $0 + $1.count } }
+
     init(reached: Int) {
         self.reached = reached
         load(0)
@@ -46,37 +50,45 @@ final class FlowModel {
 
     // MARK: Levels
 
+    // Every level below is built from a hand-traced solution that covers
+    // EVERY cell, so each is guaranteed solvable and the "fill the whole
+    // grid" win condition is always reachable.
     static let levels: [FlowLevel] = [
+        // 5×5 — 3 pairs. Rows 0-1 comb / row 2 / rows 3-4 comb.
         FlowLevel(size: 5, pairs: [
-            (0, FlowCell(r: 0, c: 0), FlowCell(r: 4, c: 1)),
-            (1, FlowCell(r: 0, c: 4), FlowCell(r: 3, c: 3)),
-            (2, FlowCell(r: 2, c: 1), FlowCell(r: 4, c: 4)),
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 1, c: 4)),
+            (1, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 4)),
+            (2, FlowCell(r: 3, c: 0), FlowCell(r: 4, c: 4)),
         ]),
+        // 5×5 — 4 pairs.
         FlowLevel(size: 5, pairs: [
-            (0, FlowCell(r: 0, c: 0), FlowCell(r: 2, c: 2)),
-            (1, FlowCell(r: 0, c: 4), FlowCell(r: 4, c: 4)),
-            (2, FlowCell(r: 4, c: 0), FlowCell(r: 2, c: 3)),
-            (3, FlowCell(r: 1, c: 1), FlowCell(r: 3, c: 3)),
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 0, c: 4)),
+            (1, FlowCell(r: 1, c: 0), FlowCell(r: 2, c: 2)),
+            (2, FlowCell(r: 2, c: 0), FlowCell(r: 4, c: 1)),
+            (3, FlowCell(r: 4, c: 2), FlowCell(r: 3, c: 4)),
         ]),
+        // 6×6 — 4 pairs. Two combs on top, two combs on the bottom.
         FlowLevel(size: 6, pairs: [
-            (0, FlowCell(r: 0, c: 0), FlowCell(r: 5, c: 5)),
-            (1, FlowCell(r: 0, c: 5), FlowCell(r: 5, c: 0)),
-            (2, FlowCell(r: 1, c: 2), FlowCell(r: 4, c: 3)),
-            (3, FlowCell(r: 2, c: 0), FlowCell(r: 3, c: 5)),
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 0, c: 5)),
+            (1, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 5)),
+            (2, FlowCell(r: 4, c: 0), FlowCell(r: 5, c: 2)),
+            (3, FlowCell(r: 5, c: 3), FlowCell(r: 4, c: 5)),
         ]),
+        // 6×6 — 5 pairs.
         FlowLevel(size: 6, pairs: [
-            (0, FlowCell(r: 0, c: 1), FlowCell(r: 5, c: 1)),
-            (1, FlowCell(r: 0, c: 4), FlowCell(r: 5, c: 4)),
-            (2, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 5)),
-            (3, FlowCell(r: 3, c: 0), FlowCell(r: 3, c: 5)),
-            (4, FlowCell(r: 0, c: 0), FlowCell(r: 5, c: 5)),
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 0, c: 5)),
+            (1, FlowCell(r: 3, c: 0), FlowCell(r: 2, c: 2)),
+            (2, FlowCell(r: 3, c: 3), FlowCell(r: 2, c: 5)),
+            (3, FlowCell(r: 4, c: 0), FlowCell(r: 5, c: 2)),
+            (4, FlowCell(r: 5, c: 3), FlowCell(r: 4, c: 5)),
         ]),
+        // 7×7 — 5 pairs.
         FlowLevel(size: 7, pairs: [
-            (0, FlowCell(r: 0, c: 0), FlowCell(r: 6, c: 6)),
-            (1, FlowCell(r: 0, c: 6), FlowCell(r: 6, c: 0)),
-            (2, FlowCell(r: 3, c: 0), FlowCell(r: 3, c: 6)),
-            (3, FlowCell(r: 0, c: 3), FlowCell(r: 6, c: 3)),
-            (4, FlowCell(r: 2, c: 2), FlowCell(r: 4, c: 4)),
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 1, c: 6)),
+            (1, FlowCell(r: 2, c: 0), FlowCell(r: 3, c: 6)),
+            (2, FlowCell(r: 4, c: 0), FlowCell(r: 4, c: 6)),
+            (3, FlowCell(r: 5, c: 0), FlowCell(r: 6, c: 3)),
+            (4, FlowCell(r: 5, c: 3), FlowCell(r: 6, c: 6)),
         ]),
     ]
 
@@ -148,11 +160,15 @@ final class FlowModel {
     }
 
     private func checkComplete() {
-        let done = endpoints.keys.allSatisfy { color in
+        let linked = endpoints.keys.allSatisfy { color in
             guard let path = paths[color], let (a, b) = endpoints[color] else { return false }
             return (path.first == a && path.last == b) || (path.first == b && path.last == a)
         }
-        if done {
+        guard linked else { return }
+        // Classic Flow rule: every cell must be covered. Paths never overlap
+        // (extend() forbids it), so summing their lengths is enough.
+        let filled = paths.values.reduce(0) { $0 + $1.count }
+        if filled == size * size {
             completions += 1
             reached = max(reached, levelIndex + 1)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) { [weak self] in

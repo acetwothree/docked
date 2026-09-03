@@ -2,12 +2,11 @@
 //  RootView.swift
 //  Docked
 //
-//  The single screen. A GeometryReader gives the safe-area size to
-//  `LayoutSolver`, which returns the rectangle for every region. Doodle /
-//  Notes / Runner get the full-width band away from the video; Zen Puzzle
-//  gets the whole area and builds around the video. The tab bar carries the
-//  four modes plus the move-video / settings pair, and always sits on the
-//  edge the video doesn't.
+//  The single screen. An outer GeometryReader hands the safe-area size and
+//  insets to `LayoutSolver`, which returns every region in full-screen
+//  coordinates. The video border is drawn ignoring the safe area so the band
+//  can sit as high (or low) as the real PiP window; the tab bar and content
+//  stay inside the safe area. The Layout button just flips top ⇄ bottom.
 //
 
 import SwiftUI
@@ -19,12 +18,14 @@ struct RootView: View {
 
     @State private var showSettings = false
     @State private var showOnboarding = false
+    @State private var showPicker = false
     @State private var hintDim = false
 
     var body: some View {
         GeometryReader { geo in
-            let s = LayoutSolver.solve(app.layout, size: geo.size)
-            let fillsToEdge = app.module == .zen || app.module == .pop
+            let insets = geo.safeAreaInsets
+            let s = LayoutSolver.solve(app.layout, size: geo.size,
+                                       topInset: insets.top, bottomInset: insets.bottom)
 
             ZStack(alignment: .topLeading) {
                 Theme.backdrop.ignoresSafeArea()
@@ -32,36 +33,42 @@ struct RootView: View {
                 // module content
                 moduleHost(solved: s)
                     .frame(width: s.content.width, height: s.content.height)
-                    .clipShape(RoundedRectangle(cornerRadius: fillsToEdge ? 0 : 20, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: moduleCorner, style: .continuous))
                     .position(x: s.content.midX, y: s.content.midY)
 
-                // tab bar — modes + control pair
+                // tab bar — activity chooser + Layout toggle + Settings
                 TabBarView(isHeader: s.tabIsHeader,
-                           onLayout: { withAnimation(.easeInOut(duration: 0.2)) { app.isEditingLayout = true } },
+                           onLayout: {
+                               withAnimation(Theme.layoutAnimation) { app.layout = app.layout.toggled }
+                           },
+                           onPicker: { showPicker = true },
                            onSettings: { showSettings = true })
                     .frame(width: s.tab.width, height: s.tab.height)
                     .position(x: s.tab.midX, y: s.tab.midY)
 
-                // pixel-art TV frame (bezel shows around the PiP window)
-                VideoFrameView(layout: app.layout, hole: s.holeInFrame, dimHint: hintDim)
+                // pixel-art TV frame — allowed past the safe area so the
+                // border's outer edge reaches the physical screen edge where
+                // the real PiP window floats.
+                VideoFrameView(hole: s.holeInFrame, dimHint: hintDim)
                     .frame(width: s.video.width, height: s.video.height)
                     .position(x: s.video.midX, y: s.video.midY)
+                    .ignoresSafeArea()
 
                 if app.debugOverlay {
                     DebugOverlay(solved: s)
                 }
 
-                if app.isEditingLayout {
-                    EditLayoutOverlay(
-                        size: geo.size,
-                        current: app.layout,
+                if showPicker {
+                    ActivityPickerPanel(
+                        solved: s,
+                        current: app.module,
                         onPick: { picked in
-                            withAnimation(Theme.layoutAnimation) { app.layout = picked }
-                            app.isEditingLayout = false
+                            withAnimation(.snappy(duration: 0.24)) { app.module = picked }
+                            showPicker = false
                         },
-                        onCancel: { app.isEditingLayout = false }
+                        onClose: { showPicker = false }
                     )
-                    .transition(.opacity)
+                    .zIndex(15)
                 }
 
                 // First-run onboarding — an overlay, so the live dashboard
@@ -77,8 +84,8 @@ struct RootView: View {
                 }
             }
             .animation(Theme.layoutAnimation, value: app.layout)
-            .animation(.easeInOut(duration: 0.2), value: app.isEditingLayout)
             .animation(.easeInOut(duration: 0.25), value: app.module)
+            .animation(.easeInOut(duration: 0.22), value: showPicker)
             .animation(.easeInOut(duration: 0.3), value: showOnboarding)
         }
         .preferredColorScheme(app.theme.colorScheme)
@@ -101,6 +108,10 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { doodle.saveNow() }
         }
+    }
+
+    private var moduleCorner: CGFloat {
+        (app.module == .zen || app.module == .pop) ? 0 : 20
     }
 
     @ViewBuilder

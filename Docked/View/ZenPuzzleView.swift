@@ -71,7 +71,9 @@ struct ZenPuzzleView: View {
             }
         }
         .onChange(of: model.highScore) { _, v in app.zenHighScore = v }
-        .sensoryFeedback(.impact(weight: .medium), trigger: model.clearEvents)
+        .sensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: model.placeEvents)
+        .sensoryFeedback(.success, trigger: model.clearEvents)
+        .sensoryFeedback(.error, trigger: model.phase) { _, phase in phase == .over }
     }
 
     private struct ConfigKey: Equatable { var size: CGSize; var header: Bool }
@@ -119,7 +121,8 @@ struct ZenPuzzleView: View {
             }
             .padding(.horizontal, 18)
         }
-        .padding(.top, 8).padding(.bottom, 6)
+        .padding(.top, tabsAreHeader ? 16 : 8)
+        .padding(.bottom, tabsAreHeader ? 8 : 18)
         .frame(height: dockH)
         .frame(maxWidth: .infinity)
         .background(Theme.elevated.opacity(0.92))

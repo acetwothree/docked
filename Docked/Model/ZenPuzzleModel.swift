@@ -47,6 +47,8 @@ final class ZenPuzzleModel {
     private(set) var clearing: Set<String> = []
     /// Bumps every time one or more lines clear — a haptic trigger.
     private(set) var clearEvents = 0
+    /// Bumps on every successful placement — a light haptic trigger.
+    private(set) var placeEvents = 0
 
     var highScore: Int
 
@@ -107,6 +109,7 @@ final class ZenPuzzleModel {
         guard phase == .play, canPlace(shape, atRow: ar, col: ac) else { return false }
         for (dr, dc) in shape.cells { board[ar + dr][ac + dc] = shape.palette }
         score += shape.cells.count
+        placeEvents += 1
 
         let cleared = clearFullLines()
         if cleared > 0 { score += cleared * 10 + (cleared - 1) * 6 }

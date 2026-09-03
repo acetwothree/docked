@@ -51,9 +51,6 @@ final class AppModel {
         didSet { store(pinnedModules.map(\.rawValue), K.pinned) }
     }
 
-    /// Transient — true while the tap-to-place layout editor is open.
-    var isEditingLayout = false
-
     static let defaultPinned: [ActivityModule] = [.doodle, .zen, .pop]
 
     init() {

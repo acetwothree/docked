@@ -30,15 +30,14 @@ struct SettingsView: View {
                                 trailing: { chevron })
                         }
                         divider
-                        row(icon: "rectangle.on.rectangle.angled", "Move the video") {
-                            Button("Choose…") {
-                                dismiss()
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                                    app.isEditingLayout = true
-                                }
+                        row(icon: "rectangle.on.rectangle.angled", "Video position") {
+                            Picker("", selection: $app.layout) {
+                                Text("Top").tag(VideoLayout.top)
+                                Text("Bottom").tag(VideoLayout.bottom)
                             }
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .frame(width: 150)
                         }
                         divider
                         row(icon: "tv", "Show “drag here” hint") {
@@ -91,13 +90,6 @@ struct SettingsView: View {
                             VStack(spacing: 0) {
                                 row(icon: "ladybug.fill", "Layout debug overlay") {
                                     Toggle("", isOn: $app.debugOverlay).labelsHidden()
-                                }
-                                divider
-                                row(icon: "square.dashed", "Force layout") {
-                                    Picker("", selection: $app.layout) {
-                                        ForEach(VideoLayout.allCases) { Text($0.label).tag($0) }
-                                    }
-                                    .labelsHidden()
                                 }
                                 divider
                                 devButton("Clear all app data", "trash", destructive: true) {

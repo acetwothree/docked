@@ -23,10 +23,13 @@ struct FlowView: View {
                     .allowsHitTesting(false)
 
                 // HUD floats in the top-left / top-right so it steals no room
-                HStack {
+                HStack(spacing: 8) {
                     Text("LEVEL \(model.levelIndex + 1)")
                         .font(.system(size: 13, weight: .heavy)).tracking(1)
                         .foregroundStyle(.secondary)
+                    Text("\(model.filledCount)/\(model.cellCount)")
+                        .font(.system(size: 11, weight: .heavy)).monospacedDigit()
+                        .foregroundStyle(model.filledCount == model.cellCount ? Color.green : .tertiary)
                     Spacer()
                     Button { model.restart(); active = nil } label: {
                         Image(systemName: "arrow.counterclockwise")
