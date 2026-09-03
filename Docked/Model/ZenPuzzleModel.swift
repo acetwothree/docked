@@ -39,8 +39,6 @@ final class ZenPuzzleModel {
     private(set) var rows = 0
     /// nil = empty, otherwise the placed piece's palette.
     private(set) var board: [[[Color]?]] = []
-    /// true = permanently unavailable (under the video).
-    private(set) var blocked: [[Bool]] = []
 
     private(set) var dock: [ZenShape?] = [nil, nil, nil]
     private(set) var score = 0
@@ -64,12 +62,12 @@ final class ZenPuzzleModel {
         return Array(repeating: row, count: max(1, rows))
     }
 
-    /// `blockedMask[r][c]` marks cells hidden under the video.
-    func configure(cols: Int, rows: Int, blockedMask: [[Bool]]) {
+    /// Set the grid dimensions; wipes the board when they change or a reset
+    /// is pending.
+    func configure(cols: Int, rows: Int) {
         let dimsChanged = cols != self.cols || rows != self.rows
         self.cols = max(1, cols)
         self.rows = max(1, rows)
-        self.blocked = blockedMask
         if pendingWipe || dimsChanged {
             board = emptyBoard(cols: self.cols, rows: self.rows)
             pendingWipe = false
@@ -96,7 +94,6 @@ final class ZenPuzzleModel {
         for (dr, dc) in shape.cells {
             let r = ar + dr, c = ac + dc
             guard r >= 0, c >= 0, r < rows, c < cols else { return false }
-            if blocked.indices.contains(r), blocked[r].indices.contains(c), blocked[r][c] { return false }
             if board[r][c] != nil { return false }
         }
         return true
@@ -136,12 +133,9 @@ final class ZenPuzzleModel {
     }
 
     private func clearFullLines() -> Int {
-        func occupied(_ r: Int, _ c: Int) -> Bool {
-            board[r][c] != nil || (blocked.indices.contains(r) && blocked[r].indices.contains(c) && blocked[r][c])
-        }
         var fullRows: [Int] = [], fullCols: [Int] = []
-        for r in 0..<rows where (0..<cols).allSatisfy({ occupied(r, $0) }) { fullRows.append(r) }
-        for c in 0..<cols where (0..<rows).allSatisfy({ occupied($0, c) }) { fullCols.append(c) }
+        for r in 0..<rows where (0..<cols).allSatisfy({ board[r][$0] != nil }) { fullRows.append(r) }
+        for c in 0..<cols where (0..<rows).allSatisfy({ board[$0][c] != nil }) { fullCols.append(c) }
         guard !fullRows.isEmpty || !fullCols.isEmpty else { return 0 }
 
         var keys: Set<String> = []
@@ -149,9 +143,7 @@ final class ZenPuzzleModel {
         for c in fullCols { for r in 0..<rows { keys.insert("\(r),\(c)") } }
         for k in keys {
             let p = k.split(separator: ",").compactMap { Int($0) }
-            if p.count == 2, !(blocked.indices.contains(p[0]) && blocked[p[0]].indices.contains(p[1]) && blocked[p[0]][p[1]]) {
-                board[p[0]][p[1]] = nil
-            }
+            if p.count == 2 { board[p[0]][p[1]] = nil }
         }
         clearing = keys
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in

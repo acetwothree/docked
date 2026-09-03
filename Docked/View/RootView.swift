@@ -24,16 +24,16 @@ struct RootView: View {
     var body: some View {
         GeometryReader { geo in
             let s = LayoutSolver.solve(app.layout, size: geo.size)
-            let moduleFrame = app.module == .zen ? s.zenField : s.content
+            let fillsToEdge = app.module == .zen || app.module == .pop
 
             ZStack(alignment: .topLeading) {
                 Theme.backdrop.ignoresSafeArea()
 
                 // module content
                 moduleHost(solved: s)
-                    .frame(width: moduleFrame.width, height: moduleFrame.height)
-                    .clipShape(RoundedRectangle(cornerRadius: app.module == .zen ? 0 : 20, style: .continuous))
-                    .position(x: moduleFrame.midX, y: moduleFrame.midY)
+                    .frame(width: s.content.width, height: s.content.height)
+                    .clipShape(RoundedRectangle(cornerRadius: fillsToEdge ? 0 : 20, style: .continuous))
+                    .position(x: s.content.midX, y: s.content.midY)
 
                 // tab bar — modes + control pair
                 TabBarView(isHeader: s.tabIsHeader,
@@ -102,12 +102,13 @@ struct RootView: View {
                 .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
         case .zen:
             ZenPuzzleView(
-                videoRectInField: s.video.offsetBy(dx: -s.zenField.minX, dy: -s.zenField.minY),
                 tabsAreHeader: s.tabIsHeader,
-                isBandLayout: !app.layout.isCorner,
                 layoutKey: app.layout,
                 highScore: app.zenHighScore
             )
+        case .pop:
+            ZStack { Theme.paper; PopView() }
+                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
         }
     }
 }
@@ -117,9 +118,9 @@ private struct DebugOverlay: View {
     var solved: SolvedLayout
     var body: some View {
         ZStack(alignment: .topLeading) {
-            box(solved.video, "video", .red)
+            box(solved.pip, "pip", .orange)
+            box(solved.video, "frame", .red)
             box(solved.content, "content", .green)
-            box(solved.zenField, "zenField", .cyan)
             box(solved.tab, "tab", .blue)
         }
         .allowsHitTesting(false)

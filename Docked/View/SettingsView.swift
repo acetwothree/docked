@@ -70,7 +70,7 @@ struct SettingsView: View {
                         Label("Replay onboarding", systemImage: "arrow.counterclockwise")
                     }
                     Button("Reset Runner best") { app.runnerHighScore = 0 }
-                    Button("Reset Zen best") { app.zenHighScore = 0 }
+                    Button("Reset Blocks best") { app.zenHighScore = 0 }
                     Toggle("Layout debug overlay", isOn: $app.debugOverlay)
                     Picker("Force layout", selection: $app.layout) {
                         ForEach(VideoLayout.allCases) { Text($0.label).tag($0) }

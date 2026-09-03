@@ -61,14 +61,15 @@ enum VideoLayout: String, CaseIterable, Identifiable {
 }
 
 enum ActivityModule: String, CaseIterable, Identifiable {
-    case doodle, notes, game, zen
+    case doodle, notes, game, zen, pop
     var id: String { rawValue }
     var title: String {
         switch self {
         case .doodle: "Doodle"
         case .notes: "Notes"
         case .game: "Runner"
-        case .zen: "Zen"
+        case .zen: "Blocks"
+        case .pop: "Pop"
         }
     }
     var systemImage: String {
@@ -77,6 +78,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .notes: "note.text"
         case .game: "figure.run"
         case .zen: "square.grid.3x3.fill"
+        case .pop: "circle.grid.3x3.fill"
         }
     }
 }

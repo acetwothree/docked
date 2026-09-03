@@ -47,28 +47,29 @@ struct DoodlePadView: View {
     }
 
     private var toolbar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             ForEach(palette, id: \.self) { hex in
                 Circle()
                     .fill(Color(hex: hex))
-                    .frame(width: 30, height: 30)
+                    .frame(width: 26, height: 26)
                     .overlay { Circle().strokeBorder(.white.opacity(colorHex == hex ? 0.95 : 0), lineWidth: 2.5) }
-                    .padding(4)
                     .contentShape(Circle())
                     .onTapGesture { colorHex = hex }
             }
-            Slider(value: $lineWidth, in: 2...22).frame(minWidth: 60)
+            Slider(value: $lineWidth, in: 2...22)
+                .frame(maxWidth: 74)
+            Spacer(minLength: 2)
             Button { store.undo() } label: {
-                Image(systemName: "arrow.uturn.backward").frame(width: 40, height: 40).contentShape(Rectangle())
+                Image(systemName: "arrow.uturn.backward").frame(width: 38, height: 38).contentShape(Rectangle())
             }
             .disabled(store.strokes.isEmpty)
             Button(role: .destructive) { store.clear() } label: {
-                Image(systemName: "trash").frame(width: 40, height: 40).contentShape(Rectangle())
+                Image(systemName: "trash").frame(width: 38, height: 38).contentShape(Rectangle())
             }
             .disabled(store.strokes.isEmpty)
         }
-        .font(.system(size: 17, weight: .semibold))
-        .padding(.horizontal, 8).padding(.vertical, 6)
+        .font(.system(size: 16, weight: .semibold))
+        .padding(.leading, 14).padding(.trailing, 18).padding(.vertical, 6)
         .background(.ultraThinMaterial)
     }
 
