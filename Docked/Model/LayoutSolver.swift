@@ -29,16 +29,16 @@ struct SolvedLayout {
 enum LayoutSolver {
 
     static let tabHeight: CGFloat = 68
-    static let bezel: CGFloat = 5              // thin border on every side
+    static let bezel: CGFloat = 8              // border thickness on every side
 
     // ---- iPhone PiP presets (only two sizes exist). Calibrated from
     //      on-device screenshots; nudge these until the border wraps snug. ----
-    static let bandEdgeInset: CGFloat = 9      // large PiP: gap from the screen side edge
-    static let bandTopInset: CGFloat = 2       // large PiP: gap from the safe-area top/bottom
+    static let bandEdgeInset: CGFloat = 10     // large PiP: gap from the screen side edge
+    static let bandTopInset: CGFloat = 3       // large PiP: gap from the safe-area top/bottom
     static let bandAspect: CGFloat = 1.78      // large PiP  width / height (≈16:9)
-    static let cornerWidthFrac: CGFloat = 0.50 // small PiP: fraction of screen width
-    static let cornerEdgeInset: CGFloat = 10   // small PiP: gap from the screen edge
-    static let cornerAspect: CGFloat = 1.78    // small PiP  width / height (≈16:9)
+    static let cornerWidthFrac: CGFloat = 0.54 // small PiP: fraction of screen width
+    static let cornerEdgeInset: CGFloat = 9    // small PiP: gap from the screen edge
+    static let cornerAspect: CGFloat = 1.85    // small PiP  width / height
 
     static func solve(_ layout: VideoLayout, size: CGSize) -> SolvedLayout {
         let W = size.width, H = size.height

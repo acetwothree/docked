@@ -102,6 +102,9 @@ struct SettingsView: View {
                     Text("Visible during development. Hide this section before shipping.")
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.backdrop.ignoresSafeArea())
+            .tint(Theme.accent)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -2,9 +2,8 @@
 //  TabBarView.swift
 //  Docked
 //
-//  Pinned modules + a "More" menu for the rest, then the two labelled
-//  controls (Layout, Settings). Header or footer depending on where the
-//  video sits.
+//  Pinned activity tabs fill the leading space; a compact "More" opens a
+//  clean sheet with the rest. Layout / Settings sit snug at the trailing end.
 //
 
 import SwiftUI
@@ -15,9 +14,11 @@ struct TabBarView: View {
     var onLayout: () -> Void
     var onSettings: () -> Void
 
+    @State private var showMore = false
+
     private var pinned: [ActivityModule] {
         var list = ActivityModule.allCases.filter { app.pinnedModules.contains($0) }
-        if !list.contains(app.module) { list.insert(app.module, at: 0) }
+        if !list.contains(app.module) { list.append(app.module) }
         return list
     }
     private var overflow: [ActivityModule] {
@@ -25,72 +26,112 @@ struct TabBarView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 3) {
             ForEach(pinned) { mod in
-                modeButton(mod)
-            }
-            if !overflow.isEmpty {
-                Menu {
-                    ForEach(overflow) { mod in
-                        Button {
-                            withAnimation(.snappy(duration: 0.24)) { app.module = mod }
-                        } label: {
-                            Label(mod.title, systemImage: mod.systemImage)
-                        }
-                    }
-                } label: {
-                    cell(icon: "ellipsis.circle.fill", text: "More", tint: false)
+                tab(mod.systemImage, mod.title, tint: app.module == mod, fills: true) {
+                    withAnimation(.snappy(duration: 0.24)) { app.module = mod }
                 }
             }
+            if !overflow.isEmpty {
+                tab("ellipsis", "More", tint: false, fills: false) { showMore = true }
+            }
 
-            Rectangle().fill(Theme.hairline).frame(width: 1, height: 34).padding(.horizontal, 3)
+            Rectangle().fill(Theme.hairline).frame(width: 1, height: 32).padding(.horizontal, 3)
 
-            iconButton("rectangle.on.rectangle.angled", "Layout", active: app.isEditingLayout, action: onLayout)
-            iconButton("gearshape.fill", "Settings", active: false, action: onSettings)
+            tab("rectangle.on.rectangle.angled", "Layout", tint: app.isEditingLayout, fills: false, action: onLayout)
+            tab("gearshape.fill", "Settings", tint: false, fills: false, action: onSettings)
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.elevated)
         .overlay(alignment: isHeader ? .bottom : .top) {
             Rectangle().fill(Theme.hairline).frame(height: 1)
         }
-    }
-
-    private func modeButton(_ mod: ActivityModule) -> some View {
-        let selected = app.module == mod
-        return Button {
-            withAnimation(.snappy(duration: 0.24)) { app.module = mod }
-        } label: {
-            cell(icon: mod.systemImage, text: mod.title, tint: selected)
+        .sheet(isPresented: $showMore) {
+            MoreSheet(
+                hidden: overflow,
+                onPick: { picked in
+                    withAnimation(.snappy(duration: 0.24)) { app.module = picked }
+                    showMore = false
+                },
+                onManage: { showMore = false; onSettings() }
+            )
+            .presentationDetents([.height(CGFloat(max(overflow.count, 1)) * 62 + 150)])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Theme.elevated)
         }
-        .buttonStyle(.plain)
     }
 
-    private func iconButton(_ name: String, _ label: String, active: Bool, action: @escaping () -> Void) -> some View {
+    private func tab(_ icon: String, _ text: String, tint: Bool, fills: Bool,
+                     action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            cell(icon: name, text: label, tint: active)
+            VStack(spacing: 3) {
+                Image(systemName: icon).font(.system(size: 19))
+                Text(text)
+                    .font(.system(size: 9, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .frame(maxWidth: fills ? .infinity : nil, minHeight: 52)
+            .frame(width: fills ? nil : 52)
+            .padding(.vertical, 4)
+            .background {
+                if tint {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Theme.accent.opacity(0.16))
+                }
+            }
+            .foregroundStyle(tint ? Theme.accent : Color.secondary)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(label)
+        .accessibilityLabel(text)
     }
+}
 
-    private func cell(icon: String, text: String, tint: Bool) -> some View {
-        VStack(spacing: 3) {
-            Image(systemName: icon).font(.system(size: 19))
-            Text(text)
-                .font(.system(size: 9, weight: .bold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .frame(maxWidth: .infinity, minHeight: 52)
-        .padding(.vertical, 4)
-        .background {
-            if tint {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Theme.accent.opacity(0.16))
+/// The "More" sheet — bigger, cleaner rows than a stock context menu.
+struct MoreSheet: View {
+    var hidden: [ActivityModule]
+    var onPick: (ActivityModule) -> Void
+    var onManage: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Text("More activities")
+                .font(.system(size: 16, weight: .heavy))
+                .padding(.top, 20).padding(.bottom, 12)
+
+            ForEach(hidden) { mod in
+                Button { onPick(mod) } label: {
+                    HStack(spacing: 14) {
+                        Image(systemName: mod.systemImage)
+                            .font(.system(size: 18, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .background(Theme.accent.opacity(0.16),
+                                        in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                            .foregroundStyle(Theme.accent)
+                        Text(mod.title).font(.system(size: 16, weight: .semibold))
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.horizontal, 22).padding(.vertical, 9)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
+
+            Button(action: onManage) {
+                Label("Choose which tabs show", systemImage: "slider.horizontal.3")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 16)
+            }
+            .buttonStyle(.plain)
+
+            Spacer(minLength: 0)
         }
-        .foregroundStyle(tint ? Theme.accent : Color.secondary)
-        .contentShape(Rectangle())
+        .frame(maxWidth: .infinity)
     }
 }
