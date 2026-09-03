@@ -2,11 +2,12 @@
 //  RootView.swift
 //  Docked
 //
-//  The single screen. An outer GeometryReader hands the safe-area size and
-//  insets to `LayoutSolver`, which returns every region in full-screen
-//  coordinates. The video border is drawn ignoring the safe area so the band
-//  can sit as high (or low) as the real PiP window; the tab bar and content
-//  stay inside the safe area. The Layout button just flips top ⇄ bottom.
+//  The single screen. A GeometryReader hands the safe-area size to
+//  `LayoutSolver`, which lays every region out in safe-area coordinates. Only
+//  the video border ignores the safe area, so it can nudge a few points past
+//  the edge to meet the real PiP window; the tab bar and content stay fully
+//  inside the safe area so nothing hides under a system bar. The Layout button
+//  just flips top ⇄ bottom.
 //
 
 import SwiftUI
@@ -24,15 +25,10 @@ struct RootView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let insets = geo.safeAreaInsets
-            let fullW = geo.size.width + insets.leading + insets.trailing
-            let fullH = geo.size.height + insets.top + insets.bottom
-            let s = LayoutSolver.solve(app.layout,
-                                       size: CGSize(width: fullW, height: fullH),
-                                       safeTop: insets.top, safeBottom: insets.bottom)
+            let s = LayoutSolver.solve(app.layout, size: geo.size)
 
             ZStack(alignment: .topLeading) {
-                Theme.backdrop
+                Theme.backdrop.ignoresSafeArea()
 
                 // module content
                 moduleHost(solved: s)
@@ -50,12 +46,12 @@ struct RootView: View {
                     .frame(width: s.tab.width, height: s.tab.height)
                     .position(x: s.tab.midX, y: s.tab.midY)
 
-                // pixel-art TV frame — positioned in full-screen coords so the
-                // border's outer edge reaches the physical screen edge where
-                // the real PiP window floats.
+                // pixel-art TV frame — the one layer allowed a few points past
+                // the safe edge so its border can meet the real PiP window.
                 VideoFrameView(hole: s.holeInFrame, dimHint: hintDim)
                     .frame(width: s.video.width, height: s.video.height)
                     .position(x: s.video.midX, y: s.video.midY)
+                    .ignoresSafeArea()
 
                 if app.debugOverlay {
                     DebugOverlay(solved: s)
@@ -86,9 +82,6 @@ struct RootView: View {
                     .zIndex(20)
                 }
             }
-            .padding(EdgeInsets(top: -insets.top, leading: -insets.leading,
-                                bottom: -insets.bottom, trailing: -insets.trailing))
-            .ignoresSafeArea()
             .animation(Theme.layoutAnimation, value: app.layout)
             .animation(.easeInOut(duration: 0.25), value: app.module)
             .animation(.easeInOut(duration: 0.22), value: showPicker)
