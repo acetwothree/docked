@@ -47,13 +47,18 @@ enum LayoutSolver {
     static let topBorderGap: CGFloat = -8      // border top vs the island bottom
     static let bandAspect: CGFloat = 1.82
 
+    /// User drag range for the screen-height stretch (added to `bh`).
+    static let stretchRange: ClosedRange<CGFloat> = -16 ... 120
+
     static func solve(_ layout: VideoLayout, size: CGSize,
-                      insetTop: CGFloat, insetBottom: CGFloat) -> SolvedLayout {
+                      insetTop: CGFloat, insetBottom: CGFloat,
+                      stretch: CGFloat = 0) -> SolvedLayout {
         let W = size.width, H = size.height
         let TAB = tabHeight
 
         let bw = (W - bandSideInset * 2).rounded()
-        let bh = (bw / bandAspect).rounded()
+        let s = min(max(stretch, stretchRange.lowerBound), stretchRange.upperBound)
+        let bh = (bw / bandAspect).rounded() + s
 
         let vMinY = insetTop + topBorderGap
         let cabinetH = bezelTop + bh + bezelBottom + consoleHeight

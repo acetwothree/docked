@@ -26,6 +26,7 @@ final class AppModel {
     private enum K {
         static let tvTheme = "docked.tvTheme"
         static let tvBadge = "docked.tvBadge"
+        static let tvStretch = "docked.tvStretch"
         static let favorites = "docked.favorites"
         static let module = "docked.module"
         static let theme = "docked.theme"
@@ -49,6 +50,9 @@ final class AppModel {
     var tvTheme: TVTheme { didSet { store(tvTheme.rawValue, K.tvTheme) } }
     /// Etched "DOCKED · FREE APP" text on the console (nice for ad recordings).
     var tvBadge: Bool { didSet { store(tvBadge, K.tvBadge) } }
+    /// Extra points added to the screen opening's height, so the user can drag
+    /// the TV to wrap whatever the current video source's aspect ratio is.
+    var tvStretch: CGFloat { didSet { store(Double(tvStretch), K.tvStretch) } }
     /// Starred activities, shown in a Favorites row at the top of the picker.
     var favorites: [ActivityModule] { didSet { store(favorites.map(\.rawValue), K.favorites) } }
     var module: ActivityModule { didSet { store(module.rawValue, K.module) } }
@@ -81,6 +85,7 @@ final class AppModel {
         let d = UserDefaults.standard
         tvTheme = TVTheme(rawValue: d.string(forKey: K.tvTheme) ?? "") ?? .walnut
         tvBadge = (d.object(forKey: K.tvBadge) as? Bool) ?? true
+        tvStretch = CGFloat(d.double(forKey: K.tvStretch))   // 0 when unset
         favorites = (d.array(forKey: K.favorites) as? [String] ?? []).compactMap(ActivityModule.init(rawValue:))
         module = ActivityModule(rawValue: d.string(forKey: K.module) ?? "") ?? .doodle
         theme = AppTheme(rawValue: d.string(forKey: K.theme) ?? "") ?? .system

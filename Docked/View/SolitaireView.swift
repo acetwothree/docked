@@ -13,14 +13,30 @@ struct SolitaireView: View {
     @AppStorage("docked.solitaire.wins") private var wins: Int = 0
 
     // pyramid: rows of 1,2,3,4 → flat 0..<10; each card is a 0..51 deck value
-    @State private var pyramid: [Int] = []
+    @State private var pyramid: [Int]
     @State private var removed: Set<Int> = []
-    @State private var stock: [Int] = []
-    @State private var pileTop: Int = 0
+    @State private var stock: [Int]
+    @State private var pileTop: Int
     @State private var moveTick = 0
     @State private var winTick = 0
 
     private let rowStart = [0, 1, 3, 6]   // flat index where each pyramid row begins
+
+    init() {
+        let d = Self.freshDeal()
+        _pyramid = State(initialValue: d.pyramid)
+        _stock = State(initialValue: d.stock)
+        _pileTop = State(initialValue: d.pile)
+    }
+
+    private static func freshDeal() -> (pyramid: [Int], stock: [Int], pile: Int) {
+        var deck = Array(0..<52)
+        deck.shuffle()
+        let pyr = Array(deck.prefix(10))
+        var rest = Array(deck.dropFirst(10))
+        let pile = rest.removeLast()
+        return (pyr, rest, pile)
+    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -143,12 +159,10 @@ struct SolitaireView: View {
     }
 
     private func deal() {
-        var deck = Array(0..<52)
-        deck.shuffle()
-        pyramid = Array(deck.prefix(10))
-        var rest = Array(deck.dropFirst(10))
-        pileTop = rest.removeLast()
-        stock = rest
+        let d = Self.freshDeal()
+        pyramid = d.pyramid
+        stock = d.stock
+        pileTop = d.pile
         removed = []
     }
 

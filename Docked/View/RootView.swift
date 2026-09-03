@@ -21,6 +21,8 @@ struct RootView: View {
     @State private var showPicker = false
     @State private var showPlus = false
     @State private var hintDim = false
+    @State private var stretchStart: CGFloat? = nil
+    @State private var showStretchHint = true
 
     var body: some View {
         GeometryReader { safeGeo in
@@ -32,7 +34,8 @@ struct RootView: View {
                 // at the physical top-left. Everything below lays out in that
                 // one coordinate space.
                 let s = LayoutSolver.solve(app.layout, size: fullGeo.size,
-                                           insetTop: insets.top, insetBottom: insets.bottom)
+                                           insetTop: insets.top, insetBottom: insets.bottom,
+                                           stretch: app.tvStretch)
 
                 ZStack(alignment: .topLeading) {
                     Theme.backdrop
@@ -59,6 +62,9 @@ struct RootView: View {
 
                 // real knob buttons, dropped onto the drawn wells
                 consoleKnobs(s)
+
+                // drag handle to stretch the screen to any video's height
+                stretchHandle(s)
 
                 if app.debugOverlay {
                     DebugOverlay(solved: s)
@@ -135,6 +141,39 @@ struct RootView: View {
     private func endEditing() {
         _ = UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    /// A grabber on the bottom edge of the screen — drag it to stretch the TV
+    /// down so the border wraps whatever video you have playing.
+    private func stretchHandle(_ s: SolvedLayout) -> some View {
+        let y = s.pip.maxY - 2
+        return VStack(spacing: 2) {
+            Capsule().fill(Theme.accent).frame(width: 40, height: 5)
+            if showStretchHint {
+                Text("drag to fit your video")
+                    .font(.system(size: 9, weight: .heavy))
+                    .foregroundStyle(Theme.accent.opacity(0.9))
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(.ultraThinMaterial, in: Capsule())
+            }
+        }
+        .padding(10)
+        .contentShape(Rectangle())
+        .position(x: s.pip.midX, y: y)
+        .gesture(
+            DragGesture(minimumDistance: 1)
+                .onChanged { v in
+                    if stretchStart == nil { stretchStart = app.tvStretch }
+                    let base = stretchStart ?? app.tvStretch
+                    app.tvStretch = min(max(base + v.translation.height, LayoutSolver.stretchRange.lowerBound),
+                                        LayoutSolver.stretchRange.upperBound)
+                }
+                .onEnded { _ in
+                    stretchStart = nil
+                    withAnimation { showStretchHint = false }
+                }
+        )
+        .accessibilityLabel("Stretch TV screen")
     }
 
     /// The three console knobs, positioned over the wells drawn by VideoFrameView.
