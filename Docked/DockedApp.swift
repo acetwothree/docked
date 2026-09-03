@@ -20,6 +20,7 @@ struct DockedApp: App {
     @State private var appModel = AppModel()
     @State private var notes = NotesStore()
     @State private var doodle = DoodleStore()
+    @State private var store = StoreManager()
 
     var body: some Scene {
         WindowGroup {
@@ -27,6 +28,7 @@ struct DockedApp: App {
                 .environment(appModel)
                 .environment(notes)
                 .environment(doodle)
+                .environment(store)
                 .tint(Theme.accent)
         }
     }

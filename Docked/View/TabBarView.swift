@@ -61,6 +61,7 @@ struct ActivityPickerPanel: View {
     var solved: SolvedLayout
     var current: ActivityModule
     var favorites: [ActivityModule]
+    var hasPlus: Bool
     var themeTint: Color
     var onPick: (ActivityModule) -> Void
     var onToggleFav: (ActivityModule) -> Void
@@ -173,6 +174,7 @@ struct ActivityPickerPanel: View {
     private func liveCard(_ mod: ActivityModule) -> some View {
         let on = mod == current
         let fav = favorites.contains(mod)
+        let locked = mod.isPlus && !hasPlus
         return Button { onPick(mod) } label: {
             VStack(spacing: 7) {
                 Image(systemName: mod.systemImage)
@@ -184,6 +186,7 @@ struct ActivityPickerPanel: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 84)
+            .opacity(locked ? 0.72 : 1)
             .background(on ? AnyShapeStyle(Theme.accent.opacity(0.9))
                           : AnyShapeStyle(themeTint.opacity(0.16)),
                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -191,9 +194,18 @@ struct ActivityPickerPanel: View {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(on ? Color.clear : mod.tint.opacity(0.35))
             }
+            .overlay(alignment: .bottomTrailing) {
+                if locked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundStyle(.secondary)
+                        .padding(6)
+                }
+            }
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(locked ? "\(mod.title), Docked Plus" : mod.title)
         .overlay(alignment: .topTrailing) {
             Button { onToggleFav(mod) } label: {
                 Image(systemName: fav ? "star.fill" : "star")

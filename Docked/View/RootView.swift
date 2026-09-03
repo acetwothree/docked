@@ -14,6 +14,7 @@ import UIKit
 struct RootView: View {
     @Environment(AppModel.self) private var app
     @Environment(DoodleStore.self) private var doodle
+    @Environment(StoreManager.self) private var store
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var showSettings = false
@@ -75,10 +76,16 @@ struct RootView: View {
                         solved: s,
                         current: app.module,
                         favorites: app.favorites,
+                        hasPlus: store.hasPlus,
                         themeTint: app.tvTheme.palette.mid,
                         onPick: { picked in
-                            withAnimation(.snappy(duration: 0.24)) { app.module = picked }
-                            showPicker = false
+                            if picked.isPlus && !store.hasPlus {
+                                showPicker = false
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) { showPlus = true }
+                            } else {
+                                withAnimation(.snappy(duration: 0.24)) { app.module = picked }
+                                showPicker = false
+                            }
                         },
                         onToggleFav: { app.toggleFavorite($0) },
                         onClose: { showPicker = false }
@@ -123,6 +130,7 @@ struct RootView: View {
             try? await Task.sleep(for: .seconds(5))
             hintDim = true
         }
+        .task { await store.start() }
         .onAppear { showOnboarding = !app.hasOnboarded }
         .onChange(of: app.hasOnboarded) { _, done in
             // "Replay onboarding" from Settings flips this while RootView is
@@ -131,6 +139,7 @@ struct RootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { doodle.saveNow() }
+            if phase == .active { Task { await store.refreshEntitlements() } }
         }
     }
 
@@ -193,7 +202,11 @@ struct RootView: View {
                 .position(centers[0])
 
                 TVKnob(icon: "paintpalette.fill", palette: pal) {
-                    withAnimation(.easeInOut(duration: 0.25)) { app.tvTheme = app.tvTheme.next }
+                    if store.hasPlus {
+                        withAnimation(.easeInOut(duration: 0.25)) { app.tvTheme = app.tvTheme.next }
+                    } else {
+                        endEditing(); showPlus = true
+                    }
                 }
                 .position(centers[1])
 

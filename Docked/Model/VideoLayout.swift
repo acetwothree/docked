@@ -90,6 +90,18 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Activities behind Docked Plus. The free set stays genuinely useful on
+    /// its own — sketching, notes, a runner, Blocks, 2048, three fidgets and
+    /// Tic-Tac-Toe — so the app has real value without subscribing.
+    var isPlus: Bool {
+        switch self {
+        case .doodle, .notes, .game, .zen, .merge, .pop, .click, .spinner, .tictactoe:
+            return false
+        case .mindmap, .flow, .idle, .sand, .drop, .marble, .scratch, .ksand, .connect4, .dots:
+            return true
+        }
+    }
+
     /// A colour per category — used to tint the picker cards.
     var tint: Color {
         switch category {

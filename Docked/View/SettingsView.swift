@@ -12,6 +12,7 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var app
     @Environment(NotesStore.self) private var notes
     @Environment(DoodleStore.self) private var doodle
+    @Environment(StoreManager.self) private var store
     @Environment(\.dismiss) private var dismiss
 
     private let onShowPlus: () -> Void
@@ -38,7 +39,9 @@ struct SettingsView: View {
                                 .frame(width: 22)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Docked Plus").font(.system(size: 15, weight: .semibold))
-                                Text("Free app · optional premium activities")
+                                Text(store.hasPlus
+                                     ? "Subscription active — thank you!"
+                                     : "Free app · optional premium activities")
                                     .font(.system(size: 11)).foregroundStyle(.secondary)
                             }
                             Spacer(minLength: 8)
