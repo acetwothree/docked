@@ -39,8 +39,8 @@ enum LayoutSolver {
     //      · bottomBorderGap — gap from the physical bottom to the border
     //      · bandAspect      — video width / height (smaller = taller) ----
     static let bandSideInset: CGFloat = 12
-    static let topBorderGap: CGFloat = 4
-    static let bottomBorderGap: CGFloat = 4
+    static let topBorderGap: CGFloat = -2      // .top: border top vs the island bottom
+    static let bottomBorderGap: CGFloat = 18   // .bottom: gap up from the physical bottom
     static let bandAspect: CGFloat = 1.82
 
     /// `size` is the FULL screen size; `insetTop` / `insetBottom` are the

@@ -27,11 +27,9 @@ struct FlowView: View {
                     Text("LEVEL \(model.levelIndex + 1)")
                         .font(.system(size: 13, weight: .heavy)).tracking(1)
                         .foregroundStyle(.secondary)
-                    if model.requiresFill {
-                        Text("\(model.filledCount)/\(model.cellCount)")
-                            .font(.system(size: 11, weight: .heavy)).monospacedDigit()
-                            .foregroundStyle(model.filledCount == model.cellCount ? Color.green : Color.secondary)
-                    }
+                    Text("\(model.filledCount)/\(model.cellCount) filled")
+                        .font(.system(size: 11, weight: .heavy)).monospacedDigit()
+                        .foregroundStyle(model.filledCount == model.cellCount ? Color.green : Color.secondary)
                     Spacer()
                     Button { model.restart(); active = nil } label: {
                         Image(systemName: "arrow.counterclockwise")

@@ -30,7 +30,7 @@ struct ZenPuzzleView: View {
         var location: CGPoint
     }
 
-    private let dockH: CGFloat = 94
+    private let dockH: CGFloat = 122
 
     var body: some View {
         GeometryReader { geo in
@@ -121,8 +121,8 @@ struct ZenPuzzleView: View {
             }
             .padding(.horizontal, 18)
         }
-        .padding(.top, tabsAreHeader ? 16 : 8)
-        .padding(.bottom, tabsAreHeader ? 8 : 18)
+        .padding(.top, tabsAreHeader ? 14 : 10)
+        .padding(.bottom, tabsAreHeader ? 10 : 14)
         .frame(height: dockH)
         .frame(maxWidth: .infinity)
         .background(Theme.elevated.opacity(0.92))

@@ -35,6 +35,7 @@ final class AppModel {
         static let zenHigh = "docked.zen.highScore"
         static let pinned = "docked.pinnedModules"
         static let clickPen = "docked.clickPen.count"
+        static let clickerMuted = "docked.clicker.muted"
     }
 
     var layout: VideoLayout { didSet { store(layout.rawValue, K.layout) } }
@@ -50,6 +51,8 @@ final class AppModel {
     /// Lifetime tally for the Clicker fidget. Never reset — not even by
     /// "Clear all app data".
     var clickPenCount: Int { didSet { store(clickPenCount, K.clickPen) } }
+    /// Mutes just the Clicker's click sound (haptic still fires).
+    var clickerMuted: Bool { didSet { store(clickerMuted, K.clickerMuted) } }
 
     /// Which modules show directly in the bar; the rest live under "More".
     var pinnedModules: [ActivityModule] {
@@ -70,6 +73,7 @@ final class AppModel {
         runnerHighScore = d.integer(forKey: K.highScore)
         zenHighScore = d.integer(forKey: K.zenHigh)
         clickPenCount = d.integer(forKey: K.clickPen)
+        clickerMuted = d.bool(forKey: K.clickerMuted)
         if let raw = d.array(forKey: K.pinned) as? [String] {
             let restored = raw.compactMap(ActivityModule.init(rawValue:))
             pinnedModules = restored.isEmpty ? AppModel.defaultPinned : restored

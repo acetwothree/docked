@@ -15,10 +15,6 @@ struct FlowLevel {
     let size: Int
     /// (colour index, endpoint A, endpoint B)
     let pairs: [(Int, FlowCell, FlowCell)]
-    /// When true the level also needs every cell covered (classic Flow rule).
-    /// The first couple of levels leave this off so new players just learn to
-    /// connect the dots.
-    var fill: Bool = false
 }
 
 enum FlowPalette {
@@ -54,47 +50,44 @@ final class FlowModel {
 
     // MARK: Levels
 
-    // Levels 1–2 just ask you to connect the pairs (gentle intro). Levels 3+
-    // also need every cell covered — each of those is built from a hand-traced
-    // solution that tiles the whole grid, so the fill is always reachable.
+    // Every level requires the whole grid covered (classic Flow). Each is
+    // built from a hand-traced solution that tiles the grid, so the fill is
+    // always reachable; the early ones are deliberately trivial.
     static let levels: [FlowLevel] = [
-        // 1 — 4×4, connect only. Two edge runs + a short middle.
+        // 1 — 3×3. Three straight columns. Drag each colour top → bottom.
+        FlowLevel(size: 3, pairs: [
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 2, c: 0)),
+            (1, FlowCell(r: 0, c: 1), FlowCell(r: 2, c: 1)),
+            (2, FlowCell(r: 0, c: 2), FlowCell(r: 2, c: 2)),
+        ]),
+        // 2 — 4×4. Snake the top two rows with red, then rows 2 and 3.
         FlowLevel(size: 4, pairs: [
             (0, FlowCell(r: 0, c: 0), FlowCell(r: 0, c: 3)),
-            (1, FlowCell(r: 3, c: 0), FlowCell(r: 3, c: 3)),
-            (2, FlowCell(r: 1, c: 1), FlowCell(r: 2, c: 2)),
+            (1, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 3)),
+            (2, FlowCell(r: 3, c: 0), FlowCell(r: 3, c: 3)),
         ]),
-        // 2 — 5×5, connect only.
-        FlowLevel(size: 5, pairs: [
-            (0, FlowCell(r: 0, c: 0), FlowCell(r: 4, c: 0)),
-            (1, FlowCell(r: 0, c: 4), FlowCell(r: 4, c: 4)),
-            (2, FlowCell(r: 2, c: 1), FlowCell(r: 2, c: 3)),
-        ]),
-        // 3 — 5×5, fill. Three simple hairpins: trace row 0-1, row 2, row 3-4.
+        // 3 — 5×5. Two hairpins + a straight middle row.
         FlowLevel(size: 5, pairs: [
             (0, FlowCell(r: 0, c: 0), FlowCell(r: 1, c: 0)),
             (1, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 4)),
             (2, FlowCell(r: 3, c: 0), FlowCell(r: 4, c: 0)),
-        ], fill: true),
-        // 4 — 6×6, fill. Two 2-row combs on top, two on the bottom.
+        ]),
+        // 4 — 6×6. Two 2-row combs on top, two on the bottom.
         FlowLevel(size: 6, pairs: [
             (0, FlowCell(r: 0, c: 0), FlowCell(r: 0, c: 5)),
             (1, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 5)),
             (2, FlowCell(r: 4, c: 0), FlowCell(r: 5, c: 2)),
             (3, FlowCell(r: 5, c: 3), FlowCell(r: 4, c: 5)),
-        ], fill: true),
-        // 5 — 7×7, fill.
+        ]),
+        // 5 — 7×7.
         FlowLevel(size: 7, pairs: [
             (0, FlowCell(r: 0, c: 0), FlowCell(r: 1, c: 6)),
             (1, FlowCell(r: 2, c: 0), FlowCell(r: 3, c: 6)),
             (2, FlowCell(r: 4, c: 0), FlowCell(r: 4, c: 6)),
             (3, FlowCell(r: 5, c: 0), FlowCell(r: 6, c: 3)),
             (4, FlowCell(r: 5, c: 3), FlowCell(r: 6, c: 6)),
-        ], fill: true),
+        ]),
     ]
-
-    /// Does the current level need the whole grid covered?
-    var requiresFill: Bool { Self.levels[levelIndex % Self.levels.count].fill }
 
     private func load(_ idx: Int) {
         levelIndex = idx
@@ -169,12 +162,10 @@ final class FlowModel {
             return (path.first == a && path.last == b) || (path.first == b && path.last == a)
         }
         guard linked else { return }
-        // Later levels also need every cell covered. Paths never overlap
-        // (extend() forbids it), so summing their lengths is enough.
-        if requiresFill {
-            let filled = paths.values.reduce(0) { $0 + $1.count }
-            guard filled == size * size else { return }
-        }
+        // Every cell must be covered. Paths never overlap (extend() forbids
+        // it), so summing their lengths is enough.
+        let filled = paths.values.reduce(0) { $0 + $1.count }
+        guard filled == size * size else { return }
 
         completions += 1
         reached = max(reached, levelIndex + 1)
