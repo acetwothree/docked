@@ -41,12 +41,14 @@ struct PiPHelpView: View {
                 fix("PiP toggle is greyed out", "Re-check Settings ▸ General ▸ Picture in Picture.")
                 fix("The app blocks PiP", "Some free tiers disable it — play the video in Safari or another app instead.")
                 fix("Window slid off the edge", "Swipe inward from that edge to pull it back on screen.")
-                fix("Frame doesn't line up", "Tap Move in Docked to match top / bottom, then nudge the window to fit.")
+                fix("Frame doesn't line up", "Nudge the floating window so it fills the TV screen at the top.")
                 fix("Black window or audio only", "Close the video and start it again, then re-trigger PiP.")
             }
         }
         .navigationTitle("Picture-in-Picture")
         .navigationBarTitleDisplayMode(.inline)
+        // Keep the first rows clear of a video parked at the top of the screen.
+        .safeAreaInset(edge: .top) { Color.clear.frame(height: 210) }
     }
 
     private func stepped(_ n: String, _ text: String) -> some View {

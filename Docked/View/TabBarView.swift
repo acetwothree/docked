@@ -60,10 +60,10 @@ private struct ComingSoon: Identifiable {
 struct ActivityPickerPanel: View {
     var solved: SolvedLayout
     var current: ActivityModule
+    var favorites: [ActivityModule]
     var onPick: (ActivityModule) -> Void
+    var onToggleFav: (ActivityModule) -> Void
     var onClose: () -> Void
-
-    @State private var dragOffset: CGFloat = 0
 
     private let cols = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
@@ -81,8 +81,6 @@ struct ActivityPickerPanel: View {
         .init(title: "Dots & Boxes", systemImage: "square.grid.4x3.fill",   category: .versus),
     ]
 
-    private var closeToBottom: Bool { solved.occupiesTop }   // tab bar is the footer
-
     var body: some View {
         ZStack {
             Color.black.opacity(0.5)
@@ -94,22 +92,23 @@ struct ActivityPickerPanel: View {
             panel
                 .frame(width: solved.content.width, height: solved.content.height)
                 .position(x: solved.content.midX, y: solved.content.midY)
-                .offset(y: dragOffset)
-                .transition(.move(edge: closeToBottom ? .bottom : .top).combined(with: .opacity))
+                .transition(.move(edge: .bottom).combined(with: .opacity))
         }
+    }
+
+    private var favMods: [ActivityModule] {
+        favorites.filter { m in ActivityModule.allCases.contains(m) }
     }
 
     private var panel: some View {
         VStack(spacing: 0) {
-            if !closeToBottom { grabBar }
-
             HStack {
                 Text("Choose an activity")
                     .font(.system(size: 15, weight: .heavy))
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 22))
+                        .font(.system(size: 24))
                         .foregroundStyle(.secondary)
                         .symbolRenderingMode(.hierarchical)
                 }
@@ -117,21 +116,22 @@ struct ActivityPickerPanel: View {
                 .accessibilityLabel("Close")
             }
             .padding(.horizontal, 16)
-            .padding(.top, closeToBottom ? 14 : 4)
+            .padding(.top, 14)
             .padding(.bottom, 10)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    if !favMods.isEmpty {
+                        favSection
+                    }
                     ForEach(ActivityCategory.allCases) { section($0) }
-                    Color.clear.frame(height: 8)
+                    Color.clear.frame(height: 12)
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 20)
+                .padding(.bottom, 26)
             }
             .scrollIndicators(.visible)
             .overlay(alignment: .bottom) { scrollHint }
-
-            if closeToBottom { grabBar }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.elevated)
@@ -139,41 +139,29 @@ struct ActivityPickerPanel: View {
         .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(Theme.hairline))
     }
 
-    /// Fade + chevron so it's obvious the list scrolls to more categories.
+    /// Fade + a floating chevron so it's obvious the list scrolls further.
     private var scrollHint: some View {
-        VStack(spacing: 0) {
-            LinearGradient(colors: [Theme.elevated.opacity(0), Theme.elevated],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(height: 30)
-            Image(systemName: "chevron.compact.down")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.secondary)
-                .padding(.bottom, 2)
-                .background(Theme.elevated)
-        }
-        .allowsHitTesting(false)
+        LinearGradient(colors: [Theme.elevated.opacity(0), Theme.elevated],
+                       startPoint: .top, endPoint: .bottom)
+            .frame(height: 40)
+            .overlay(alignment: .center) {
+                Image(systemName: "chevron.compact.down")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .offset(y: -6)
+            }
+            .allowsHitTesting(false)
     }
 
-    /// The only thing that carries the swipe-to-close gesture, so it never
-    /// fights the scroll view. Also closes on tap.
-    private var grabBar: some View {
-        Capsule().fill(Color.secondary.opacity(0.55))
-            .frame(width: 44, height: 5)
-            .frame(maxWidth: .infinity)
-            .frame(height: 34)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: onClose)
-            .gesture(
-                DragGesture(minimumDistance: 4)
-                    .onChanged { v in
-                        dragOffset = closeToBottom ? max(0, v.translation.height) : min(0, v.translation.height)
-                    }
-                    .onEnded { v in
-                        let past = closeToBottom ? v.translation.height > 48 : v.translation.height < -48
-                        if past { onClose() }
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { dragOffset = 0 }
-                    }
-            )
+    private var favSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("FAVOURITES", systemImage: "star.fill")
+                .font(.system(size: 11, weight: .heavy)).tracking(1)
+                .foregroundStyle(Theme.accent)
+            LazyVGrid(columns: cols, spacing: 10) {
+                ForEach(favMods) { liveCard($0) }
+            }
+        }
     }
 
     @ViewBuilder
@@ -195,10 +183,12 @@ struct ActivityPickerPanel: View {
 
     private func liveCard(_ mod: ActivityModule) -> some View {
         let on = mod == current
+        let fav = favorites.contains(mod)
         return Button { onPick(mod) } label: {
             VStack(spacing: 7) {
                 Image(systemName: mod.systemImage).font(.system(size: 23, weight: .semibold))
                 Text(mod.title).font(.system(size: 12.5, weight: .bold))
+                    .lineLimit(1).minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 84)
@@ -212,6 +202,16 @@ struct ActivityPickerPanel: View {
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .topTrailing) {
+            Button { onToggleFav(mod) } label: {
+                Image(systemName: fav ? "star.fill" : "star")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(fav ? Theme.accent : Color.secondary.opacity(0.6))
+                    .padding(6)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private func soonCard(_ item: ComingSoon) -> some View {

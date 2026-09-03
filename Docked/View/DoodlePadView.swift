@@ -10,16 +10,20 @@
 
 import SwiftUI
 import UIKit
+import Foundation
 
 struct DoodlePadView: View {
     @Environment(DoodleStore.self) private var store
 
     @State private var currentPoints: [CGPoint] = []
     @State private var colorHex = "F2B950"
-    @State private var lineWidth: Double = 5
+    @State private var lineWidth: Double = 8
+    @State private var pickColor = Color(hex: "F2B950")
     @State private var exportImage: Image?
 
-    private let palette = ["F2B950", "FF6B6B", "4ECDC4", "6C8EFF", "C792EA"]
+    private let palette = ["F2B950", "FF6B6B", "FF8A3D", "4ECDC4",
+                           "3ECF7A", "6C8EFF", "C792EA", "111417"]
+    private let widths: [Double] = [3, 8, 16, 28]
 
     var body: some View {
         GeometryReader { geo in
@@ -37,46 +41,75 @@ struct DoodlePadView: View {
             }
             .onAppear { refreshExport() }
             .onChange(of: strokeCount) { _, _ in refreshExport() }
+            .onChange(of: pickColor) { _, c in colorHex = Self.hex(from: c) }
         }
     }
 
     private var toolbar: some View {
-        HStack(spacing: 6) {
-            ForEach(palette, id: \.self) { hex in
-                Circle()
-                    .fill(Color(hex: hex))
-                    .frame(width: 26, height: 26)
-                    .overlay { Circle().strokeBorder(.white.opacity(colorHex == hex ? 0.95 : 0), lineWidth: 2.5) }
-                    .contentShape(Circle())
-                    .onTapGesture { colorHex = hex }
-            }
-            Slider(value: $lineWidth, in: 2...22)
-                .frame(maxWidth: 64)
-            Spacer(minLength: 2)
-
-            if let exportImage {
-                ShareLink(item: exportImage,
-                          preview: SharePreview("Doodle", image: exportImage)) {
-                    Image(systemName: "square.and.arrow.up").frame(width: 38, height: 38).contentShape(Rectangle())
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                ForEach(palette, id: \.self) { hex in
+                    Circle()
+                        .fill(Color(hex: hex))
+                        .frame(width: 28, height: 28)
+                        .overlay { Circle().strokeBorder(.white.opacity(colorHex == hex ? 0.95 : 0.15), lineWidth: 2.5) }
+                        .contentShape(Circle())
+                        .onTapGesture { colorHex = hex; pickColor = Color(hex: hex) }
                 }
-            } else {
-                Image(systemName: "square.and.arrow.up")
-                    .frame(width: 38, height: 38)
-                    .foregroundStyle(.tertiary)
+                ColorPicker("", selection: $pickColor, supportsOpacity: false)
+                    .labelsHidden()
+                    .frame(width: 30)
             }
 
-            Button { store.undo() } label: {
-                Image(systemName: "arrow.uturn.backward").frame(width: 38, height: 38).contentShape(Rectangle())
+            HStack(spacing: 10) {
+                ForEach(Array(widths.enumerated()), id: \.offset) { pair in
+                    let w = pair.element
+                    let on = abs(lineWidth - w) < 0.5
+                    Button { lineWidth = w } label: {
+                        Circle()
+                            .fill(Color(hex: colorHex))
+                            .frame(width: min(w + 6, 26), height: min(w + 6, 26))
+                            .frame(width: 40, height: 34)
+                            .background(on ? Color.primary.opacity(0.12) : Color.clear,
+                                       in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Spacer(minLength: 2)
+
+                if let exportImage {
+                    ShareLink(item: exportImage,
+                              preview: SharePreview("Doodle", image: exportImage)) {
+                        Image(systemName: "square.and.arrow.up").frame(width: 40, height: 34).contentShape(Rectangle())
+                    }
+                } else {
+                    Image(systemName: "square.and.arrow.up")
+                        .frame(width: 40, height: 34)
+                        .foregroundStyle(.tertiary)
+                }
+                Button { store.undo() } label: {
+                    Image(systemName: "arrow.uturn.backward").frame(width: 40, height: 34).contentShape(Rectangle())
+                }
+                .disabled(store.strokes.isEmpty)
+                Button(role: .destructive) { store.clear() } label: {
+                    Image(systemName: "trash").frame(width: 40, height: 34).contentShape(Rectangle())
+                }
+                .disabled(store.strokes.isEmpty)
             }
-            .disabled(store.strokes.isEmpty)
-            Button(role: .destructive) { store.clear() } label: {
-                Image(systemName: "trash").frame(width: 38, height: 38).contentShape(Rectangle())
-            }
-            .disabled(store.strokes.isEmpty)
+            .font(.system(size: 16, weight: .semibold))
         }
-        .font(.system(size: 16, weight: .semibold))
-        .padding(.leading, 14).padding(.trailing, 16).padding(.vertical, 6)
+        .padding(.horizontal, 14).padding(.vertical, 8)
         .background(.ultraThinMaterial)
+    }
+
+    static func hex(from color: Color) -> String {
+        let ui = UIColor(color)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        _ = ui.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return String(format: "%02X%02X%02X",
+                      Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
     }
 
     private func drawGesture(in size: CGSize) -> some Gesture {

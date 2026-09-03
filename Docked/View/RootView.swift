@@ -52,7 +52,8 @@ struct RootView: View {
                 VideoFrameView(hole: s.holeInFrame,
                                consoleRect: s.consoleInFrame,
                                dimHint: hintDim,
-                               palette: app.tvTheme.palette)
+                               palette: app.tvTheme.palette,
+                               showBadge: app.tvBadge)
                     .frame(width: s.video.width, height: s.video.height)
                     .position(x: s.video.midX, y: s.video.midY)
 
@@ -67,10 +68,12 @@ struct RootView: View {
                     ActivityPickerPanel(
                         solved: s,
                         current: app.module,
+                        favorites: app.favorites,
                         onPick: { picked in
                             withAnimation(.snappy(duration: 0.24)) { app.module = picked }
                             showPicker = false
                         },
+                        onToggleFav: { app.toggleFavorite($0) },
                         onClose: { showPicker = false }
                     )
                     .zIndex(15)
@@ -185,6 +188,12 @@ struct RootView: View {
                 .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
         case .idle:
             ZStack { Theme.paper; IdleGameView() }
+                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
+        case .merge:
+            ZStack { Theme.paper; MergeView() }
+                .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
+        case .marble:
+            ZStack { Theme.paper; MarbleView() }
                 .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.hairline) }
         case .click:
             ZStack { Theme.paper; ClickPenView() }

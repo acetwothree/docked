@@ -39,16 +39,20 @@ struct ScratchGameView: View {
                 let ch = cardH / CGFloat(rowsN)
 
                 ZStack {
-                    // prize row
+                    // prize row — three ticket windows
                     HStack(spacing: 10) {
                         ForEach(Array(0..<3), id: \.self) { i in
                             Text(icons[symbols[i] % icons.count])
-                                .font(.system(size: min(cardW / 4.5, cardH * 0.62)))
+                                .font(.system(size: min(cardW / 4.6, cardH * 0.58)))
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 .background(Theme.paper, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .strokeBorder(Theme.TV.key.opacity(0.4), lineWidth: 2)
+                                )
                         }
                     }
-                    .padding(10)
+                    .padding(12)
 
                     // foil
                     Canvas { ctx, _ in
@@ -125,7 +129,7 @@ struct ScratchGameView: View {
         revealed = true
         total += prize
         dealing = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
             deal()
         }
     }

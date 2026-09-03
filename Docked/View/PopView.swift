@@ -18,13 +18,14 @@ struct PopView: View {
 
     var body: some View {
         GeometryReader { geo in
+            let topReserve: CGFloat = 26      // room for the "sheets cleared" line
             let cols = max(3, Int((geo.size.width - gap) / (diameter + gap)))
-            let rows = max(3, Int((geo.size.height - gap) / (diameter + gap)))
+            let rows = max(3, Int((geo.size.height - topReserve - gap) / (diameter + gap)))
             let total = cols * rows
             let gridW = CGFloat(cols) * diameter + CGFloat(cols - 1) * gap
             let gridH = CGFloat(rows) * diameter + CGFloat(rows - 1) * gap
             let ox = (geo.size.width - gridW) / 2
-            let oy = (geo.size.height - gridH) / 2
+            let oy = topReserve + (geo.size.height - topReserve - gridH) / 2
 
             ZStack(alignment: .topLeading) {
                 Color.clear

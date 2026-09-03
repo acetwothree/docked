@@ -28,13 +28,13 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
 }
 
 enum ActivityModule: String, CaseIterable, Identifiable {
-    case doodle, notes, game, zen, flow, idle, sand, pop, click, scratch, tictactoe
+    case doodle, notes, game, zen, flow, idle, sand, merge, marble, pop, click, scratch, tictactoe
     var id: String { rawValue }
 
     var category: ActivityCategory {
         switch self {
         case .doodle, .notes: .create
-        case .game, .zen, .flow, .idle, .sand: .play
+        case .game, .zen, .flow, .idle, .sand, .merge, .marble: .play
         case .pop, .click, .scratch: .fidget
         case .tictactoe: .versus
         }
@@ -47,8 +47,10 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .game: "Runner"
         case .zen: "Blocks"
         case .flow: "Flow"
-        case .idle: "Garden"
+        case .idle: "Garden Idle"
         case .sand: "Sand Sort"
+        case .merge: "Merge"
+        case .marble: "Roll"
         case .pop: "Pop"
         case .click: "Clicker"
         case .scratch: "Scratcher"
@@ -64,6 +66,8 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .flow: "point.3.connected.trianglepath.dotted"
         case .idle: "leaf.fill"
         case .sand: "chart.bar.fill"
+        case .merge: "square.stack.3d.up.fill"
+        case .marble: "circle.fill"
         case .pop: "circle.hexagongrid.fill"
         case .click: "hand.tap.fill"
         case .scratch: "rectangle.dashed"

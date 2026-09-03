@@ -25,8 +25,9 @@ final class AppModel {
 
     private enum K {
         static let tvTheme = "docked.tvTheme"
+        static let tvBadge = "docked.tvBadge"
+        static let favorites = "docked.favorites"
         static let module = "docked.module"
-        static let hint = "docked.showHint"
         static let theme = "docked.theme"
         static let haptics = "docked.haptics"
         static let onboarded = "docked.onboarded"
@@ -46,8 +47,11 @@ final class AppModel {
     let layout: VideoLayout = .top
 
     var tvTheme: TVTheme { didSet { store(tvTheme.rawValue, K.tvTheme) } }
+    /// Etched "DOCKED · FREE APP" text on the console (nice for ad recordings).
+    var tvBadge: Bool { didSet { store(tvBadge, K.tvBadge) } }
+    /// Starred activities, shown in a Favorites row at the top of the picker.
+    var favorites: [ActivityModule] { didSet { store(favorites.map(\.rawValue), K.favorites) } }
     var module: ActivityModule { didSet { store(module.rawValue, K.module) } }
-    var showHint: Bool { didSet { store(showHint, K.hint) } }
     var theme: AppTheme { didSet { store(theme.rawValue, K.theme) } }
     var haptics: Bool { didSet { store(haptics, K.haptics) } }
     var hasOnboarded: Bool { didSet { store(hasOnboarded, K.onboarded) } }
@@ -76,8 +80,9 @@ final class AppModel {
     init() {
         let d = UserDefaults.standard
         tvTheme = TVTheme(rawValue: d.string(forKey: K.tvTheme) ?? "") ?? .walnut
+        tvBadge = (d.object(forKey: K.tvBadge) as? Bool) ?? true
+        favorites = (d.array(forKey: K.favorites) as? [String] ?? []).compactMap(ActivityModule.init(rawValue:))
         module = ActivityModule(rawValue: d.string(forKey: K.module) ?? "") ?? .doodle
-        showHint = (d.object(forKey: K.hint) as? Bool) ?? true
         theme = AppTheme(rawValue: d.string(forKey: K.theme) ?? "") ?? .system
         haptics = (d.object(forKey: K.haptics) as? Bool) ?? true
         hasOnboarded = d.bool(forKey: K.onboarded)
@@ -105,6 +110,15 @@ final class AppModel {
         }
     }
 
+    func toggleFavorite(_ mod: ActivityModule) {
+        if let i = favorites.firstIndex(of: mod) {
+            favorites.remove(at: i)
+        } else {
+            favorites.append(mod)
+        }
+    }
+    func isFavorite(_ mod: ActivityModule) -> Bool { favorites.contains(mod) }
+
     private func store(_ value: Any, _ key: String) {
         UserDefaults.standard.set(value, forKey: key)
     }
@@ -122,8 +136,8 @@ final class AppModel {
         popClearCount = 0
         tttGames = 0
         module = .doodle
+        favorites = []
         pinnedModules = AppModel.defaultPinned
-        showHint = true
         debugOverlay = false
         hasOnboarded = false
     }

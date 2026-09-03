@@ -248,7 +248,7 @@ struct ZenPuzzleView: View {
     // MARK: Geometry
 
     struct ZenGeom: Equatable {
-        var cols = 7, rows = 7
+        var cols = 6, rows = 6
         var cell: CGFloat = 44, gap: CGFloat = 4, ox: CGFloat = 0, oy: CGFloat = 0
     }
 
@@ -270,12 +270,12 @@ struct ZenPuzzleView: View {
         let top = dockAtTop ? dockH + pad : pad
         let bot = dockAtTop ? H - pad : H - dockH - pad
         let gw = W - 12, gh = max(40, bot - top)
-        let n: CGFloat = 7
-        let gap: CGFloat = 4
-        let cell = min(max((min((gw - (n - 1) * gap) / n, (gh - (n - 1) * gap) / n)).rounded(.down), 34), 58)
+        let n: CGFloat = 6
+        let gap: CGFloat = 5
+        let cell = min(max((min((gw - (n - 1) * gap) / n, (gh - (n - 1) * gap) / n)).rounded(.down), 38), 66)
         let used = n * cell + (n - 1) * gap
         let ox = (W - used) / 2
         let oy = top + (gh - used) / 2
-        return ZenGeom(cols: 7, rows: 7, cell: cell, gap: gap, ox: ox, oy: max(top, oy))
+        return ZenGeom(cols: 6, rows: 6, cell: cell, gap: gap, ox: ox, oy: max(top, oy))
     }
 }

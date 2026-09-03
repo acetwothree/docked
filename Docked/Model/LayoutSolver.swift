@@ -36,14 +36,14 @@ enum LayoutSolver {
 
     static let tabHeight: CGFloat = 60
 
-    static let bezelSide: CGFloat = 7
+    static let bezelSide: CGFloat = 9
     static let bezelTop: CGFloat = 12
     static let bezelBottom: CGFloat = 4        // thin wood between screen and console
     static let consoleHeight: CGFloat = 62
 
     // ---- calibrated from on-device screenshots ----
     static let bandSideInset: CGFloat = 12
-    static let topBorderGap: CGFloat = -5      // border top vs the island bottom
+    static let topBorderGap: CGFloat = -8      // border top vs the island bottom
     static let bandAspect: CGFloat = 1.82
 
     static func solve(_ layout: VideoLayout, size: CGSize,
@@ -71,8 +71,10 @@ enum LayoutSolver {
         let cBot = tab.minY - G
         let content = CGRect(x: 8, y: cTop, width: W - 16, height: max(80, cBot - cTop))
 
+        // Blocks reads `tabIsHeader` as "dock at the top of the play area"; keep
+        // its dock at the bottom, near the thumbs.
         return SolvedLayout(
-            pip: pip, video: video, console: console, tab: tab, tabIsHeader: true,
+            pip: pip, video: video, console: console, tab: tab, tabIsHeader: false,
             content: content, occupiesTop: true
         )
     }

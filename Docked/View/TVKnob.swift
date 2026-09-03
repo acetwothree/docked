@@ -2,7 +2,8 @@
 //  TVKnob.swift
 //  Docked
 //
-//  A single tuning-dial button for the TV console. Turns a little on each press.
+//  A tuning-dial button for the TV console. It tilts on press and springs
+//  straight back, so the knobs always sit aligned.
 //
 
 import SwiftUI
@@ -12,12 +13,13 @@ struct TVKnob: View {
     var palette: TVPalette
     var action: () -> Void
 
-    @State private var turn = 0.0
+    @State private var pressed = false
 
     var body: some View {
         Button {
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.55)) { turn += 40 }
+            pressed = true
             action()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { pressed = false }
         } label: {
             ZStack {
                 ZStack {
@@ -31,7 +33,8 @@ struct TVKnob: View {
                         .frame(width: 2.5, height: 8)
                         .offset(y: -9)
                 }
-                .rotationEffect(.degrees(turn))
+                .rotationEffect(.degrees(pressed ? 20 : 0))
+                .animation(.spring(response: 0.32, dampingFraction: 0.5), value: pressed)
                 .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
 
                 Image(systemName: icon)

@@ -18,6 +18,7 @@ struct VideoFrameView: View {
     var consoleRect: CGRect
     var dimHint: Bool
     var palette: TVPalette
+    var showBadge: Bool = true
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -54,8 +55,10 @@ struct VideoFrameView: View {
         let outerR: CGFloat = 16
         let innerR: CGFloat = min(14, hole.width / 6, hole.height / 6)
 
-        let innerRect = CGRect(x: hole.minX + 2.5, y: hole.minY + 1,
-                               width: hole.width - 5, height: hole.height - 3.5)
+        // Pull the opening in a bit more on the sides so an offset PiP video
+        // never shows a black sliver past the border.
+        let innerRect = CGRect(x: hole.minX + 4.5, y: hole.minY + 1,
+                               width: hole.width - 9, height: hole.height - 3.5)
 
         let cabinet = Path(roundedRect: CGRect(x: 0, y: 0, width: w, height: h), cornerRadius: outerR)
         let screen = Path(roundedRect: innerRect, cornerRadius: innerR)
@@ -99,15 +102,18 @@ struct VideoFrameView: View {
             gx += 6
         }
 
-        // --- "DOCKED" engraved into the console ---
-        ctx.draw(Text("DOCKED")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundColor(palette.key.opacity(0.55)),
-                 at: CGPoint(x: gx + 12, y: consoleRect.midY + 0.5), anchor: .leading)
-        ctx.draw(Text("DOCKED")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundColor(palette.hi.opacity(0.35)),
-                 at: CGPoint(x: gx + 12, y: consoleRect.midY - 0.5), anchor: .leading)
+        // --- engraved badge on the console ---
+        if showBadge {
+            let badge = "DOCKED · FREE APP"
+            ctx.draw(Text(badge)
+                        .font(.system(size: 9.5, weight: .black, design: .rounded))
+                        .foregroundColor(palette.key.opacity(0.55)),
+                     at: CGPoint(x: gx + 12, y: consoleRect.midY + 0.5), anchor: .leading)
+            ctx.draw(Text(badge)
+                        .font(.system(size: 9.5, weight: .black, design: .rounded))
+                        .foregroundColor(palette.hi.opacity(0.32)),
+                     at: CGPoint(x: gx + 12, y: consoleRect.midY - 0.5), anchor: .leading)
+        }
 
         // --- knob wells ---
         for c in LayoutSolver.knobCenters(inConsole: consoleRect) {

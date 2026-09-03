@@ -57,10 +57,6 @@ struct SettingsView: View {
                             row(icon: "questionmark.circle.fill", "How to use it",
                                 trailing: { chevron })
                         }
-                        divider
-                        row(icon: "tv", "Show “drag here” hint") {
-                            Toggle("", isOn: $app.showHint).labelsHidden()
-                        }
                     }
 
                     card("Appearance") {
@@ -106,6 +102,10 @@ struct SettingsView: View {
                             }
                             divider
                             VStack(spacing: 0) {
+                                row(icon: "tv", "Etched badge on the TV") {
+                                    Toggle("", isOn: $app.tvBadge).labelsHidden()
+                                }
+                                divider
                                 row(icon: "ladybug.fill", "Layout debug overlay") {
                                     Toggle("", isOn: $app.debugOverlay).labelsHidden()
                                 }
