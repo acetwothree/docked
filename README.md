@@ -1,6 +1,6 @@
 # Docked
 
-A single-screen iOS app (SwiftUI, iOS 26) that acts as a **second-screen dashboard for
+A single-screen iOS app (SwiftUI, iOS 17+) that acts as a **second-screen dashboard for
 Picture-in-Picture video**. iOS owns the floating video window; Docked reshapes its own
 UI around wherever you park it, so no button or canvas ever ends up hidden underneath.
 
