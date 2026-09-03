@@ -55,10 +55,10 @@ struct VideoFrameView: View {
         let outerR: CGFloat = 16
         let innerR: CGFloat = min(14, hole.width / 6, hole.height / 6)
 
-        // Pull the opening in a bit more on the sides so an offset PiP video
-        // never shows a black sliver past the border.
-        let innerRect = CGRect(x: hole.minX + 4.5, y: hole.minY + 1,
-                               width: hole.width - 9, height: hole.height - 3.5)
+        // Pull the opening in on the sides (and a touch on the top) so an
+        // offset PiP video never shows a black sliver past the border.
+        let innerRect = CGRect(x: hole.minX + 6.5, y: hole.minY + 2.5,
+                               width: hole.width - 13, height: hole.height - 5)
 
         let cabinet = Path(roundedRect: CGRect(x: 0, y: 0, width: w, height: h), cornerRadius: outerR)
         let screen = Path(roundedRect: innerRect, cornerRadius: innerR)
@@ -124,13 +124,8 @@ struct VideoFrameView: View {
                        with: .color(palette.key.opacity(0.4)), lineWidth: 1)
         }
 
-        // cabinet keyline + corner rivets
+        // cabinet keyline (no top-corner rivets — the video can drift over
+        // the top corners, so there's nothing there to cover).
         ctx.stroke(cabinet, with: .color(palette.key.opacity(0.9)), lineWidth: 1.5)
-        for p in [CGPoint(x: 12, y: 12), CGPoint(x: w - 12, y: 12)] {
-            ctx.fill(Path(ellipseIn: CGRect(x: p.x - 2.5, y: p.y - 2.5, width: 5, height: 5)),
-                     with: .color(palette.deep))
-            ctx.fill(Path(ellipseIn: CGRect(x: p.x - 1, y: p.y - 1, width: 2, height: 2)),
-                     with: .color(palette.hi))
-        }
     }
 }

@@ -10,13 +10,14 @@
 import SwiftUI
 
 struct OnboardingView: View {
+    var topClearance: CGFloat = 0
     var onDone: () -> Void
 
     @State private var page = 0
     private let pageCount = 4
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             Color.black.opacity(0.55)
                 .ignoresSafeArea()
                 .transition(.opacity)
@@ -24,6 +25,7 @@ struct OnboardingView: View {
             cardShell
                 .frame(maxWidth: 360)
                 .padding(.horizontal, 22)
+                .padding(.top, topClearance + 14)
                 .transition(.scale(scale: 0.92).combined(with: .opacity))
         }
     }

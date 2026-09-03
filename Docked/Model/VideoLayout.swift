@@ -49,7 +49,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .flow: "Flow"
         case .idle: "Garden Idle"
         case .sand: "Sand Sort"
-        case .merge: "Merge"
+        case .merge: "2048"
         case .marble: "Roll"
         case .pop: "Pop"
         case .click: "Clicker"
@@ -72,6 +72,16 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .click: "hand.tap.fill"
         case .scratch: "rectangle.dashed"
         case .tictactoe: "number"
+        }
+    }
+
+    /// A colour per category — used to tint the picker cards.
+    var tint: Color {
+        switch category {
+        case .create: Color(hex: "4A9CFF")
+        case .play:   Color(hex: "3ECF7A")
+        case .fidget: Color(hex: "C77DFF")
+        case .versus: Color(hex: "FF8A3D")
         }
     }
 }

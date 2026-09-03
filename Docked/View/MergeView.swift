@@ -16,6 +16,7 @@ struct MergeView: View {
     @State private var over = false
     @State private var moveTick = 0
     @State private var mergeTick = 0
+    @State private var nudge: CGSize = .zero
 
     private let n = 4
 
@@ -39,6 +40,7 @@ struct MergeView: View {
                 let side = min(geo.size.width, geo.size.height)
                 board(side: side)
                     .frame(width: side, height: side)
+                    .offset(nudge)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
@@ -179,6 +181,22 @@ struct MergeView: View {
             if didMerge { mergeTick += 1 }
             best = max(best, score)
             if !anyMoveLeft() { over = true }
+            bump(dir)
+        }
+    }
+
+    private func bump(_ dir: Dir) {
+        let d: CGFloat = 14
+        let target: CGSize
+        switch dir {
+        case .up:    target = CGSize(width: 0, height: -d)
+        case .down:  target = CGSize(width: 0, height: d)
+        case .left:  target = CGSize(width: -d, height: 0)
+        case .right: target = CGSize(width: d, height: 0)
+        }
+        withAnimation(.spring(response: 0.16, dampingFraction: 0.55)) { nudge = target }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { nudge = .zero }
         }
     }
 

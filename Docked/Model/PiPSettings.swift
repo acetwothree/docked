@@ -2,26 +2,30 @@
 //  PiPSettings.swift
 //  Docked
 //
-//  Best-effort jump to iOS Settings ▸ General, where "Picture in Picture"
-//  lives. Apple's only public API (`openSettingsURLString`) lands on the app's
-//  own settings pane, which has nothing to toggle — so we first try the
-//  semi-documented `App-Prefs:` deep link and fall back to the app pane if the
-//  system refuses it.
+//  Best-effort jump to iOS Settings ▸ General ▸ Picture in Picture. Apple's
+//  only public API (`openSettingsURLString`) lands on the app's own pane, so we
+//  try the semi-documented `App-Prefs:` deep links first and fall back through
+//  progressively less specific targets.
 //
 
 import UIKit
 
 enum PiPSettings {
     static func open() {
-        let fallback = URL(string: UIApplication.openSettingsURLString)
+        let candidates = [
+            "App-Prefs:root=General&path=PICTURE_IN_PICTURE",
+            "App-Prefs:root=General&path=PICTURE-IN-PICTURE",
+            "App-Prefs:root=General",
+            "App-Prefs:",
+            UIApplication.openSettingsURLString,
+        ]
+        tryNext(candidates, 0)
+    }
 
-        guard let general = URL(string: "App-Prefs:root=General") else {
-            if let fallback { UIApplication.shared.open(fallback) }
-            return
-        }
-
-        UIApplication.shared.open(general, options: [:]) { ok in
-            if !ok, let fallback { UIApplication.shared.open(fallback) }
+    private static func tryNext(_ list: [String], _ i: Int) {
+        guard i < list.count, let url = URL(string: list[i]) else { return }
+        UIApplication.shared.open(url, options: [:]) { ok in
+            if !ok { tryNext(list, i + 1) }
         }
     }
 }

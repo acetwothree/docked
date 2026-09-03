@@ -36,8 +36,9 @@ enum LayoutSolver {
 
     static let tabHeight: CGFloat = 60
 
-    static let bezelSide: CGFloat = 9
-    static let bezelTop: CGFloat = 12
+    static let bezelSide: CGFloat = 10
+    static let bezelTop: CGFloat = 18          // extra wood above the video so an
+                                              // offset PiP can't reach the corners
     static let bezelBottom: CGFloat = 4        // thin wood between screen and console
     static let consoleHeight: CGFloat = 62
 

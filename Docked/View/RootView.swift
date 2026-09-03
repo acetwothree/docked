@@ -69,6 +69,7 @@ struct RootView: View {
                         solved: s,
                         current: app.module,
                         favorites: app.favorites,
+                        themeTint: app.tvTheme.palette.mid,
                         onPick: { picked in
                             withAnimation(.snappy(duration: 0.24)) { app.module = picked }
                             showPicker = false
@@ -82,7 +83,7 @@ struct RootView: View {
                 // First-run onboarding — an overlay, so the live dashboard
                 // stays visible (dimmed) behind it.
                 if showOnboarding {
-                    OnboardingView {
+                    OnboardingView(topClearance: s.video.maxY) {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             app.hasOnboarded = true
                             showOnboarding = false

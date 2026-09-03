@@ -61,6 +61,7 @@ struct ActivityPickerPanel: View {
     var solved: SolvedLayout
     var current: ActivityModule
     var favorites: [ActivityModule]
+    var themeTint: Color
     var onPick: (ActivityModule) -> Void
     var onToggleFav: (ActivityModule) -> Void
     var onClose: () -> Void
@@ -68,15 +69,10 @@ struct ActivityPickerPanel: View {
     private let cols = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
     private let soon: [ComingSoon] = [
-        // create
         .init(title: "Mind Map",  systemImage: "brain",                     category: .create),
-        // play
-        .init(title: "2048",      systemImage: "square.grid.3x3.fill",      category: .play),
         .init(title: "Solitaire", systemImage: "suit.spade.fill",          category: .play),
-        // fidget
         .init(title: "Spinner",     systemImage: "fan.fill",               category: .fidget),
         .init(title: "Kinetic Sand", systemImage: "hand.draw.fill",        category: .fidget),
-        // 2 player (same phone)
         .init(title: "Connect 4",    systemImage: "circle.grid.cross.fill", category: .versus),
         .init(title: "Dots & Boxes", systemImage: "square.grid.4x3.fill",   category: .versus),
     ]
@@ -155,7 +151,7 @@ struct ActivityPickerPanel: View {
 
     private var favSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("FAVOURITES", systemImage: "star.fill")
+            Label("FAVORITES", systemImage: "star.fill")
                 .font(.system(size: 11, weight: .heavy)).tracking(1)
                 .foregroundStyle(Theme.accent)
             LazyVGrid(columns: cols, spacing: 10) {
@@ -186,28 +182,31 @@ struct ActivityPickerPanel: View {
         let fav = favorites.contains(mod)
         return Button { onPick(mod) } label: {
             VStack(spacing: 7) {
-                Image(systemName: mod.systemImage).font(.system(size: 23, weight: .semibold))
+                Image(systemName: mod.systemImage)
+                    .font(.system(size: 23, weight: .semibold))
+                    .foregroundStyle(on ? Color(red: 0.11, green: 0.08, blue: 0.02) : mod.tint)
                 Text(mod.title).font(.system(size: 12.5, weight: .bold))
                     .lineLimit(1).minimumScaleFactor(0.8)
+                    .foregroundStyle(on ? Color(red: 0.11, green: 0.08, blue: 0.02) : Color.primary)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 84)
-            .background(on ? AnyShapeStyle(Theme.accent.opacity(0.9)) : AnyShapeStyle(Theme.paper),
+            .background(on ? AnyShapeStyle(Theme.accent.opacity(0.9))
+                          : AnyShapeStyle(themeTint.opacity(0.16)),
                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(on ? Color.clear : Theme.hairline)
+                    .stroke(on ? Color.clear : mod.tint.opacity(0.35))
             }
-            .foregroundStyle(on ? Color(red: 0.11, green: 0.08, blue: 0.02) : Color.primary)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
         .overlay(alignment: .topTrailing) {
             Button { onToggleFav(mod) } label: {
                 Image(systemName: fav ? "star.fill" : "star")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(fav ? Theme.accent : Color.secondary.opacity(0.6))
-                    .padding(6)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(fav ? Theme.accent : Color.secondary.opacity(0.7))
+                    .padding(9)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

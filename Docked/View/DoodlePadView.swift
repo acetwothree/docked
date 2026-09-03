@@ -18,11 +18,11 @@ struct DoodlePadView: View {
     @State private var currentPoints: [CGPoint] = []
     @State private var colorHex = "F2B950"
     @State private var lineWidth: Double = 8
-    @State private var pickColor = Color(hex: "F2B950")
+    @State private var erasing = false
     @State private var exportImage: Image?
 
-    private let palette = ["F2B950", "FF6B6B", "FF8A3D", "4ECDC4",
-                           "3ECF7A", "6C8EFF", "C792EA", "111417"]
+    private let palette = ["F2B950", "FF6B6B", "FF8A3D", "F25CA2", "C792EA",
+                           "6C8EFF", "4ECDC4", "3ECF7A", "B7C2CC", "111417"]
     private let widths: [Double] = [3, 8, 16, 28]
 
     var body: some View {
@@ -41,41 +41,49 @@ struct DoodlePadView: View {
             }
             .onAppear { refreshExport() }
             .onChange(of: strokeCount) { _, _ in refreshExport() }
-            .onChange(of: pickColor) { _, c in colorHex = Self.hex(from: c) }
         }
     }
 
     private var toolbar: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 8) {
+            HStack(spacing: 5) {
                 ForEach(palette, id: \.self) { hex in
                     Circle()
                         .fill(Color(hex: hex))
-                        .frame(width: 28, height: 28)
-                        .overlay { Circle().strokeBorder(.white.opacity(colorHex == hex ? 0.95 : 0.15), lineWidth: 2.5) }
+                        .frame(width: 25, height: 25)
+                        .overlay {
+                            Circle().strokeBorder(.white.opacity(!erasing && colorHex == hex ? 0.95 : 0.15), lineWidth: 2.5)
+                        }
                         .contentShape(Circle())
-                        .onTapGesture { colorHex = hex; pickColor = Color(hex: hex) }
+                        .onTapGesture { colorHex = hex; erasing = false }
                 }
-                ColorPicker("", selection: $pickColor, supportsOpacity: false)
-                    .labelsHidden()
-                    .frame(width: 30)
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 ForEach(Array(widths.enumerated()), id: \.offset) { pair in
                     let w = pair.element
                     let on = abs(lineWidth - w) < 0.5
                     Button { lineWidth = w } label: {
                         Circle()
-                            .fill(Color(hex: colorHex))
+                            .fill(erasing ? Color.secondary : Color(hex: colorHex))
                             .frame(width: min(w + 6, 26), height: min(w + 6, 26))
-                            .frame(width: 40, height: 34)
+                            .frame(width: 38, height: 34)
                             .background(on ? Color.primary.opacity(0.12) : Color.clear,
                                        in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
+
+                Button { erasing.toggle() } label: {
+                    Image(systemName: "eraser.fill")
+                        .frame(width: 38, height: 34)
+                        .foregroundStyle(erasing ? Theme.accent : Color.secondary)
+                        .background(erasing ? Theme.accent.opacity(0.15) : Color.clear,
+                                   in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
 
                 Spacer(minLength: 2)
 
@@ -104,14 +112,6 @@ struct DoodlePadView: View {
         .background(.ultraThinMaterial)
     }
 
-    static func hex(from color: Color) -> String {
-        let ui = UIColor(color)
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        _ = ui.getRed(&r, green: &g, blue: &b, alpha: &a)
-        return String(format: "%02X%02X%02X",
-                      Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
-    }
-
     private func drawGesture(in size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { v in
@@ -121,15 +121,19 @@ struct DoodlePadView: View {
             }
             .onEnded { _ in
                 if currentPoints.count > 1 {
-                    store.append(DoodleStroke(points: currentPoints, colorHex: colorHex, width: lineWidth))
+                    store.append(DoodleStroke(points: currentPoints,
+                                              colorHex: strokeHex, width: strokeWidth))
                 }
                 currentPoints = []
             }
     }
 
+    private var strokeHex: String { erasing ? DoodleCanvas.eraseHex : colorHex }
+    private var strokeWidth: Double { erasing ? lineWidth * 2.4 : lineWidth }
+
     private var liveStroke: DoodleCanvas.Live? {
         guard currentPoints.count > 1 else { return nil }
-        return DoodleCanvas.Live(points: currentPoints, colorHex: colorHex, width: lineWidth)
+        return DoodleCanvas.Live(points: currentPoints, colorHex: strokeHex, width: strokeWidth)
     }
 
     @MainActor private func refreshExport() {
@@ -151,21 +155,31 @@ struct DoodlePadView: View {
 struct DoodleCanvas: View {
     struct Live { var points: [CGPoint]; var colorHex: String; var width: Double }
 
+    /// Sentinel colour that means "erase what's already drawn".
+    static let eraseHex = "__erase__"
+
     var strokes: [DoodleStroke]
     var live: Live?
 
     var body: some View {
         Canvas { ctx, size in
             for stroke in strokes {
-                ctx.stroke(Self.smoothPath(stroke.points, size),
-                           with: .color(Color(hex: stroke.colorHex)),
-                           style: Self.style(stroke.width))
+                paint(&ctx, points: stroke.points, hex: stroke.colorHex, width: stroke.width, size: size)
             }
             if let live, live.points.count > 1 {
-                ctx.stroke(Self.smoothPath(live.points, size),
-                           with: .color(Color(hex: live.colorHex)),
-                           style: Self.style(live.width))
+                paint(&ctx, points: live.points, hex: live.colorHex, width: live.width, size: size)
             }
+        }
+    }
+
+    private func paint(_ ctx: inout GraphicsContext, points: [CGPoint], hex: String, width: Double, size: CGSize) {
+        let path = Self.smoothPath(points, size)
+        if hex == Self.eraseHex {
+            var eraser = ctx
+            eraser.blendMode = .destinationOut
+            eraser.stroke(path, with: .color(.black), style: Self.style(width))
+        } else {
+            ctx.stroke(path, with: .color(Color(hex: hex)), style: Self.style(width))
         }
     }
 

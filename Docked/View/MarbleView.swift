@@ -133,12 +133,15 @@ struct MarbleView: View {
 
     private func load(_ n: Int) {
         // (cols, rows, start, wall indices) — every layout is a 1-wide
-        // serpentine corridor, so a full sweep is always possible.
+        // serpentine corridor, so a full sweep is always possible. Mix of
+        // horizontal and vertical combs, growing in size.
         let layouts: [(Int, Int, Int, [Int])] = [
             (4, 4, 0, [4, 5, 6, 13, 14, 15]),
             (5, 5, 0, [5, 6, 7, 8, 16, 17, 18, 19]),
-            (6, 5, 0, [6, 7, 8, 9, 10, 19, 20, 21, 22, 23]),
+            (5, 6, 0, [1, 6, 11, 16, 21, 8, 13, 18, 23, 28]),
             (6, 6, 0, [6, 7, 8, 9, 10, 19, 20, 21, 22, 23, 30, 31, 32, 33, 34]),
+            (7, 5, 0, [7, 8, 9, 10, 11, 12, 22, 23, 24, 25, 26, 27]),
+            (5, 7, 0, [1, 6, 11, 16, 21, 26, 8, 13, 18, 23, 28, 33]),
         ]
         let picked = layouts[(max(1, n) - 1) % layouts.count]
         cols = picked.0
