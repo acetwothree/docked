@@ -139,42 +139,42 @@ enum ColorSheets {
 
     // A house on a sunny day — 7 regions.
     static let house: [ColorRegion] = [
-        rect(0, 0, 1, 0.62),          // sky
-        rect(0, 0.60, 1, 0.40),       // ground
-        e(0.70, 0.05, 0.20, 0.20),    // sun
-        tri(0.15, 0.20, 0.70, 0.24),  // roof
-        rect(0.22, 0.42, 0.56, 0.34), // house body
-        rect(0.30, 0.48, 0.13, 0.13), // window
-        rect(0.45, 0.56, 0.16, 0.20), // door
+        Self.rect(0, 0, 1, 0.62),          // sky
+        Self.rect(0, 0.60, 1, 0.40),       // ground
+        Self.e(0.70, 0.05, 0.20, 0.20),    // sun
+        Self.tri(0.15, 0.20, 0.70, 0.24),  // roof
+        Self.rect(0.22, 0.42, 0.56, 0.34), // house body
+        Self.rect(0.30, 0.48, 0.13, 0.13), // window
+        Self.rect(0.45, 0.56, 0.16, 0.20), // door
     ]
 
     // A single big flower — 10 regions (5 roomy petals + centre).
     static let flower: [ColorRegion] = {
         var r: [ColorRegion] = [
-            rect(0, 0, 1, 0.68),            // sky
-            rect(0, 0.66, 1, 0.34),         // ground
-            rect(0.47, 0.40, 0.06, 0.34),   // stem
-            e(0.30, 0.50, 0.18, 0.11),      // left leaf
-            e(0.52, 0.44, 0.18, 0.11),      // right leaf
+            Self.rect(0, 0, 1, 0.68),            // sky
+            Self.rect(0, 0.66, 1, 0.34),         // ground
+            Self.rect(0.47, 0.40, 0.06, 0.34),   // stem
+            Self.e(0.30, 0.50, 0.18, 0.11),      // left leaf
+            Self.e(0.52, 0.44, 0.18, 0.11),      // right leaf
         ]
         let cx: CGFloat = 0.5, cy: CGFloat = 0.30, ring: CGFloat = 0.16, pet: CGFloat = 0.17
         for k in 0..<5 {
             let a = Double(k) / 5 * 2 * .pi - .pi / 2
-            r.append(e(cx + CGFloat(cos(a)) * ring - pet / 2,
-                       cy + CGFloat(sin(a)) * ring - pet / 2, pet, pet))
+            r.append(Self.e(cx + CGFloat(cos(a)) * ring - pet / 2,
+                            cy + CGFloat(sin(a)) * ring - pet / 2, pet, pet))
         }
-        r.append(e(cx - 0.09, cy - 0.09, 0.18, 0.18))   // centre (on top)
+        r.append(Self.e(cx - 0.09, cy - 0.09, 0.18, 0.18))   // centre (on top)
         return r
     }()
 
     // A sailboat at sunset — 7 regions.
     static let sailboat: [ColorRegion] = [
-        rect(0, 0, 1, 0.34),           // upper sky
-        rect(0, 0.32, 1, 0.25),        // lower sky
-        e(0.08, 0.07, 0.22, 0.22),     // sun
-        rect(0, 0.55, 1, 0.45),        // sea
-        rect(0.49, 0.48, 0.03, 0.22),  // mast
-        tri(0.50, 0.48, 0.19, 0.22),   // sail
-        rect(0.34, 0.68, 0.34, 0.07),  // hull
+        Self.rect(0, 0, 1, 0.34),           // upper sky
+        Self.rect(0, 0.32, 1, 0.25),        // lower sky
+        Self.e(0.08, 0.07, 0.22, 0.22),     // sun
+        Self.rect(0, 0.55, 1, 0.45),        // sea
+        Self.rect(0.49, 0.48, 0.03, 0.22),  // mast
+        Self.tri(0.50, 0.48, 0.19, 0.22),   // sail
+        Self.rect(0.34, 0.68, 0.34, 0.07),  // hull
     ]
 }
