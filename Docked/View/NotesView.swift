@@ -67,37 +67,48 @@ private struct NotesEditorSheet: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Theme.backdrop.ignoresSafeArea()
+        GeometryReader { geo in
+            // Start the writing area low on the screen — below where a docked
+            // floating video sits — so the video never covers the text you're
+            // typing. The editor scrolls within this lower band.
+            let topInset = max(64, geo.size.height * 0.42)
 
-            TextEditor(text: $store.text)
-                .focused($focused)
-                .font(.body)
-                .scrollContentBackground(.hidden)
-                .padding(.horizontal, 12)
-                .padding(.top, 46)
-                .padding(.bottom, 8)
+            ZStack(alignment: .top) {
+                Theme.backdrop.ignoresSafeArea()
 
-            HStack(spacing: 10) {
-                Text("\(wordCount) words")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
-                Button { dismiss() } label: {
-                    Text("Done").font(.system(size: 14, weight: .heavy))
-                        .padding(.horizontal, 16).padding(.vertical, 7)
-                        .background(Theme.accent, in: Capsule())
-                        .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
+                TextEditor(text: $store.text)
+                    .focused($focused)
+                    .font(.body)
+                    .scrollContentBackground(.hidden)
+                    .padding(.horizontal, 12)
+                    .padding(.top, topInset)
+                    .padding(.bottom, 8)
+
+                HStack(spacing: 10) {
+                    Text("\(wordCount) words")
+                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    Button { dismiss() } label: {
+                        Text("Done").font(.system(size: 14, weight: .heavy))
+                            .padding(.horizontal, 16).padding(.vertical, 7)
+                            .background(Theme.accent, in: Capsule())
+                            .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(.ultraThinMaterial)
+
+                Text("Text starts here, clear of the floating video. Drag the video aside if it still overlaps.")
+                    .font(.system(size: 10)).foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
+                    .padding(.top, topInset - 22)
+                    .allowsHitTesting(false)
             }
-            .padding(.horizontal, 14).padding(.top, 8)
         }
         .onAppear { focused = true }
-        .overlay(alignment: .bottomLeading) {
-            Text("Drag your floating video aside if it covers the text.")
-                .font(.system(size: 10)).foregroundStyle(.tertiary)
-                .padding(.leading, 14).padding(.bottom, 6)
-                .allowsHitTesting(false)
-        }
     }
 
     private var wordCount: Int {

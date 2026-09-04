@@ -35,9 +35,7 @@ struct BlackjackView: View {
                     .font(.system(size: 12, weight: .black, design: .rounded)).tracking(2)
                     .foregroundStyle(Theme.accent)
                 Spacer()
-                Label("\(app.coins)", systemImage: "circle.fill")
-                    .font(.system(size: 12, weight: .heavy)).monospacedDigit()
-                    .foregroundStyle(Color(hex: "F5C518"))
+                ChipBalance(coins: app.coins)
             }
 
             Spacer(minLength: 0)

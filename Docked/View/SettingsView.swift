@@ -20,6 +20,11 @@ struct SettingsView: View {
     @State private var confirmWipe = false
     @State private var showDev = false
 
+    // The developer tools stay hidden in normal use — tap the version number
+    // seven times to reveal them. The flag sticks so it's a one-time reveal.
+    @AppStorage("docked.devToolsUnlocked") private var devToolsUnlocked = false
+    @State private var versionTaps = 0
+
     init(onShowPlus: @escaping () -> Void = {}) {
         self.onShowPlus = onShowPlus
     }
@@ -91,52 +96,64 @@ struct SettingsView: View {
                                 Spacer()
                                 Text("1.0").font(.system(size: 13)).foregroundStyle(.secondary)
                             }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                guard !devToolsUnlocked else { return }
+                                versionTaps += 1
+                                if versionTaps >= 7 { devToolsUnlocked = true }
+                            }
                         }
                         .padding(14)
                     }
 
-                    DisclosureGroup(isExpanded: $showDev) {
-                        VStack(spacing: 0) {
+                    if devToolsUnlocked {
+                        DisclosureGroup(isExpanded: $showDev) {
                             VStack(spacing: 0) {
-                                devButton("Replay onboarding", "arrow.counterclockwise") {
-                                    app.hasOnboarded = false
-                                    dismiss()
+                                VStack(spacing: 0) {
+                                    devButton("Replay onboarding", "arrow.counterclockwise") {
+                                        app.hasOnboarded = false
+                                        dismiss()
+                                    }
+                                    divider
+                                    devButton("Reset Blocks best", "gauge") { app.zenHighScore = 0 }
                                 }
                                 divider
-                                devButton("Reset Runner best", "gauge") { app.runnerHighScore = 0 }
-                                divider
-                                devButton("Reset Blocks best", "gauge") { app.zenHighScore = 0 }
+                                VStack(spacing: 0) {
+                                    row(icon: "lock.open.fill", "Unlock Plus (testing)") {
+                                        Toggle("", isOn: Binding(
+                                            get: { store.devUnlock },
+                                            set: { store.devUnlock = $0 })).labelsHidden()
+                                    }
+                                    divider
+                                    row(icon: "tv", "Etched badge on the TV") {
+                                        Toggle("", isOn: $app.tvBadge).labelsHidden()
+                                    }
+                                    divider
+                                    row(icon: "ladybug.fill", "Layout debug overlay") {
+                                        Toggle("", isOn: $app.debugOverlay).labelsHidden()
+                                    }
+                                    divider
+                                    devButton("Hide developer tools", "eye.slash") {
+                                        devToolsUnlocked = false
+                                        versionTaps = 0
+                                        showDev = false
+                                    }
+                                    divider
+                                    devButton("Clear all app data", "trash", destructive: true) {
+                                        confirmWipe = true
+                                    }
+                                }
                             }
-                            divider
-                            VStack(spacing: 0) {
-                                row(icon: "lock.open.fill", "Unlock Plus (testing)") {
-                                    Toggle("", isOn: Binding(
-                                        get: { store.devUnlock },
-                                        set: { store.devUnlock = $0 })).labelsHidden()
-                                }
-                                divider
-                                row(icon: "tv", "Etched badge on the TV") {
-                                    Toggle("", isOn: $app.tvBadge).labelsHidden()
-                                }
-                                divider
-                                row(icon: "ladybug.fill", "Layout debug overlay") {
-                                    Toggle("", isOn: $app.debugOverlay).labelsHidden()
-                                }
-                                divider
-                                devButton("Clear all app data", "trash", destructive: true) {
-                                    confirmWipe = true
-                                }
-                            }
+                            .background(Theme.paper, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.hairline))
+                            .padding(.top, 8)
+                        } label: {
+                            Text("DEVELOPER")
+                                .font(.system(size: 11, weight: .heavy)).tracking(0.8)
+                                .foregroundStyle(.secondary)
                         }
-                        .background(Theme.paper, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.hairline))
-                        .padding(.top, 8)
-                    } label: {
-                        Text("DEVELOPER")
-                            .font(.system(size: 11, weight: .heavy)).tracking(0.8)
-                            .foregroundStyle(.secondary)
+                        .tint(.secondary)
                     }
-                    .tint(.secondary)
                 }
                 .padding(18)
             }

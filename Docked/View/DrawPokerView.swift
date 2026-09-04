@@ -40,39 +40,54 @@ struct DrawPokerView: View {
     private var maxBet: Int { max(minBet, min(200, app.coins)) }
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text("DRAW POKER")
-                    .font(.system(size: 12, weight: .black, design: .rounded)).tracking(2)
-                    .foregroundStyle(Theme.accent)
-                Spacer()
-                Label("\(app.coins)", systemImage: "circle.fill")
-                    .font(.system(size: 12, weight: .heavy)).monospacedDigit()
-                    .foregroundStyle(Color(hex: "F5C518"))
+        GeometryReader { geo in
+            let H = geo.size.height
+            let W = geo.size.width
+            // Scale down (never up) from a comfortable ~430pt tall layout so the
+            // hands, reference rows and controls stay whole when the module area
+            // shrinks (TV/video stretched bigger).
+            let k = max(0.60, min(1, H / 430))
+            let cardH = 62 * k
+            let cardW = min(46 * k, max(24, (W - 32 - 24) / 5))
+            let ctrlH = 92 * k
+            let vGap = 8 * k
+
+            VStack(spacing: vGap) {
+                HStack {
+                    Text("DRAW POKER")
+                        .font(.system(size: 12, weight: .black, design: .rounded)).tracking(2)
+                        .foregroundStyle(Theme.accent)
+                    Spacer()
+                    ChipBalance(coins: app.coins)
+                }
+
+                rankLadder
+                if H > 360 { symbolOrder }
+
+                Spacer(minLength: 0)
+
+                hand(cards: dealer, faceUp: { $0 < revealCount }, showHolds: false, label: "DEALER",
+                     rankText: phase == .result ? rankNames[Self.rank(dealer)] : nil,
+                     cardW: cardW, cardH: cardH)
+
+                hand(cards: player, faceUp: { _ in true }, showHolds: phase == .hold, label: "YOU",
+                     rankText: player.count == 5 ? rankNames[Self.rank(player)] : nil,
+                     cardW: cardW, cardH: cardH)
+
+                Text(statusLine)
+                    .font(.system(size: 13, weight: .heavy))
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                    .foregroundStyle(message.contains("win") || message.contains("+") ? Color.green
+                                     : message.contains("Dealer") ? Color.red : .secondary)
+                    .frame(height: 16)
+
+                Spacer(minLength: 0)
+
+                controls.frame(maxWidth: .infinity, minHeight: ctrlH, maxHeight: ctrlH)
             }
-
-            rankLadder
-            symbolOrder
-
-            Spacer(minLength: 0)
-
-            hand(cards: dealer, faceUp: { $0 < revealCount }, showHolds: false, label: "DEALER",
-                 rankText: phase == .result ? rankNames[Self.rank(dealer)] : nil)
-
-            hand(cards: player, faceUp: { _ in true }, showHolds: phase == .hold, label: "YOU",
-                 rankText: player.count == 5 ? rankNames[Self.rank(player)] : nil)
-
-            Text(statusLine)
-                .font(.system(size: 14, weight: .heavy))
-                .foregroundStyle(message.contains("win") || message.contains("+") ? Color.green
-                                 : message.contains("Dealer") ? Color.red : .secondary)
-                .frame(height: 18)
-
-            Spacer(minLength: 0)
-
-            controls.frame(maxWidth: .infinity, minHeight: 92, maxHeight: 92)
+            .padding(16 * k)
+            .frame(width: W, height: H)
         }
-        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sensoryFeedback(.impact(weight: .light), trigger: dealTick) { _, _ in app.haptics }
         .sensoryFeedback(.selection, trigger: holdTick) { _, _ in app.haptics }
@@ -125,7 +140,7 @@ struct DrawPokerView: View {
     // MARK: hands
 
     private func hand(cards: [Int], faceUp: @escaping (Int) -> Bool, showHolds: Bool,
-                      label: String, rankText: String?) -> some View {
+                      label: String, rankText: String?, cardW: CGFloat, cardH: CGFloat) -> some View {
         VStack(spacing: 3) {
             HStack(spacing: 5) {
                 Text(label).font(.system(size: 9, weight: .heavy)).tracking(1).foregroundStyle(.secondary)
@@ -136,7 +151,8 @@ struct DrawPokerView: View {
             HStack(spacing: 6) {
                 ForEach(0..<5, id: \.self) { i in
                     let up = i < cards.count && faceUp(i)
-                    card(icon: up ? cards[i] : nil, held: showHolds && held.indices.contains(i) && held[i])
+                    card(icon: up ? cards[i] : nil, held: showHolds && held.indices.contains(i) && held[i],
+                         w: cardW, h: cardH)
                         .onTapGesture {
                             guard phase == .hold, label == "YOU", i < player.count else { return }
                             held[i].toggle()
@@ -147,13 +163,13 @@ struct DrawPokerView: View {
         }
     }
 
-    private func card(icon: Int?, held: Bool) -> some View {
+    private func card(icon: Int?, held: Bool, w: CGFloat, h: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
             .fill(icon == nil ? AnyShapeStyle(Theme.accent.opacity(0.5)) : AnyShapeStyle(Theme.paper))
             .overlay {
                 if let icon {
                     Image(systemName: icons[icon])
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: h * 0.32, weight: .bold))
                         .foregroundStyle(iconColors[icon])
                 }
             }
@@ -162,7 +178,7 @@ struct DrawPokerView: View {
             .overlay(alignment: .bottom) {
                 if held { Text("HELD").font(.system(size: 7, weight: .black)).foregroundStyle(Theme.accent).padding(.bottom, 1) }
             }
-            .frame(width: 46, height: 62)
+            .frame(width: w, height: h)
     }
 
     // MARK: controls
@@ -272,8 +288,9 @@ struct DrawPokerView: View {
             player[i] = randIcon()
         }
         dealTick += 1
-        held = Array(repeating: false, count: 5)
         drawsLeft -= 1
+        // Keep the current hold selection into the next round — the player can
+        // still tap to release a card, but doesn't have to re-pick every time.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
             if drawsLeft > 0 {
                 phase = .hold

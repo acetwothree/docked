@@ -46,6 +46,13 @@ struct RingsView: View {
                 .buttonStyle(.plain)
             }
 
+            Text("Goal: move the whole stack onto the ▶ right peg, big on the bottom. You can never place a bigger ring on a smaller one.")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2).minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+
             GeometryReader { geo in
                 let W = geo.size.width, H = geo.size.height
                 let pegW = W / 3
@@ -57,12 +64,18 @@ struct RingsView: View {
                     // pegs
                     ForEach(0..<3, id: \.self) { p in
                         let cx = pegW * (CGFloat(p) + 0.5)
-                        Capsule().fill(Theme.ink.opacity(0.18))
+                        let isGoal = p == 2
+                        Capsule().fill(isGoal ? Theme.accent.opacity(0.35) : Theme.ink.opacity(0.18))
                             .frame(width: 6, height: H - 30)
                             .position(x: cx, y: (H - 30) / 2 + 6)
-                        Capsule().fill(Theme.ink.opacity(0.25))
-                            .frame(width: pegW - 14, height: 6)
+                        Capsule().fill(isGoal ? Theme.accent : Theme.ink.opacity(0.25))
+                            .frame(width: pegW - 14, height: isGoal ? 7 : 6)
                             .position(x: cx, y: baseY + 4)
+                        if isGoal {
+                            Text("GOAL PEG").font(.system(size: 8, weight: .black)).tracking(2)
+                                .foregroundStyle(Theme.accent)
+                                .position(x: cx, y: baseY + 15)
+                        }
                         // stacked rings
                         ForEach(Array(pegs[p].enumerated()), id: \.offset) { pair in
                             ringBar(size: pair.element, unit: unit, height: ringH)

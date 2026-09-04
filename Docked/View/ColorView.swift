@@ -123,7 +123,9 @@ private struct ColorTri: Shape {
 }
 
 enum ColorSheets {
-    static let all: [[ColorRegion]] = [garden, forest, sunset]
+    // A handful of BIG, mostly non-overlapping regions per sheet — easy to hit
+    // with a fingertip.
+    static let all: [[ColorRegion]] = [house, flower, sailboat]
 
     private static func e(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> ColorRegion {
         ColorRegion(shape: AnyShape(Ellipse()), rect: CGRect(x: x, y: y, width: w, height: h))
@@ -135,56 +137,44 @@ enum ColorSheets {
         ColorRegion(shape: AnyShape(ColorTri()), rect: CGRect(x: x, y: y, width: w, height: h))
     }
 
-    // A little garden: sky, ground, sun, two clouds, three flowers.
-    static let garden: [ColorRegion] = {
-        var r: [ColorRegion] = []
-        r.append(Self.rect(0, 0, 1, 0.68))       // sky
-        r.append(Self.rect(0, 0.66, 1, 0.34))    // ground
-        r.append(Self.e(0.06, 0.05, 0.18, 0.18)) // sun
-        r.append(Self.e(0.55, 0.08, 0.22, 0.10)) // cloud
-        r.append(Self.e(0.72, 0.16, 0.20, 0.09)) // cloud
-        let flowers: [(CGFloat, CGFloat, CGFloat)] = [(0.18, 0.42, 0.9), (0.46, 0.34, 1.05), (0.74, 0.44, 0.85)]
-        for (fx, fy, size) in flowers {
-            let pr: CGFloat = 0.07 * size
-            r.append(Self.rect(fx + 0.005, fy + 0.10, 0.02, 0.24))         // stem
-            r.append(Self.e(fx - 0.055, fy + 0.16, 0.13, 0.07))            // leaf
-            for k in 0..<5 {
-                let a = Double(k) / 5 * 2 * .pi
-                r.append(Self.e(CGFloat(Double(fx) + cos(a) * 0.06) - pr,
-                           CGFloat(Double(fy) + sin(a) * 0.06) - pr, pr * 2, pr * 2))
-            }
-            r.append(Self.e(fx - pr * 0.7, fy - pr * 0.7, pr * 1.4, pr * 1.4))  // centre
+    // A house on a sunny day — 7 regions.
+    static let house: [ColorRegion] = [
+        rect(0, 0, 1, 0.62),          // sky
+        rect(0, 0.60, 1, 0.40),       // ground
+        e(0.70, 0.05, 0.20, 0.20),    // sun
+        tri(0.15, 0.20, 0.70, 0.24),  // roof
+        rect(0.22, 0.42, 0.56, 0.34), // house body
+        rect(0.30, 0.48, 0.13, 0.13), // window
+        rect(0.45, 0.56, 0.16, 0.20), // door
+    ]
+
+    // A single big flower — 10 regions (5 roomy petals + centre).
+    static let flower: [ColorRegion] = {
+        var r: [ColorRegion] = [
+            rect(0, 0, 1, 0.68),            // sky
+            rect(0, 0.66, 1, 0.34),         // ground
+            rect(0.47, 0.40, 0.06, 0.34),   // stem
+            e(0.30, 0.50, 0.18, 0.11),      // left leaf
+            e(0.52, 0.44, 0.18, 0.11),      // right leaf
+        ]
+        let cx: CGFloat = 0.5, cy: CGFloat = 0.30, ring: CGFloat = 0.16, pet: CGFloat = 0.17
+        for k in 0..<5 {
+            let a = Double(k) / 5 * 2 * .pi - .pi / 2
+            r.append(e(cx + CGFloat(cos(a)) * ring - pet / 2,
+                       cy + CGFloat(sin(a)) * ring - pet / 2, pet, pet))
         }
+        r.append(e(cx - 0.09, cy - 0.09, 0.18, 0.18))   // centre (on top)
         return r
     }()
 
-    // A row of trees on a hill.
-    static let forest: [ColorRegion] = {
-        var r: [ColorRegion] = []
-        r.append(Self.rect(0, 0, 1, 0.62))        // sky
-        r.append(Self.e(-0.2, 0.5, 1.4, 0.9))     // hill
-        r.append(Self.e(0.72, 0.05, 0.17, 0.17))  // sun
-        for tx: CGFloat in [0.16, 0.42, 0.68] {
-            r.append(Self.rect(tx - 0.03, 0.5, 0.06, 0.24))     // trunk
-            r.append(Self.tri(tx - 0.13, 0.16, 0.26, 0.24))     // top
-            r.append(Self.tri(tx - 0.15, 0.30, 0.30, 0.22))     // mid
-            r.append(Self.tri(tx - 0.17, 0.42, 0.34, 0.20))     // bottom
-        }
-        return r
-    }()
-
-    // Sunset over water.
-    static let sunset: [ColorRegion] = {
-        var r: [ColorRegion] = []
-        r.append(Self.rect(0, 0, 1, 0.22))
-        r.append(Self.rect(0, 0.22, 1, 0.18))
-        r.append(Self.rect(0, 0.40, 1, 0.14))
-        r.append(Self.e(0.35, 0.34, 0.30, 0.30))   // sun
-        r.append(Self.rect(0, 0.62, 1, 0.38))      // sea
-        r.append(Self.tri(0.66, 0.66, 0.14, 0.10)) // sail
-        r.append(Self.rect(0.63, 0.75, 0.12, 0.03))// boat
-        r.append(Self.tri(0.12, 0.14, 0.08, 0.05)) // bird
-        r.append(Self.tri(0.24, 0.10, 0.08, 0.05)) // bird
-        return r
-    }()
+    // A sailboat at sunset — 7 regions.
+    static let sailboat: [ColorRegion] = [
+        rect(0, 0, 1, 0.34),           // upper sky
+        rect(0, 0.32, 1, 0.25),        // lower sky
+        e(0.08, 0.07, 0.22, 0.22),     // sun
+        rect(0, 0.55, 1, 0.45),        // sea
+        rect(0.49, 0.48, 0.03, 0.22),  // mast
+        tri(0.50, 0.48, 0.19, 0.22),   // sail
+        rect(0.34, 0.68, 0.34, 0.07),  // hull
+    ]
 }

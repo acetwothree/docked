@@ -29,7 +29,6 @@ struct ScratchGameView: View {
     @State private var cardOpacity: Double = 1
     @State private var winFlash = false
     @State private var flyPrize: Int? = nil
-    @State private var displayCoins = 0
     @State private var tossTick = 0
 
     private let colsN = 21
@@ -48,10 +47,7 @@ struct ScratchGameView: View {
                     .font(.system(size: 12, weight: .black, design: .rounded)).tracking(2)
                     .foregroundStyle(Theme.accent)
                 Spacer()
-                Label("\(displayCoins)", systemImage: "circle.fill")
-                    .font(.system(size: 12, weight: .heavy)).monospacedDigit()
-                    .foregroundStyle(Color(hex: "F5C518"))
-                    .contentTransition(.numericText())
+                ChipBalance(coins: app.coins)
             }
 
             GeometryReader { geo in
@@ -140,13 +136,7 @@ struct ScratchGameView: View {
         .sensoryFeedback(.success, trigger: winFlash) { _, now in now && app.haptics }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: tossTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(weight: .light), trigger: scratched.count) { _, _ in app.haptics && !revealed }
-        .onAppear {
-            displayCoins = app.coins
-            app.checkChipRefill()
-        }
-        .onChange(of: app.coins) { _, new in
-            withAnimation(.easeOut(duration: 0.4)) { displayCoins = new }
-        }
+        .onAppear { app.checkChipRefill() }
     }
 
     private func windowTile(symbol: String, size: CGFloat) -> some View {
