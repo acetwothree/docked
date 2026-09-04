@@ -33,6 +33,8 @@ struct NotesView: View {
         }
         .sheet(isPresented: $editing) {
             NotesEditorSheet(store: store)
+                .presentationDetents([.medium, .large])
+                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
     }
 

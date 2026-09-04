@@ -61,7 +61,10 @@ struct BlackjackView: View {
 
             Spacer(minLength: 0)
 
+            // Fixed height so switching between "Dealing…", "Hit / Stand",
+            // the bet row etc. never shifts the cards vertically.
             controls
+                .frame(maxWidth: .infinity, minHeight: 118, maxHeight: 118)
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

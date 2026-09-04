@@ -2,12 +2,12 @@
 //  DrawPokerView.swift
 //  Docked
 //
-//  "Draw Poker" (premium) — five-card draw video poker with a standard 52-card
-//  deck. Bet chips, hold the cards you want, draw once, get paid on the
-//  standard Jacks-or-Better table. Chips can't run out — a broke balance
-//  refills on a short timer.
+//  "Draw Poker" (free, Gambling) — you're dealt five symbol cards one at a
+//  time. Hold the ones you want, draw the rest, then the dealer reveals their
+//  five. Best hand wins the pot. Bets use the shared chip balance; a broke
+//  balance refills on a short timer.
 //
-//  Original mechanic + a normal playing-card deck. No third-party assets.
+//  Symbols and rules are original — no playing-card deck, no third-party art.
 //
 
 import SwiftUI
@@ -15,14 +15,21 @@ import SwiftUI
 struct DrawPokerView: View {
     @Environment(AppModel.self) private var app
 
-    private enum Phase { case bet, draw, result }
+    private enum Phase { case bet, dealing, hold, reveal, result }
+
+    // 6 symbols
+    private let icons = ["star.fill", "heart.fill", "bolt.fill", "leaf.fill", "moon.fill", "flame.fill"]
+    private let iconColors = [Color(hex: "F2B90C"), Color(hex: "F25CA2"), Color(hex: "4A9CFF"),
+                              Color(hex: "3ECF7A"), Color(hex: "8B5CF6"), Color(hex: "FF8A3D")]
+    private let rankNames = ["High", "Pair", "Two Pair", "Trips", "Full House", "Quads", "Fives"]
 
     @State private var phase: Phase = .bet
-    @State private var hand: [Card] = []
+    @State private var player: [Int] = []
+    @State private var dealer: [Int] = []
+    @State private var revealCount = 0        // how many dealer cards are shown
     @State private var held: [Bool] = Array(repeating: false, count: 5)
-    @State private var deck: [Card] = []
     @State private var bet = 20
-    @State private var result = ""
+    @State private var message = ""
     @State private var dealTick = 0
     @State private var holdTick = 0
     @State private var winTick = 0
@@ -32,21 +39,8 @@ struct DrawPokerView: View {
     private var broke: Bool { app.coins < minBet }
     private var maxBet: Int { max(minBet, min(200, app.coins)) }
 
-    struct Card: Equatable {
-        var rank: Int   // 2...14 (11 J, 12 Q, 13 K, 14 A)
-        var suit: Int   // 0 ♠  1 ♥  2 ♦  3 ♣
-        var glyph: String { ["♠", "♥", "♦", "♣"][suit] }
-        var isRed: Bool { suit == 1 || suit == 2 }
-        var label: String {
-            switch rank {
-            case 14: return "A"; case 13: return "K"; case 12: return "Q"; case 11: return "J"
-            default: return "\(rank)"
-            }
-        }
-    }
-
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             HStack {
                 Text("DRAW POKER")
                     .font(.system(size: 12, weight: .black, design: .rounded)).tracking(2)
@@ -57,34 +51,26 @@ struct DrawPokerView: View {
                     .foregroundStyle(Color(hex: "F5C518"))
             }
 
+            ladder
+
             Spacer(minLength: 0)
 
-            HStack(spacing: 6) {
-                ForEach(Array(hand.enumerated()), id: \.offset) { pair in
-                    cardView(pair.element, held: held[pair.offset])
-                        .onTapGesture {
-                            guard phase == .draw else { return }
-                            held[pair.offset].toggle()
-                            holdTick += 1
-                        }
-                }
-                if hand.isEmpty {
-                    ForEach(0..<5, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 7).fill(Theme.accent.opacity(0.4))
-                            .frame(width: 46, height: 66).opacity(0.3)
-                    }
-                }
-            }
-            .frame(height: 80)
+            hand(cards: dealer, faceUp: { $0 < revealCount }, held: nil, label: "DEALER",
+                 rankText: phase == .result ? rankNames[Self.rank(dealer)] : nil)
 
-            Text(result.isEmpty ? " " : result)
+            hand(cards: player, faceUp: { _ in true },
+                 held: phase == .hold ? held : nil, label: "YOU",
+                 rankText: player.count == 5 ? rankNames[Self.rank(player)] : nil)
+
+            Text(message.isEmpty ? " " : message)
                 .font(.system(size: 15, weight: .heavy))
-                .foregroundStyle(result.contains("+") ? Color.green : .secondary)
+                .foregroundStyle(message.contains("win") || message.contains("+") ? Color.green
+                                 : message.contains("Dealer") ? Color.red : .secondary)
                 .frame(height: 20)
 
             Spacer(minLength: 0)
 
-            controls
+            controls.frame(maxWidth: .infinity, minHeight: 92, maxHeight: 92)
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -94,6 +80,66 @@ struct DrawPokerView: View {
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: bigWinTick) { _, _ in app.haptics }
         .onAppear { app.checkChipRefill() }
     }
+
+    // MARK: ladder
+
+    private var ladder: some View {
+        HStack(spacing: 4) {
+            ForEach(1..<7, id: \.self) { i in
+                let mine = player.count == 5 && Self.rank(player) == i
+                Text(rankNames[i])
+                    .font(.system(size: 8.5, weight: .heavy))
+                    .lineLimit(1).minimumScaleFactor(0.6)
+                    .padding(.horizontal, 4).padding(.vertical, 3)
+                    .frame(maxWidth: .infinity)
+                    .background(mine ? Theme.accent.opacity(0.9) : Color.primary.opacity(0.06),
+                               in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .foregroundStyle(mine ? Color(red: 0.11, green: 0.08, blue: 0.02) : .secondary)
+            }
+        }
+    }
+
+    // MARK: hands
+
+    private func hand(cards: [Int], faceUp: (Int) -> Bool, held: [Bool]?, label: String, rankText: String?) -> some View {
+        VStack(spacing: 3) {
+            HStack(spacing: 5) {
+                Text(label).font(.system(size: 9, weight: .heavy)).tracking(1).foregroundStyle(.secondary)
+                if let rankText { Text("· \(rankText)").font(.system(size: 9, weight: .heavy)).foregroundStyle(Theme.accent) }
+            }
+            HStack(spacing: 6) {
+                ForEach(0..<5, id: \.self) { i in
+                    let up = i < cards.count && faceUp(i)
+                    card(icon: up ? cards[i] : nil, held: held?[safe: i] ?? false)
+                        .onTapGesture {
+                            guard phase == .hold, label == "YOU", i < player.count else { return }
+                            held[i].toggle()
+                            holdTick += 1
+                        }
+                }
+            }
+        }
+    }
+
+    private func card(icon: Int?, held: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(icon == nil ? AnyShapeStyle(Theme.accent.opacity(0.5)) : AnyShapeStyle(Theme.paper))
+            .overlay {
+                if let icon {
+                    Image(systemName: icons[icon])
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(iconColors[icon])
+                }
+            }
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(held ? Theme.accent : Theme.hairline, lineWidth: held ? 2.5 : 1))
+            .overlay(alignment: .bottom) {
+                if held { Text("HELD").font(.system(size: 7, weight: .black)).foregroundStyle(Theme.accent).padding(.bottom, 1) }
+            }
+            .frame(width: 46, height: 62)
+    }
+
+    // MARK: controls
 
     @ViewBuilder private var controls: some View {
         switch phase {
@@ -111,14 +157,14 @@ struct DrawPokerView: View {
                 }
             } else {
                 HStack(spacing: 12) {
-                    step("minus") { bet = max(minBet, bet - 5) }
+                    stepBtn("minus") { bet = max(minBet, bet - 5) }
                     VStack(spacing: 0) {
                         Text("BET").font(.system(size: 9, weight: .heavy)).foregroundStyle(.secondary)
                         Text("\(bet)").font(.system(size: 20, weight: .black)).monospacedDigit()
                     }
-                    .frame(width: 60)
-                    step("plus") { bet = min(maxBet, bet + 5) }
-                    Button { deal() } label: {
+                    .frame(width: 58)
+                    stepBtn("plus") { bet = min(maxBet, bet + 5) }
+                    Button { startDeal() } label: {
                         Text("Deal").font(.system(size: 15, weight: .heavy))
                             .padding(.horizontal, 22).padding(.vertical, 10)
                             .background(Theme.accent, in: Capsule())
@@ -127,16 +173,20 @@ struct DrawPokerView: View {
                     .buttonStyle(.plain)
                 }
             }
-        case .draw:
+        case .dealing:
+            Text("Dealing…").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+        case .hold:
             Button { draw() } label: {
-                Text("Draw").font(.system(size: 15, weight: .heavy))
-                    .padding(.horizontal, 26).padding(.vertical, 10)
+                Text("Draw & Show").font(.system(size: 16, weight: .heavy))
+                    .padding(.horizontal, 28).padding(.vertical, 12)
                     .background(Theme.accent, in: Capsule())
                     .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
             }
             .buttonStyle(.plain)
+        case .reveal:
+            Text("Revealing…").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
         case .result:
-            Button { phase = .bet; result = "" } label: {
+            Button { phase = .bet; message = ""; player = []; dealer = []; revealCount = 0 } label: {
                 Text("Next hand").font(.system(size: 15, weight: .heavy))
                     .padding(.horizontal, 22).padding(.vertical, 10)
                     .background(Theme.accent, in: Capsule())
@@ -146,107 +196,88 @@ struct DrawPokerView: View {
         }
     }
 
-    private func step(_ icon: String, _ act: @escaping () -> Void) -> some View {
+    private func stepBtn(_ icon: String, _ act: @escaping () -> Void) -> some View {
         Button(action: act) {
             Image(systemName: icon).font(.system(size: 15, weight: .black))
-                .frame(width: 36, height: 36)
+                .frame(width: 34, height: 34)
                 .background(Color.primary.opacity(0.08), in: Circle())
         }
         .buttonStyle(.plain)
     }
 
-    private func cardView(_ c: Card, held: Bool) -> some View {
-        VStack(spacing: 1) {
-            Text(c.label).font(.system(size: 17, weight: .black, design: .rounded))
-            Text(c.glyph).font(.system(size: 15))
-        }
-        .foregroundStyle(c.isRed ? Color(hex: "E0473E") : Color.primary)
-        .frame(width: 46, height: 66)
-        .background(Theme.paper, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .stroke(held ? Theme.accent : Theme.hairline, lineWidth: held ? 2.5 : 1))
-        .overlay(alignment: .bottom) {
-            if held {
-                Text("HELD").font(.system(size: 7, weight: .black))
-                    .foregroundStyle(Theme.accent).padding(.bottom, 1)
-            }
-        }
-    }
-
     // MARK: flow
 
-    private func freshDeck() -> [Card] {
-        var d: [Card] = []
-        for s in 0..<4 { for r in 2...14 { d.append(Card(rank: r, suit: s)) } }
-        d.shuffle()
-        return d
-    }
+    private func randIcon() -> Int { Int.random(in: 0..<icons.count) }
 
-    private func deal() {
+    private func startDeal() {
         app.checkChipRefill()
         guard !broke else { return }
         bet = min(bet, max(minBet, app.coins))
         _ = app.placeBet(bet)
-        deck = freshDeck()
-        hand = Array(deck.prefix(5))
-        deck.removeFirst(5)
+        player = []
+        dealer = (0..<5).map { _ in randIcon() }
+        revealCount = 0
         held = Array(repeating: false, count: 5)
-        result = ""
-        phase = .draw
-        dealTick += 1
+        message = ""
+        phase = .dealing
+        for i in 0..<5 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22 * Double(i)) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { player.append(randIcon()) }
+                dealTick += 1
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22 * 5 + 0.1) { phase = .hold }
     }
 
     private func draw() {
         for i in 0..<5 where !held[i] {
-            hand[i] = deck.removeFirst()
+            player[i] = randIcon()
         }
         dealTick += 1
-        let (name, mult) = Self.evaluate(hand)
+        phase = .reveal
+        revealCount = 0
+        for k in 1...5 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.28 * Double(k)) {
+                withAnimation(.easeOut(duration: 0.2)) { revealCount = k }
+                dealTick += 1
+                if k == 5 { settle() }
+            }
+        }
+    }
+
+    private func settle() {
+        let p = Self.rank(player), d = Self.rank(dealer)
         phase = .result
-        if mult > 0 {
-            let payout = bet * mult
-            app.awardChips(payout)
-            result = "\(name)  +\(payout)"
-            if mult >= 9 { bigWinTick += 1 } else { winTick += 1 }
+        if p > d {
+            app.awardChips(bet * 2)
+            message = "You win +\(bet)"
+            if p >= 4 { bigWinTick += 1 } else { winTick += 1 }
+        } else if p == d {
+            app.awardChips(bet)
+            message = "Push"
         } else {
-            result = "No pay — \(name)"
+            message = "Dealer wins"
         }
         app.checkChipRefill()
     }
 
-    // MARK: hand ranking (Jacks or Better)
+    // MARK: ranking — 0 High, 1 Pair, 2 Two Pair, 3 Trips, 4 Full House, 5 Quads, 6 Fives
 
-    static func evaluate(_ cards: [Card]) -> (String, Int) {
-        let ranks = cards.map { $0.rank }.sorted()
-        let suits = Set(cards.map { $0.suit })
+    static func rank(_ cards: [Int]) -> Int {
+        guard cards.count == 5 else { return 0 }
         var counts: [Int: Int] = [:]
-        for r in ranks { counts[r, default: 0] += 1 }
-        let groups = counts.values.sorted(by: >)
-
-        let flush = suits.count == 1
-        let unique = Set(ranks).sorted()
-        var straight = false
-        if unique.count == 5 {
-            if unique[4] - unique[0] == 4 { straight = true }
-            if unique == [2, 3, 4, 5, 14] { straight = true }   // wheel
+        for c in cards { counts[c, default: 0] += 1 }
+        let g = counts.values.sorted(by: >)
+        switch g.first {
+        case 5: return 6
+        case 4: return 5
+        case 3: return g.count > 1 && g[1] == 2 ? 4 : 3
+        case 2: return g.count > 1 && g[1] == 2 ? 2 : 1
+        default: return 0
         }
-
-        if straight && flush {
-            return unique == [10, 11, 12, 13, 14] ? ("Royal Flush", 250) : ("Straight Flush", 50)
-        }
-        if groups.first == 4 { return ("Four of a Kind", 25) }
-        if groups.first == 3 && groups.count > 1 && groups[1] == 2 { return ("Full House", 9) }
-        if flush { return ("Flush", 6) }
-        if straight { return ("Straight", 4) }
-        if groups.first == 3 { return ("Three of a Kind", 3) }
-        if groups.first == 2 && groups.count > 1 && groups[1] == 2 { return ("Two Pair", 2) }
-        if groups.first == 2 {
-            // paying pair only if it's Jacks or better
-            if let pairRank = counts.first(where: { $0.value == 2 })?.key, pairRank >= 11 {
-                return ("Jacks or Better", 1)
-            }
-            return ("Low Pair", 0)
-        }
-        return ("High Card", 0)
     }
+}
+
+private extension Array {
+    subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }
 }

@@ -2,10 +2,9 @@
 //  RunnerModel.swift
 //  Docked
 //
-//  A lane runner: the player is pinned near the bottom in one of three lanes,
-//  obstacles scroll down from the top. Swipe left/right to change lane, swipe
-//  UP to jump the blocks on the ground, swipe DOWN to slide under the bars
-//  hanging from above.
+//  "Fit" — a wall with a hole in it slides down at you. Get into the hole's
+//  lane and strike its pose (stand / jump / duck) to pass. Occasional solid
+//  blocks just need a lane change — never a jump or duck.
 //
 //  Pure simulation — no SwiftUI. `step(dt:arenaHeight:)` runs from the view's
 //  60 Hz ticker.
@@ -17,15 +16,15 @@ import SwiftUI
 final class RunnerModel {
 
     enum Phase: Equatable { case ready, running, paused, gameOver }
-    /// `ground` = a block on the floor → JUMP it. `overhead` = a bar from the
-    /// ceiling → SLIDE under it.
-    enum Kind: Equatable { case ground, overhead }
+    enum Pose: Equatable { case stand, jump, duck }
+    enum Kind: Equatable { case wall, block }
 
-    struct Obstacle: Identifiable {
+    struct Hazard: Identifiable {
         let id = UUID()
-        var lane: Int
-        var y: CGFloat
         var kind: Kind
+        var y: CGFloat
+        var lane: Int      // wall: the hole's lane · block: the blocked lane
+        var pose: Pose     // wall: the hole's pose · block: unused
         var scored = false
     }
 
@@ -33,27 +32,29 @@ final class RunnerModel {
 
     private(set) var phase: Phase = .ready
     private(set) var lane = 1
-    /// 0 = grounded, up to 1 at the apex of a jump.
-    private(set) var hop: CGFloat = 0
-    /// > 0 while sliding (crouched).
-    private(set) var slide: CGFloat = 0
-    private(set) var obstacles: [Obstacle] = []
+    private(set) var hop: CGFloat = 0     // 0…1 through a jump
+    private(set) var slide: CGFloat = 0   // 0…1 through a duck
+    private(set) var hazards: [Hazard] = []
     private(set) var score: Double = 0
-    private(set) var speed: CGFloat = 420
-
-    /// bumps when you clear an obstacle in your lane — a "whoosh" haptic.
+    private(set) var speed: CGFloat = 190
     private(set) var dodgeTick = 0
 
     private var hopTime: CGFloat = 0
     private var slideTime: CGFloat = 0
-    private var spawnCountdown: CGFloat = 0.9
+    private var spawnCountdown: CGFloat = 1.4
 
-    private let hopDuration: CGFloat = 0.56
-    private let slideDuration: CGFloat = 0.55
-    private let baseSpeed: CGFloat = 420
-    private let maxSpeed: CGFloat = 860
+    private let hopDuration: CGFloat = 0.64
+    private let slideDuration: CGFloat = 0.64
+    private let baseSpeed: CGFloat = 190
+    private let maxSpeed: CGFloat = 430
 
     var scoreValue: Int { Int(score) }
+
+    var pose: Pose {
+        if hop > 0.32 { return .jump }
+        if slide > 0.35 { return .duck }
+        return .stand
+    }
 
     // MARK: intent
 
@@ -63,18 +64,14 @@ final class RunnerModel {
     func moveRight() {
         if phase == .running { lane = min(lanes - 1, lane + 1) } else { tap() }
     }
-
     func jump() {
         guard phase == .running else { tap(); return }
         if hopTime <= 0 && slideTime <= 0 { hopTime = hopDuration }
     }
-
-    func slideDown() {
+    func duck() {
         guard phase == .running else { tap(); return }
         if slideTime <= 0 && hopTime <= 0 { slideTime = slideDuration }
     }
-
-    /// Tap = start / resume / retry (also a small hop while running).
     func tap() {
         switch phase {
         case .ready, .gameOver: reset(); phase = .running
@@ -82,17 +79,16 @@ final class RunnerModel {
         case .running: if hopTime <= 0 && slideTime <= 0 { hopTime = hopDuration }
         }
     }
-
     func pauseIfRunning() { if phase == .running { phase = .paused } }
 
     private func reset() {
         lane = 1
         hop = 0; slide = 0
         hopTime = 0; slideTime = 0
-        obstacles.removeAll()
+        hazards.removeAll()
         score = 0
         speed = baseSpeed
-        spawnCountdown = 0.9
+        spawnCountdown = 1.4
     }
 
     // MARK: simulation
@@ -101,13 +97,12 @@ final class RunnerModel {
         guard phase == .running else { return }
         let dt = min(rawDt, 1.0 / 30.0)
 
-        speed = min(maxSpeed, baseSpeed + CGFloat(score) * 2.2)
-        score += Double(dt) * 14
+        speed = min(maxSpeed, baseSpeed + CGFloat(score) * 0.85)
+        score += Double(dt) * 9
 
         if hopTime > 0 {
             hopTime -= dt
-            let t = max(0, 1 - hopTime / hopDuration)
-            hop = CGFloat(sin(Double(t) * Double.pi))
+            hop = CGFloat(sin(Double(max(0, 1 - hopTime / hopDuration)) * Double.pi))
             if hopTime <= 0 { hop = 0; hopTime = 0 }
         }
         if slideTime > 0 {
@@ -116,30 +111,37 @@ final class RunnerModel {
             if slideTime <= 0 { slide = 0; slideTime = 0 }
         }
 
-        for i in obstacles.indices { obstacles[i].y += speed * dt }
-        obstacles.removeAll { $0.y > arenaHeight + 90 }
+        for i in hazards.indices { hazards[i].y += speed * dt }
+        hazards.removeAll { $0.y > arenaHeight + 110 }
 
         spawnCountdown -= dt
         if spawnCountdown <= 0 {
-            let l = Int.random(in: 0..<lanes)
-            let kind: Kind = Bool.random() ? .ground : .overhead
-            obstacles.append(Obstacle(lane: l, y: -80, kind: kind))
-            spawnCountdown = max(0.45, CGFloat.random(in: 0.7...1.3) * (baseSpeed / speed))
+            if Int.random(in: 0..<4) == 0 {
+                hazards.append(Hazard(kind: .block, y: -90,
+                                      lane: Int.random(in: 0..<lanes), pose: .stand))
+            } else {
+                let poses: [Pose] = [.stand, .stand, .jump, .duck]
+                hazards.append(Hazard(kind: .wall, y: -90,
+                                      lane: Int.random(in: 0..<lanes),
+                                      pose: poses.randomElement()!))
+            }
+            let base = max(1.0, 2.0 - CGFloat(score) * 0.0016)
+            spawnCountdown = base * CGFloat.random(in: 0.85...1.2)
         }
 
-        let playerY = arenaHeight - 90
-        for i in obstacles.indices {
-            let o = obstacles[i]
-            guard o.lane == lane else { continue }
-            if !o.scored && o.y > playerY + 20 {
-                obstacles[i].scored = true
+        let playerY = arenaHeight - 92
+        for i in hazards.indices {
+            let hz = hazards[i]
+            if !hz.scored && hz.y > playerY + 26 {
+                hazards[i].scored = true
                 dodgeTick += 1
+                score += 3
             }
-            guard abs(o.y - playerY) < 30 else { continue }
+            guard abs(hz.y - playerY) < 24 else { continue }
             let safe: Bool
-            switch o.kind {
-            case .ground:   safe = hop > 0.3
-            case .overhead: safe = slide > 0.4
+            switch hz.kind {
+            case .wall:  safe = (lane == hz.lane && pose == hz.pose)
+            case .block: safe = (lane != hz.lane)
             }
             if !safe { phase = .gameOver; return }
         }

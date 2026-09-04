@@ -77,34 +77,35 @@ struct BrawlView: View {
                      with: .radialGradient(Gradient(colors: [Theme.accent.opacity(0.06), .clear]),
                                            center: c, startRadius: 0, endRadius: reach))
 
-            // lane guides — fade toward the centre
+            // lane guides — thin solid lines fading toward the centre
             for d in dirs {
                 var p = Path()
                 p.move(to: CGPoint(x: c.x + d.x * ringR, y: c.y + d.y * ringR))
                 p.addLine(to: CGPoint(x: c.x + d.x * reach, y: c.y + d.y * reach))
-                ctx.stroke(p, with: .color(Theme.ink.opacity(0.08)),
-                           style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [5, 9]))
+                ctx.stroke(p, with: .color(Theme.ink.opacity(0.10)),
+                           style: StrokeStyle(lineWidth: 2, lineCap: .round))
             }
 
-            // strike ring — a soft glow plus a crisp edge
+            // strike zone — a filled disc so "in range" reads at a glance
             let ringRect = CGRect(x: c.x - ringR, y: c.y - ringR, width: ringR * 2, height: ringR * 2)
-            ctx.fill(Path(ellipseIn: ringRect), with: .color(Theme.accent.opacity(0.07)))
-            ctx.stroke(Path(ellipseIn: ringRect), with: .color(Theme.accent.opacity(0.5)),
-                       style: StrokeStyle(lineWidth: 2, dash: [3, 5]))
+            ctx.fill(Path(ellipseIn: ringRect), with: .color(Theme.accent.opacity(0.10)))
+            ctx.stroke(Path(ellipseIn: ringRect), with: .color(Theme.accent.opacity(0.45)), lineWidth: 2)
 
-            // slash arc from the last swipe
+            // slash — a wedge that shoots from the player toward the swipe
             if let sd = slashDir {
                 let age = Date().timeIntervalSince(slashAt)
-                if age < 0.22 {
-                    let o = 1 - age / 0.22
+                if age < 0.18 {
+                    let o = CGFloat(1 - age / 0.18)
                     let d = dirs[sd]
                     let ang = atan2(Double(d.y), Double(d.x))
-                    var arc = Path()
-                    arc.addArc(center: c, radius: ringR + 8,
-                               startAngle: .radians(ang - 0.6), endAngle: .radians(ang + 0.6),
-                               clockwise: false)
-                    ctx.stroke(arc, with: .color(Theme.accent.opacity(o)),
-                               style: StrokeStyle(lineWidth: CGFloat(6 * o + 2), lineCap: .round))
+                    let len = ringR + 14
+                    let a1 = ang - 0.34, a2 = ang + 0.34
+                    var wedge = Path()
+                    wedge.move(to: c)
+                    wedge.addLine(to: CGPoint(x: c.x + CGFloat(cos(a1)) * len, y: c.y + CGFloat(sin(a1)) * len))
+                    wedge.addLine(to: CGPoint(x: c.x + CGFloat(cos(a2)) * len, y: c.y + CGFloat(sin(a2)) * len))
+                    wedge.closeSubpath()
+                    ctx.fill(wedge, with: .color(Theme.accent.opacity(0.55 * o)))
                 }
             }
 
@@ -181,7 +182,9 @@ final class BrawlModel {
     enum Phase: Equatable { case ready, running, over }
     struct Enemy: Identifiable { let id = UUID(); var dir: Int; var dist: CGFloat }
 
-    static let strikeDist: CGFloat = 0.34
+    /// An enemy anywhere from the centre out to here is a valid target — a
+    /// generous window, not a knife-edge at the ring.
+    static let strikeDist: CGFloat = 0.46
 
     private(set) var phase: Phase = .ready
     private(set) var enemies: [Enemy] = []
@@ -190,7 +193,7 @@ final class BrawlModel {
     private(set) var elapsed: CGFloat = 0
 
     private var spawnCountdown: CGFloat = 1.1
-    private var speed: CGFloat = 0.14
+    private var speed: CGFloat = 0.12
 
     func tap() {
         switch phase {
@@ -219,7 +222,7 @@ final class BrawlModel {
         guard phase == .running else { return }
         let dt = min(rawDt, 1.0 / 30.0)
         elapsed += dt
-        speed = 0.14 + elapsed * 0.006
+        speed = 0.12 + elapsed * 0.005
 
         for i in enemies.indices { enemies[i].dist -= speed * dt }
 
