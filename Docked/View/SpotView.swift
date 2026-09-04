@@ -55,8 +55,9 @@ struct SpotView: View {
             GeometryReader { geo in
                 let n = crowd.count
                 let rowsN = max(1, (n + cols - 1) / cols)
-                let side = min((geo.size.width - CGFloat(cols + 1) * 6) / CGFloat(cols),
-                               (geo.size.height - CGFloat(rowsN + 1) * 6) / CGFloat(rowsN))
+                let sw: CGFloat = (geo.size.width - CGFloat(cols + 1) * 6) / CGFloat(cols)
+                let sh: CGFloat = (geo.size.height - CGFloat(rowsN + 1) * 6) / CGFloat(rowsN)
+                let side: CGFloat = min(sw, sh)
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: cols), spacing: 6) {
                     ForEach(Array(crowd.enumerated()), id: \.offset) { pair in
                         creatureView(pair.element, side: max(24, side))

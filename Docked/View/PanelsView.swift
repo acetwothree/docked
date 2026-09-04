@@ -47,10 +47,11 @@ struct PanelsView: View {
 
             GeometryReader { geo in
                 let gap: CGFloat = 4
-                let cw = (min(geo.size.width, geo.size.height / CGFloat(rows) * CGFloat(cols))
-                          - gap * CGFloat(cols + 1)) / CGFloat(cols)
-                let boardW = cw * CGFloat(cols) + gap * CGFloat(cols + 1)
-                let boardH = cw * CGFloat(rows) + gap * CGFloat(rows + 1)
+                let fitW: CGFloat = geo.size.width
+                let fitH: CGFloat = geo.size.height / CGFloat(rows) * CGFloat(cols)
+                let cw: CGFloat = (min(fitW, fitH) - gap * CGFloat(cols + 1)) / CGFloat(cols)
+                let boardW: CGFloat = cw * CGFloat(cols) + gap * CGFloat(cols + 1)
+                let boardH: CGFloat = cw * CGFloat(rows) + gap * CGFloat(rows + 1)
                 ZStack(alignment: .topLeading) {
                     ForEach(Array(0..<(cols * rows)), id: \.self) { i in
                         tile(i, cw: cw, gap: gap)

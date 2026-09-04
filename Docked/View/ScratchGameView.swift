@@ -55,22 +55,16 @@ struct ScratchGameView: View {
             }
 
             GeometryReader { geo in
-                let cardW = geo.size.width
-                let cardH = geo.size.height
-                let cw = cardW / CGFloat(colsN)
-                let ch = cardH / CGFloat(rowsN)
+                let cardW: CGFloat = geo.size.width
+                let cardH: CGFloat = geo.size.height
+                let cw: CGFloat = cardW / CGFloat(colsN)
+                let ch: CGFloat = cardH / CGFloat(rowsN)
+                let iconSize: CGFloat = min(cardW / 4.6, cardH * 0.58)
 
                 ZStack {
                     HStack(spacing: 10) {
                         ForEach(Array(0..<3), id: \.self) { i in
-                            Text(icons[symbols[i] % icons.count])
-                                .font(.system(size: min(cardW / 4.6, cardH * 0.58)))
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .background(Theme.paper, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .strokeBorder(Theme.TV.key.opacity(0.4), lineWidth: 2)
-                                )
+                            windowTile(symbol: icons[symbols[i] % icons.count], size: iconSize)
                         }
                     }
                     .padding(12)
@@ -153,6 +147,17 @@ struct ScratchGameView: View {
         .onChange(of: app.coins) { _, new in
             withAnimation(.easeOut(duration: 0.4)) { displayCoins = new }
         }
+    }
+
+    private func windowTile(symbol: String, size: CGFloat) -> some View {
+        Text(symbol)
+            .font(.system(size: size))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Theme.paper, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Theme.TV.key.opacity(0.4), lineWidth: 2)
+            )
     }
 
     @ViewBuilder private var buyOverlay: some View {
