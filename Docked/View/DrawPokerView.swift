@@ -55,11 +55,10 @@ struct DrawPokerView: View {
 
             Spacer(minLength: 0)
 
-            hand(cards: dealer, faceUp: { $0 < revealCount }, held: nil, label: "DEALER",
+            hand(cards: dealer, faceUp: { $0 < revealCount }, showHolds: false, label: "DEALER",
                  rankText: phase == .result ? rankNames[Self.rank(dealer)] : nil)
 
-            hand(cards: player, faceUp: { _ in true },
-                 held: phase == .hold ? held : nil, label: "YOU",
+            hand(cards: player, faceUp: { _ in true }, showHolds: phase == .hold, label: "YOU",
                  rankText: player.count == 5 ? rankNames[Self.rank(player)] : nil)
 
             Text(message.isEmpty ? " " : message)
@@ -101,7 +100,7 @@ struct DrawPokerView: View {
 
     // MARK: hands
 
-    private func hand(cards: [Int], faceUp: (Int) -> Bool, held: [Bool]?, label: String, rankText: String?) -> some View {
+    private func hand(cards: [Int], faceUp: (Int) -> Bool, showHolds: Bool, label: String, rankText: String?) -> some View {
         VStack(spacing: 3) {
             HStack(spacing: 5) {
                 Text(label).font(.system(size: 9, weight: .heavy)).tracking(1).foregroundStyle(.secondary)
@@ -110,7 +109,7 @@ struct DrawPokerView: View {
             HStack(spacing: 6) {
                 ForEach(0..<5, id: \.self) { i in
                     let up = i < cards.count && faceUp(i)
-                    card(icon: up ? cards[i] : nil, held: held?[safe: i] ?? false)
+                    card(icon: up ? cards[i] : nil, held: showHolds && held.indices.contains(i) && held[i])
                         .onTapGesture {
                             guard phase == .hold, label == "YOU", i < player.count else { return }
                             held[i].toggle()
@@ -276,8 +275,4 @@ struct DrawPokerView: View {
         default: return 0
         }
     }
-}
-
-private extension Array {
-    subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }
 }
