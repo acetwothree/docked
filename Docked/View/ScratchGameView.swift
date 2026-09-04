@@ -138,7 +138,7 @@ struct ScratchGameView: View {
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sensoryFeedback(.success, trigger: winFlash) { _, now in now && app.haptics }
-        .sensoryFeedback(.impact(weight: .rigid), trigger: tossTick) { _, _ in app.haptics }
+        .sensoryFeedback(.impact(flexibility: .rigid), trigger: tossTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(weight: .light), trigger: scratched.count) { _, _ in app.haptics && !revealed }
         .onAppear {
             displayCoins = app.coins
