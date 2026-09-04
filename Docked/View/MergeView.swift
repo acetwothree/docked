@@ -17,7 +17,7 @@ struct MergeView: View {
     @State private var over = false
     @State private var moveTick = 0
     @State private var mergeTick = 0
-    @State private var nudge: CGSize = .zero
+    @State private var pulse: CGFloat = 1
 
     private let n = 4
 
@@ -41,7 +41,7 @@ struct MergeView: View {
                 let side = min(geo.size.width, geo.size.height)
                 board(side: side)
                     .frame(width: side, height: side)
-                    .offset(nudge)
+                    .scaleEffect(pulse)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
@@ -85,7 +85,7 @@ struct MergeView: View {
                 tile(i, cell: cell, gap: gap)
             }
         }
-        .animation(.snappy(duration: 0.12), value: grid)
+        .animation(.easeOut(duration: 0.13), value: grid)
     }
 
     private func tile(_ i: Int, cell: CGFloat, gap: CGFloat) -> some View {
@@ -182,22 +182,16 @@ struct MergeView: View {
             if didMerge { mergeTick += 1 }
             best = max(best, score)
             if !anyMoveLeft() { over = true }
-            bump(dir)
+            if didMerge { pop() }
         }
     }
 
-    private func bump(_ dir: Dir) {
-        let d: CGFloat = 14
-        let target: CGSize
-        switch dir {
-        case .up:    target = CGSize(width: 0, height: -d)
-        case .down:  target = CGSize(width: 0, height: d)
-        case .left:  target = CGSize(width: -d, height: 0)
-        case .right: target = CGSize(width: d, height: 0)
-        }
-        withAnimation(.spring(response: 0.16, dampingFraction: 0.55)) { nudge = target }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { nudge = .zero }
+    /// A tiny, non-directional squeeze when tiles merge — acknowledges the
+    /// move without the board lurching around.
+    private func pop() {
+        withAnimation(.easeOut(duration: 0.07)) { pulse = 0.97 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.07) {
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.6)) { pulse = 1 }
         }
     }
 

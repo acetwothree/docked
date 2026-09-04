@@ -24,13 +24,15 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
     case play = "Play"
     case fidget = "Fidget"
     case versus = "2 Player"
+    case gamble = "Gambling"
     var id: String { rawValue }
 }
 
 enum ActivityModule: String, CaseIterable, Identifiable {
     case doodle, notes
     case game, zen, flow, merge, drop, marble
-    case pop, click, scratch, ksand
+    case pop, click, ksand
+    case scratch, blackjack
     case tictactoe, connect4, dots
     var id: String { rawValue }
 
@@ -38,7 +40,8 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         switch self {
         case .doodle, .notes: .create
         case .game, .zen, .flow, .merge, .drop, .marble: .play
-        case .pop, .click, .scratch, .ksand: .fidget
+        case .pop, .click, .ksand: .fidget
+        case .scratch, .blackjack: .gamble
         case .tictactoe, .connect4, .dots: .versus
         }
     }
@@ -55,8 +58,9 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .marble: "Roll"
         case .pop: "Pop"
         case .click: "Clicker"
-        case .scratch: "Scratcher"
         case .ksand: "Kinetic Sand"
+        case .scratch: "Scratcher"
+        case .blackjack: "Blackjack"
         case .tictactoe: "Tic-Tac-Toe"
         case .connect4: "Connect 4"
         case .dots: "Dots & Boxes"
@@ -74,8 +78,9 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .marble: "circle.fill"
         case .pop: "circle.hexagongrid.fill"
         case .click: "hand.tap.fill"
-        case .scratch: "rectangle.dashed"
         case .ksand: "hand.draw.fill"
+        case .scratch: "rectangle.dashed"
+        case .blackjack: "suit.club.fill"
         case .tictactoe: "number"
         case .connect4: "circle.grid.cross.fill"
         case .dots: "square.grid.4x3.fill"
@@ -83,13 +88,14 @@ enum ActivityModule: String, CaseIterable, Identifiable {
     }
 
     /// Activities behind Docked Plus. The free set stays genuinely useful on
-    /// its own — sketching, notes, a runner, Blocks, 2048, two fidgets and
-    /// Tic-Tac-Toe — so the app has real value without subscribing.
+    /// its own — sketching, notes, Blocks, Roll, Merge, two fidgets, the
+    /// gambling loop and Tic-Tac-Toe — so the app has real value unpaid.
     var isPlus: Bool {
         switch self {
-        case .doodle, .notes, .game, .zen, .merge, .pop, .click, .tictactoe:
+        case .doodle, .notes, .zen, .drop, .marble, .pop, .click,
+             .scratch, .blackjack, .tictactoe:
             return false
-        case .flow, .drop, .marble, .scratch, .ksand, .connect4, .dots:
+        case .game, .flow, .merge, .ksand, .connect4, .dots:
             return true
         }
     }
@@ -105,10 +111,11 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .flow: "Connect the matching dots without crossing."
         case .merge: "Slide-to-merge number tiles (2048)."
         case .drop: "Drop blocks into columns; equal ones merge."
-        case .marble: "Slide a marble to paint every tile."
+        case .marble: "Slide a marble through a maze to the goal."
         case .pop: "A sheet of endless bubble wrap."
         case .click: "A tally clicker with a satisfying tick."
-        case .scratch: "Scratch-off cards — match three to win."
+        case .scratch: "Scratch-off cards — match three to win chips."
+        case .blackjack: "Simple blackjack against the dealer."
         case .ksand: "Rake patterns into a zen sand tray."
         case .tictactoe: "Two-player noughts and crosses."
         case .connect4: "Two-player four-in-a-row."
@@ -123,6 +130,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .play:   Color(hex: "3ECF7A")
         case .fidget: Color(hex: "C77DFF")
         case .versus: Color(hex: "FF8A3D")
+        case .gamble: Color(hex: "F5C518")
         }
     }
 }

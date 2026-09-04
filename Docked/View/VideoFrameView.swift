@@ -107,14 +107,15 @@ struct VideoFrameView: View {
         if showBadge {
             let badge = "DOCKED · FREE iOS APP"
             let bx = gx + 22
+            // engraved look: a light highlight above, a darker cut below
             ctx.draw(Text(badge)
-                        .font(.system(size: 9.5, weight: .black, design: .rounded))
-                        .foregroundColor(palette.key.opacity(0.55)),
-                     at: CGPoint(x: bx, y: consoleRect.midY + 0.5), anchor: .leading)
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .foregroundColor(palette.hi.opacity(0.5)),
+                     at: CGPoint(x: bx, y: consoleRect.midY + 1.2), anchor: .leading)
             ctx.draw(Text(badge)
-                        .font(.system(size: 9.5, weight: .black, design: .rounded))
-                        .foregroundColor(palette.hi.opacity(0.32)),
-                     at: CGPoint(x: bx, y: consoleRect.midY - 0.5), anchor: .leading)
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .foregroundColor(palette.key.opacity(0.82)),
+                     at: CGPoint(x: bx, y: consoleRect.midY - 0.3), anchor: .leading)
         }
 
         // --- knob wells ---

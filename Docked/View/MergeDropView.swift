@@ -22,6 +22,9 @@ struct MergeDropView: View {
     @State private var over = false
     @State private var dropTick = 0
     @State private var mergeTick = 0
+    @State private var bigMergeTick = 0
+    /// Whole-board squeeze when a merge resolves.
+    @State private var pulse: CGFloat = 1
 
     /// Column currently under the finger while aiming.
     @State private var hoverCol: Int? = nil
@@ -90,6 +93,7 @@ struct MergeDropView: View {
                     }
                 }
                 .frame(width: boardW, height: boardH)
+                .scaleEffect(pulse)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .contentShape(Rectangle())
                 .gesture(
@@ -112,7 +116,8 @@ struct MergeDropView: View {
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sensoryFeedback(.impact(weight: .light), trigger: dropTick) { _, _ in app.haptics }
-        .sensoryFeedback(.impact(weight: .medium), trigger: mergeTick) { _, _ in app.haptics }
+        .sensoryFeedback(.impact(flexibility: .rigid), trigger: mergeTick) { _, _ in app.haptics }
+        .sensoryFeedback(.success, trigger: bigMergeTick) { _, _ in app.haptics }
         .onAppear { if grid.allSatisfy({ $0 == 0 }) { newGame() } }
     }
 
@@ -185,9 +190,18 @@ struct MergeDropView: View {
             grid[landing * cols + col] = val
             falling = nil
             dropTick += 1
+            let mergesBefore = mergeTick
             resolve()
             best = max(best, score)
             if topRowFull() { over = true }
+            if mergeTick > mergesBefore { squeeze() }
+        }
+    }
+
+    private func squeeze() {
+        withAnimation(.easeOut(duration: 0.07)) { pulse = 0.96 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.07) {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.55)) { pulse = 1 }
         }
     }
 
@@ -209,6 +223,7 @@ struct MergeDropView: View {
                         grid[up] = 0
                         score += 1 << grid[i]
                         mergeTick += 1
+                        if grid[i] >= 6 { bigMergeTick += 1 }   // 64+ tier
                         again = true
                     }
                 }

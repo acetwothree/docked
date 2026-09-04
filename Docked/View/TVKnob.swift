@@ -38,8 +38,10 @@ struct TVKnob: View {
                 .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
 
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(palette.key)
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.55), radius: 1.5, y: 0.5)
+                    .shadow(color: .black.opacity(0.35), radius: 0.5)
             }
             .frame(width: LayoutSolver.knobDiameter, height: LayoutSolver.knobDiameter)
             .contentShape(Circle())

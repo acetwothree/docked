@@ -23,6 +23,9 @@ struct RootView: View {
     @State private var showPlus = false
     /// Set just before opening the paywall so it can name what the user tapped.
     @State private var plusContext: String? = nil
+    /// When the paywall was opened from a locked picker card, reopen the picker
+    /// on dismiss so "Maybe later" lands back where the user was.
+    @State private var reopenPickerAfterPlus = false
     @State private var hintDim = false
     @State private var stretchStart: CGFloat? = nil
     @State private var stretching = false
@@ -85,6 +88,7 @@ struct RootView: View {
                         onPick: { picked in
                             if picked.isPlus && !store.entitled {
                                 plusContext = "\(picked.title) — \(picked.blurb)"
+                                reopenPickerAfterPlus = true
                                 showPicker = false
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) { showPlus = true }
                             } else {
@@ -126,7 +130,13 @@ struct RootView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showPlus, onDismiss: { plusContext = nil }) {
+        .sheet(isPresented: $showPlus, onDismiss: {
+            plusContext = nil
+            if reopenPickerAfterPlus && !store.entitled {
+                showPicker = true
+            }
+            reopenPickerAfterPlus = false
+        }) {
             PlusSheet(context: plusContext)
                 .presentationDragIndicator(.visible)
         }
@@ -203,8 +213,10 @@ struct RootView: View {
         let pal = app.tvTheme.palette
         ZStack {
             if centers.count == 3 {
-                TVKnob(icon: "gearshape.fill", palette: pal) {
-                    endEditing(); showSettings = true
+                // Left → right: Premium, Theme, Settings (settings is the
+                // right-most, easiest-reach knob).
+                TVKnob(icon: "sparkles", palette: pal) {
+                    endEditing(); plusContext = nil; showPlus = true
                 }
                 .position(centers[0])
 
@@ -219,8 +231,8 @@ struct RootView: View {
                 }
                 .position(centers[1])
 
-                TVKnob(icon: "sparkles", palette: pal) {
-                    endEditing(); plusContext = nil; showPlus = true
+                TVKnob(icon: "gearshape.fill", palette: pal) {
+                    endEditing(); showSettings = true
                 }
                 .position(centers[2])
             }
@@ -250,6 +262,7 @@ struct RootView: View {
         case .pop:       PopView()
         case .click:     ClickPenView()
         case .scratch:   ScratchGameView()
+        case .blackjack: BlackjackView()
         case .ksand:     KineticSandView()
         case .tictactoe: TicTacToeView()
         case .connect4:  ConnectFourView()
