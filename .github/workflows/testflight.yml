@@ -160,12 +160,11 @@ jobs:
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" 2>&1 | tee /tmp/build.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" != "0" ]; then
-            {
-              echo '### Build failed — Swift errors'
-              echo '```'
-              grep -E 'error:|warning: .*deprecated' /tmp/build.log | grep -v 'Node.js' | tail -n 60 || tail -n 60 /tmp/build.log
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
+            grep -E ': error:' /tmp/build.log | sort -u | head -n 20 | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+            echo "----- build.log tail -----"
+            tail -n 80 /tmp/build.log
           fi
           exit $rc
 
