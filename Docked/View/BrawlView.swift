@@ -3,7 +3,7 @@
 //  Docked
 //
 //  "Brawl" (premium) — you're the block in the middle. Enemies march in along
-//  the four cardinal paths. Swipe toward one that's in range to strike it.
+//  the four cardinal paths. Swipe toward one that's in the ring to strike it.
 //  Let one reach you and you lose a heart; survive the waves.
 //
 
@@ -18,6 +18,10 @@ struct BrawlView: View {
     @State private var lastTick = Date()
     @State private var hitTick = 0
     @State private var hurtTick = 0
+    @State private var swipeTick = 0
+    /// Direction of the last swipe + when it happened, for the slash arc.
+    @State private var slashDir: Int? = nil
+    @State private var slashAt = Date()
 
     private let ticker = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
@@ -35,9 +39,10 @@ struct BrawlView: View {
                     .onEnded { v in
                         guard game.phase == .running else { game.tap(); return }
                         let dx = v.translation.width, dy = v.translation.height
-                        let dir: Int
-                        if abs(dx) > abs(dy) { dir = dx > 0 ? 1 : 3 }
-                        else { dir = dy > 0 ? 2 : 0 }
+                        let dir = abs(dx) > abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0)
+                        slashDir = dir
+                        slashAt = Date()
+                        swipeTick += 1
                         if game.strike(dir) { hitTick += 1 }
                     }
             )
@@ -53,6 +58,7 @@ struct BrawlView: View {
         .onChange(of: game.phase) { _, p in
             if p == .over, game.score > best { best = game.score }
         }
+        .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: swipeTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: hitTick) { _, _ in app.haptics }
         .sensoryFeedback(.error, trigger: hurtTick) { _, _ in app.haptics }
     }
@@ -61,40 +67,71 @@ struct BrawlView: View {
         _ = tick
         return Canvas { ctx, cs in
             let c = CGPoint(x: cs.width / 2, y: cs.height / 2)
-            let reach = min(cs.width, cs.height) / 2 - 10
+            let reach = min(cs.width, cs.height) / 2 - 12
+            let ringR = reach * BrawlModel.strikeDist
             let dirs: [CGPoint] = [CGPoint(x: 0, y: -1), CGPoint(x: 1, y: 0),
                                    CGPoint(x: 0, y: 1), CGPoint(x: -1, y: 0)]
 
-            // lane guides
+            // soft vignette background
+            ctx.fill(Path(CGRect(origin: .zero, size: cs)),
+                     with: .radialGradient(Gradient(colors: [Theme.accent.opacity(0.06), .clear]),
+                                           center: c, startRadius: 0, endRadius: reach))
+
+            // lane guides — fade toward the centre
             for d in dirs {
                 var p = Path()
-                p.move(to: c)
+                p.move(to: CGPoint(x: c.x + d.x * ringR, y: c.y + d.y * ringR))
                 p.addLine(to: CGPoint(x: c.x + d.x * reach, y: c.y + d.y * reach))
-                ctx.stroke(p, with: .color(Theme.ink.opacity(0.12)),
-                           style: StrokeStyle(lineWidth: 2, dash: [6, 8]))
+                ctx.stroke(p, with: .color(Theme.ink.opacity(0.08)),
+                           style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [5, 9]))
             }
-            // strike-range ring
-            ctx.stroke(Path(ellipseIn: CGRect(x: c.x - reach * BrawlModel.strikeDist,
-                                              y: c.y - reach * BrawlModel.strikeDist,
-                                              width: reach * BrawlModel.strikeDist * 2,
-                                              height: reach * BrawlModel.strikeDist * 2)),
-                       with: .color(Theme.accent.opacity(0.25)), lineWidth: 1.5)
+
+            // strike ring — a soft glow plus a crisp edge
+            let ringRect = CGRect(x: c.x - ringR, y: c.y - ringR, width: ringR * 2, height: ringR * 2)
+            ctx.fill(Path(ellipseIn: ringRect), with: .color(Theme.accent.opacity(0.07)))
+            ctx.stroke(Path(ellipseIn: ringRect), with: .color(Theme.accent.opacity(0.5)),
+                       style: StrokeStyle(lineWidth: 2, dash: [3, 5]))
+
+            // slash arc from the last swipe
+            if let sd = slashDir {
+                let age = Date().timeIntervalSince(slashAt)
+                if age < 0.22 {
+                    let o = 1 - age / 0.22
+                    let d = dirs[sd]
+                    let ang = atan2(Double(d.y), Double(d.x))
+                    var arc = Path()
+                    arc.addArc(center: c, radius: ringR + 8,
+                               startAngle: .radians(ang - 0.6), endAngle: .radians(ang + 0.6),
+                               clockwise: false)
+                    ctx.stroke(arc, with: .color(Theme.accent.opacity(o)),
+                               style: StrokeStyle(lineWidth: CGFloat(6 * o + 2), lineCap: .round))
+                }
+            }
 
             // enemies
             for e in game.enemies {
                 let d = dirs[e.dir]
                 let px = c.x + d.x * reach * e.dist
                 let py = c.y + d.y * reach * e.dist
-                let s: CGFloat = 20
-                let col = e.dist <= BrawlModel.strikeDist ? Theme.accent : Theme.ink.opacity(0.8)
-                ctx.fill(Path(roundedRect: CGRect(x: px - s / 2, y: py - s / 2, width: s, height: s),
-                              cornerRadius: 4), with: .color(col))
+                let inRing = e.dist <= BrawlModel.strikeDist
+                let s: CGFloat = inRing ? 24 : 20
+                let col = inRing ? Theme.accent : Theme.ink.opacity(0.78)
+                let r = CGRect(x: px - s / 2, y: py - s / 2, width: s, height: s)
+                ctx.fill(Path(roundedRect: r, cornerRadius: 5, style: .continuous), with: .color(col))
+                if inRing {
+                    ctx.stroke(Path(roundedRect: r.insetBy(dx: -3, dy: -3), cornerRadius: 7),
+                               with: .color(Theme.accent.opacity(0.3)), lineWidth: 2)
+                }
             }
 
-            // player
-            let ps: CGFloat = 34
-            ctx.fill(Path(roundedRect: CGRect(x: c.x - ps / 2, y: c.y - ps / 2, width: ps, height: ps),
-                          cornerRadius: 8), with: .color(Theme.accent))
+            // player — soft glow + a slow idle bob
+            let bob = CGFloat(sin(Double(game.elapsed) * 2.2)) * 2
+            let ps: CGFloat = 36
+            let prect = CGRect(x: c.x - ps / 2, y: c.y - ps / 2 + bob, width: ps, height: ps)
+            ctx.fill(Path(ellipseIn: prect.insetBy(dx: -8, dy: -8)),
+                     with: .color(Theme.accent.opacity(0.18)))
+            ctx.fill(Path(roundedRect: prect, cornerRadius: 9, style: .continuous),
+                     with: .color(Theme.accent))
         }
     }
 
@@ -150,10 +187,10 @@ final class BrawlModel {
     private(set) var enemies: [Enemy] = []
     private(set) var score = 0
     private(set) var lives = 3
+    private(set) var elapsed: CGFloat = 0
 
     private var spawnCountdown: CGFloat = 1.1
-    private var speed: CGFloat = 0.14   // fraction of a lane per second
-    private var elapsed: CGFloat = 0
+    private var speed: CGFloat = 0.14
 
     func tap() {
         switch phase {
@@ -166,7 +203,6 @@ final class BrawlModel {
         }
     }
 
-    /// Attack in `dir`. Returns true if it connected.
     @discardableResult
     func strike(_ dir: Int) -> Bool {
         guard phase == .running else { return false }
@@ -183,7 +219,7 @@ final class BrawlModel {
         guard phase == .running else { return }
         let dt = min(rawDt, 1.0 / 30.0)
         elapsed += dt
-        speed = 0.14 + elapsed * 0.006          // ramps up over time
+        speed = 0.14 + elapsed * 0.006
 
         for i in enemies.indices { enemies[i].dist -= speed * dt }
 

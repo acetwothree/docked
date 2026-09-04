@@ -22,6 +22,7 @@ struct TVKnob: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { pressed = false }
         } label: {
             ZStack {
+                // The dial — this is the part that tilts on press.
                 ZStack {
                     Circle()
                         .fill(RadialGradient(colors: [palette.hi, palette.mid, palette.deep],
@@ -30,18 +31,26 @@ struct TVKnob: View {
                         .overlay(Circle().strokeBorder(palette.key.opacity(0.6), lineWidth: 1))
                     Capsule()
                         .fill(palette.key)
-                        .frame(width: 2.5, height: 8)
-                        .offset(y: -9)
+                        .frame(width: 2.5, height: 7)
+                        .offset(y: -10)
                 }
                 .rotationEffect(.degrees(pressed ? 20 : 0))
                 .animation(.spring(response: 0.32, dampingFraction: 0.5), value: pressed)
                 .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
 
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .black))
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.55), radius: 1.5, y: 0.5)
-                    .shadow(color: .black.opacity(0.35), radius: 0.5)
+                // Fixed centre label — a small dark chip so the glyph always
+                // has the same contrast on every wood theme, and it stays dead
+                // centre while the dial tilts underneath.
+                ZStack {
+                    Circle()
+                        .fill(Color.black.opacity(0.5))
+                        .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+                        .frame(width: 20, height: 20)
+                    Image(systemName: icon)
+                        .font(.system(size: 11.5, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.35), radius: 0.5)
+                }
             }
             .frame(width: LayoutSolver.knobDiameter, height: LayoutSolver.knobDiameter)
             .contentShape(Circle())

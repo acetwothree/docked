@@ -14,6 +14,7 @@ import Foundation
 
 struct DoodlePadView: View {
     @Environment(DoodleStore.self) private var store
+    @Environment(AppModel.self) private var app
 
     @State private var currentPoints: [CGPoint] = []
     @State private var colorHex = "F2B950"
@@ -39,6 +40,7 @@ struct DoodlePadView: View {
 
                 toolbar
             }
+            .sensoryFeedback(.impact(weight: .light, intensity: 0.5), trigger: strokeCount) { _, _ in app.haptics }
             .onAppear { refreshExport() }
             .onChange(of: strokeCount) { _, _ in refreshExport() }
         }

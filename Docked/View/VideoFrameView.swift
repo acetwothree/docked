@@ -107,15 +107,18 @@ struct VideoFrameView: View {
         if showBadge {
             let badge = "DOCKED · FREE iOS APP"
             let bx = gx + 22
-            // engraved look: a light highlight above, a darker cut below
-            ctx.draw(Text(badge)
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundColor(palette.hi.opacity(0.5)),
-                     at: CGPoint(x: bx, y: consoleRect.midY + 1.2), anchor: .leading)
-            ctx.draw(Text(badge)
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundColor(palette.key.opacity(0.82)),
-                     at: CGPoint(x: bx, y: consoleRect.midY - 0.3), anchor: .leading)
+            let cy = consoleRect.midY
+            let font = Font.system(size: 10, weight: .black, design: .rounded)
+            // A light halo in every direction first (carries it on the dark
+            // woods), then the dark cut on top (carries it on the pale woods) —
+            // so the text always has an edge whatever the console tone is.
+            let halo = Text(badge).font(font).foregroundColor(palette.hi.opacity(0.85))
+            for off in [CGSize(width: -0.8, height: -0.8), CGSize(width: 0.8, height: -0.8),
+                        CGSize(width: -0.8, height: 0.8), CGSize(width: 0.8, height: 0.8)] {
+                ctx.draw(halo, at: CGPoint(x: bx + off.width, y: cy + off.height), anchor: .leading)
+            }
+            ctx.draw(Text(badge).font(font).foregroundColor(palette.deep.opacity(0.95)),
+                     at: CGPoint(x: bx, y: cy), anchor: .leading)
         }
 
         // --- knob wells ---

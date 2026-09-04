@@ -2,10 +2,10 @@
 //  RunnerGameView.swift
 //  Docked
 //
-//  Renders `RunnerModel`. A 60 Hz `Timer` publisher drives the simulation from
-//  `onReceive`; writing the tick date into `@State lastTick` re-evaluates
-//  `body` each frame so the `Canvas` redraws. Swipe left/right to switch lane,
-//  swipe up or tap to hop.
+//  Renders `RunnerModel`. A 60 Hz `Timer` publisher drives the sim; writing
+//  the tick date into `@State lastTick` re-evaluates `body` each frame so the
+//  `Canvas` redraws. Swipe left/right = change lane, swipe up = jump the
+//  ground blocks, swipe down = slide under the overhead bars, tap = jump.
 //
 
 import SwiftUI
@@ -17,6 +17,8 @@ struct RunnerGameView: View {
 
     @State private var game = RunnerModel()
     @State private var lastTick = Date()
+    @State private var jumpTick = 0
+    @State private var slideTick = 0
     @State private var deathTick = 0
 
     private let ticker = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
@@ -29,17 +31,17 @@ struct RunnerGameView: View {
                 messageOverlay
             }
             .contentShape(Rectangle())
-            .onTapGesture { game.tap() }
+            .onTapGesture { game.jump(); jumpTick += 1 }
             .gesture(
-                DragGesture(minimumDistance: 18)
+                DragGesture(minimumDistance: 16)
                     .onEnded { v in
                         let dx = v.translation.width, dy = v.translation.height
                         if abs(dx) > abs(dy) {
                             if dx > 0 { game.moveRight() } else { game.moveLeft() }
                         } else if dy < 0 {
-                            game.jump()
+                            game.jump(); jumpTick += 1
                         } else {
-                            game.tap()
+                            game.slideDown(); slideTick += 1
                         }
                     }
             )
@@ -60,6 +62,9 @@ struct RunnerGameView: View {
             if phase != .active { game.pauseIfRunning() }
         }
         .onDisappear { game.pauseIfRunning() }
+        .sensoryFeedback(.impact(weight: .light), trigger: jumpTick) { _, _ in app.haptics && game.phase == .running }
+        .sensoryFeedback(.impact(flexibility: .soft), trigger: slideTick) { _, _ in app.haptics && game.phase == .running }
+        .sensoryFeedback(.impact(weight: .light, intensity: 0.4), trigger: game.dodgeTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: deathTick) { _, _ in app.haptics }
     }
 
@@ -71,33 +76,54 @@ struct RunnerGameView: View {
             let laneW = cs.width / CGFloat(game.lanes)
             func laneX(_ l: Int) -> CGFloat { laneW * (CGFloat(l) + 0.5) }
 
-            // lane dividers
             for l in 1..<game.lanes {
                 var p = Path()
                 p.move(to: CGPoint(x: laneW * CGFloat(l), y: 0))
                 p.addLine(to: CGPoint(x: laneW * CGFloat(l), y: cs.height))
-                ctx.stroke(p, with: .color(Theme.ink.opacity(0.12)),
+                ctx.stroke(p, with: .color(Theme.ink.opacity(0.10)),
                            style: StrokeStyle(lineWidth: 2, dash: [8, 10]))
             }
 
-            // obstacles
             for o in game.obstacles {
-                let w = laneW * 0.62
-                let h: CGFloat = o.kind == .low ? 26 : 46
-                let rect = CGRect(x: laneX(o.lane) - w / 2, y: o.y - h / 2, width: w, height: h)
-                let col = o.kind == .low ? Theme.ink.opacity(0.45) : Theme.ink.opacity(0.82)
-                ctx.fill(Path(roundedRect: rect, cornerRadius: 6, style: .continuous), with: .color(col))
+                let x = laneX(o.lane)
+                let w = laneW * 0.6
+                switch o.kind {
+                case .ground:
+                    // block on the floor — JUMP (accent, glyph ↑)
+                    let h: CGFloat = 40
+                    let rect = CGRect(x: x - w / 2, y: o.y - h / 2, width: w, height: h)
+                    ctx.fill(Path(roundedRect: rect, cornerRadius: 7, style: .continuous),
+                             with: .color(Theme.accent))
+                    ctx.draw(Text("↑").font(.system(size: 15, weight: .black))
+                                .foregroundColor(Color(red: 0.11, green: 0.08, blue: 0.02)),
+                             at: CGPoint(x: x, y: o.y))
+                case .overhead:
+                    // bar hanging from the top of the lane — SLIDE (ink, glyph ↓)
+                    let h: CGFloat = 42
+                    let rect = CGRect(x: x - w / 2, y: o.y - h, width: w, height: h)
+                    ctx.fill(Path(roundedRect: rect, cornerRadius: 7, style: .continuous),
+                             with: .color(Theme.ink.opacity(0.82)))
+                    ctx.draw(Text("↓").font(.system(size: 15, weight: .black))
+                                .foregroundColor(.white),
+                             at: CGPoint(x: x, y: o.y - h / 2))
+                }
             }
 
             // player
-            let ps: CGFloat = laneW * 0.5
-            let py = cs.height - 88 - game.hop * 46
-            let pr = CGRect(x: laneX(game.lane) - ps / 2, y: py - ps / 2, width: ps, height: ps)
-            ctx.fill(Path(roundedRect: pr, cornerRadius: 8, style: .continuous), with: .color(Theme.accent))
-            // shadow under the player scales down while hopping
-            let sh = ps * (0.9 - game.hop * 0.4)
-            ctx.fill(Path(ellipseIn: CGRect(x: laneX(game.lane) - sh / 2, y: cs.height - 70, width: sh, height: sh * 0.28)),
-                     with: .color(.black.opacity(0.18 - game.hop * 0.1)))
+            let base = cs.height - 90
+            let px = laneX(game.lane)
+            let sliding = game.slide > 0.4
+            let pw: CGFloat = sliding ? laneW * 0.62 : laneW * 0.46
+            let phh: CGFloat = sliding ? 22 : 50
+            let py = base - game.hop * 52
+            let pr = CGRect(x: px - pw / 2, y: py - phh + (sliding ? phh * 0.5 : 0),
+                            width: pw, height: phh)
+            ctx.fill(Path(roundedRect: pr, cornerRadius: 8, style: .continuous),
+                     with: .color(Theme.accent))
+            let sh = pw * (0.95 - game.hop * 0.4)
+            ctx.fill(Path(ellipseIn: CGRect(x: px - sh / 2, y: cs.height - 70,
+                                            width: sh, height: sh * 0.26)),
+                     with: .color(.black.opacity(0.16 - game.hop * 0.09)))
         }
     }
 
@@ -120,7 +146,7 @@ struct RunnerGameView: View {
     @ViewBuilder private var messageOverlay: some View {
         switch game.phase {
         case .ready:
-            prompt("Tap to run", "Swipe to switch lane · swipe up to hop")
+            prompt("Tap to run", "⬆︎ jump the blocks · ⬇︎ slide under the bars · ⬅︎➡︎ switch lane")
         case .paused:
             prompt("Paused", "Tap to resume")
         case .gameOver:

@@ -181,17 +181,27 @@ struct BlackjackView: View {
     }
 
     private func cardView(_ rank: Int, faceDown: Bool) -> some View {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(faceDown ? AnyShapeStyle(Theme.accent.opacity(0.5)) : AnyShapeStyle(Theme.paper))
-            .overlay {
-                if !faceDown {
+        ZStack {
+            // back
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Theme.accent.opacity(0.5))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Theme.hairline))
+                .opacity(faceDown ? 1 : 0)
+            // front (pre-flipped so it reads right when the card is rotated 180°)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Theme.paper)
+                .overlay {
                     Text(rankLabel(rank))
                         .font(.system(size: 20, weight: .black, design: .rounded))
                         .foregroundStyle(Color.primary)
                 }
-            }
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Theme.hairline))
-            .frame(width: 44, height: 62)
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Theme.hairline))
+                .opacity(faceDown ? 0 : 1)
+                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+        }
+        .frame(width: 44, height: 62)
+        .rotation3DEffect(.degrees(faceDown ? 0 : 180), axis: (x: 0, y: 1, z: 0))
+        .animation(.easeInOut(duration: 0.5), value: faceDown)
     }
 
     private func rankLabel(_ r: Int) -> String {
@@ -258,12 +268,12 @@ struct BlackjackView: View {
             { dealer.append(draw()) },
         ]
         for (i, stepFn) in steps.enumerated() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16 * Double(i)) {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) { stepFn() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3 * Double(i)) {
+                withAnimation(.spring(response: 0.36, dampingFraction: 0.72)) { stepFn() }
                 dealTick += 1
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16 * 4 + 0.1) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3 * 4 + 0.15) {
             if total(player) == 21 {
                 phase = .done
                 settleTick += 1

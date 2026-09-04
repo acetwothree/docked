@@ -63,6 +63,8 @@ struct KineticSandView: View {
             .padding(14)
         }
         .sensoryFeedback(.impact(flexibility: .soft), trigger: smoothCount) { _, _ in app.haptics }
+        .sensoryFeedback(.impact(weight: .light, intensity: 0.4), trigger: current.count) { _, _ in app.haptics && !current.isEmpty }
+        .sensoryFeedback(.impact(weight: .light), trigger: strokes.count) { _, _ in app.haptics }
     }
 
     private func smoothOver() {

@@ -36,6 +36,8 @@ final class FlowModel {
     private(set) var paths: [Int: [FlowCell]] = [:]
     /// bumps whenever a level is completed (a haptic trigger)
     private(set) var completions = 0
+    /// bumps whenever a single pipe links its two endpoints (a haptic trigger)
+    private(set) var connectEvents = 0
 
     /// Cells covered so far / total — the level completes only at 100%.
     var cellCount: Int { size * size }
@@ -194,7 +196,7 @@ final class FlowModel {
         // keep a path only if it links the two endpoints
         guard let path = paths[color], let (a, b) = endpoints[color] else { paths[color] = nil; return }
         let linked = (path.first == a && path.last == b) || (path.first == b && path.last == a)
-        if !linked { paths[color] = nil }
+        if linked { connectEvents += 1 } else { paths[color] = nil }
         checkComplete()
     }
 

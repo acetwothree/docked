@@ -30,6 +30,7 @@ struct ScratchGameView: View {
     @State private var winFlash = false
     @State private var flyPrize: Int? = nil
     @State private var displayCoins = 0
+    @State private var tossTick = 0
 
     private let colsN = 21
     private let rowsN = 10
@@ -143,6 +144,7 @@ struct ScratchGameView: View {
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sensoryFeedback(.success, trigger: winFlash) { _, now in now && app.haptics }
+        .sensoryFeedback(.impact(weight: .rigid), trigger: tossTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(weight: .light), trigger: scratched.count) { _, _ in app.haptics && !revealed }
         .onAppear {
             displayCoins = app.coins
@@ -236,15 +238,24 @@ struct ScratchGameView: View {
                 awaitingBuy = true
             }
         } else {
-            // toss the losing ticket
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                withAnimation(.easeIn(duration: 0.22)) {
-                    cardScale = 0.55
-                    cardRot = 16
-                    cardOffset = CGSize(width: 60, height: 70)
-                    cardOpacity = 0
+            // Losing ticket: hold the "No match" result long enough to read,
+            // then a legible two-stage toss — a small crumple, then it spins
+            // away off the bottom.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+                tossTick += 1
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    cardScale = 0.82
+                    cardRot = -6
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+                    withAnimation(.easeIn(duration: 0.42)) {
+                        cardScale = 0.4
+                        cardRot = 26
+                        cardOffset = CGSize(width: 70, height: 130)
+                        cardOpacity = 0
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.62) {
                     app.checkChipRefill()
                     awaitingBuy = true
                 }
