@@ -60,7 +60,7 @@ struct RunnerGameView: View {
             if phase != .active { game.pauseIfRunning() }
         }
         .onDisappear { game.pauseIfRunning() }
-        .sensoryFeedback(.impact(weight: .rigid), trigger: deathTick) { _, _ in app.haptics }
+        .sensoryFeedback(.impact(flexibility: .rigid), trigger: deathTick) { _, _ in app.haptics }
     }
 
     // MARK: world
