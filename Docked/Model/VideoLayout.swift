@@ -30,7 +30,7 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
 
 enum ActivityModule: String, CaseIterable, Identifiable {
     case doodle, notes
-    case game, zen, flow, merge, drop, marble, brawl
+    case game, zen, flow, merge, drop, marble, brawl, panels, fling, spot, poker
     case pop, click, ksand
     case scratch, blackjack
     case tictactoe, connect4, dots
@@ -39,7 +39,8 @@ enum ActivityModule: String, CaseIterable, Identifiable {
     var category: ActivityCategory {
         switch self {
         case .doodle, .notes: .create
-        case .game, .zen, .flow, .merge, .drop, .marble, .brawl: .play
+        case .game, .zen, .flow, .merge, .drop, .marble, .brawl,
+             .panels, .fling, .spot, .poker: .play
         case .pop, .click, .ksand: .fidget
         case .scratch, .blackjack: .gamble
         case .tictactoe, .connect4, .dots: .versus
@@ -57,6 +58,10 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .drop: "Merge"
         case .marble: "Roll"
         case .brawl: "Brawl"
+        case .panels: "Panels"
+        case .fling: "Fling"
+        case .spot: "Spot"
+        case .poker: "Draw Poker"
         case .pop: "Pop"
         case .click: "Clicker"
         case .ksand: "Kinetic Sand"
@@ -78,6 +83,10 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .drop: "circle.grid.2x2.fill"
         case .marble: "circle.fill"
         case .brawl: "burst.fill"
+        case .panels: "square.grid.3x3.fill"
+        case .fling: "arrow.up.forward"
+        case .spot: "eye.fill"
+        case .poker: "suit.spade.fill"
         case .pop: "circle.hexagongrid.fill"
         case .click: "hand.tap.fill"
         case .ksand: "hand.draw.fill"
@@ -97,7 +106,8 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .doodle, .notes, .zen, .drop, .marble, .pop, .click,
              .scratch, .blackjack, .tictactoe:
             return false
-        case .game, .flow, .merge, .brawl, .ksand, .connect4, .dots:
+        case .game, .flow, .merge, .brawl, .panels, .fling, .spot, .poker,
+             .ksand, .connect4, .dots:
             return true
         }
     }
@@ -115,6 +125,10 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .drop: "Drop blocks into columns; equal ones merge."
         case .marble: "Slide a marble to paint every tile of the maze."
         case .brawl: "Swipe to fend off enemies from all four sides."
+        case .panels: "Rotate tiles to line up three — before the bombs go off."
+        case .fling: "Charge, launch, and steer through the air for coins."
+        case .spot: "Find the one creature that matches, against the clock."
+        case .poker: "Five-card draw video poker — hold, draw, get paid."
         case .pop: "A sheet of endless bubble wrap."
         case .click: "A tally clicker with a satisfying tick."
         case .scratch: "Scratch-off cards — match three to win chips."

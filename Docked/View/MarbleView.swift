@@ -168,6 +168,31 @@ struct MarbleView: View {
             stack.append((nx, ny))
         }
 
+        // Braid: at higher levels, punch out some walls so the layout isn't all
+        // straight corridors — this leaves loops and scattered single-square
+        // obstacles. The grid stays fully connected, so it's still clearable.
+        let braid = min(0.45, 0.06 * Double(lvl))
+        let ortho = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        func openAt(_ x: Int, _ y: Int) -> Bool {
+            x >= 0 && x < mw && y >= 0 && y < mh && isOpen[idx(x, y)]
+        }
+        func wouldMake2x2(_ x: Int, _ y: Int) -> Bool {
+            for (ox, oy) in [(0, 0), (-1, 0), (0, -1), (-1, -1)] {
+                let cells = [(x + ox, y + oy), (x + ox + 1, y + oy),
+                             (x + ox, y + oy + 1), (x + ox + 1, y + oy + 1)]
+                if cells.allSatisfy({ (cx, cy) in (cx == x && cy == y) || openAt(cx, cy) }) { return true }
+            }
+            return false
+        }
+        for y in 1..<(mh - 1) {
+            for x in 1..<(mw - 1) where !isOpen[idx(x, y)] {
+                guard Double.random(in: 0..<1) < braid else { continue }
+                let openNbrs = ortho.filter { openAt(x + $0.0, y + $0.1) }.count
+                guard openNbrs >= 2, !wouldMake2x2(x, y) else { continue }
+                isOpen[idx(x, y)] = true
+            }
+        }
+
         cols = mw
         rows = mh
         var w = Set<Int>(); var o = Set<Int>()
