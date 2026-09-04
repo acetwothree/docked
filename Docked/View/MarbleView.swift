@@ -142,12 +142,39 @@ struct MarbleView: View {
 
     private func load(_ n: Int) {
         let lvl = max(1, n)
-        // maze cells per axis grow with the level; *2+1 makes the pixel grid odd.
         let cx = min(3, 2 + lvl / 8)
         let cy = min(3, 2 + lvl / 12)
         let mw = cx * 2 + 1
         let mh = cy * 2 + 1
+        let maxBraid = min(0.45, 0.06 * Double(lvl))
 
+        var chosen: [Bool] = []
+        // Regenerate until every open tile can be reached AND painted by
+        // sliding. Later attempts braid less, so a plain (always-solvable)
+        // maze is the guaranteed fallback.
+        for attempt in 0..<22 {
+            let braid = attempt < 20 ? maxBraid * (1 - Double(attempt) / 20) : 0
+            let grid = Self.generate(mw: mw, mh: mh, braid: braid)
+            if Self.paintableBySliding(grid, mw: mw, mh: mh) {
+                chosen = grid
+                break
+            }
+            chosen = grid   // keep last as a fallback
+        }
+
+        cols = mw
+        rows = mh
+        var w = Set<Int>(); var o = Set<Int>()
+        for i in 0..<(mw * mh) { if chosen[i] { o.insert(i) } else { w.insert(i) } }
+        walls = w
+        openCells = o
+        pos = 0
+        visited = [0]
+        cleared = false
+    }
+
+    /// Recursive-backtracker carve from (0,0), then optional braiding.
+    private static func generate(mw: Int, mh: Int, braid: Double) -> [Bool] {
         var isOpen = [Bool](repeating: false, count: mw * mh)
         func idx(_ x: Int, _ y: Int) -> Int { y * mw + x }
 
@@ -163,44 +190,74 @@ struct MarbleView: View {
             }
             if options.isEmpty { stack.removeLast(); continue }
             let (nx, ny) = options.randomElement()!
-            isOpen[idx((x + nx) / 2, (y + ny) / 2)] = true   // knock the wall between
+            isOpen[idx((x + nx) / 2, (y + ny) / 2)] = true
             isOpen[idx(nx, ny)] = true
             stack.append((nx, ny))
         }
 
-        // Braid: at higher levels, punch out some walls so the layout isn't all
-        // straight corridors — this leaves loops and scattered single-square
-        // obstacles. The grid stays fully connected, so it's still clearable.
-        let braid = min(0.45, 0.06 * Double(lvl))
-        let ortho = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-        func openAt(_ x: Int, _ y: Int) -> Bool {
-            x >= 0 && x < mw && y >= 0 && y < mh && isOpen[idx(x, y)]
-        }
-        func wouldMake2x2(_ x: Int, _ y: Int) -> Bool {
-            for (ox, oy) in [(0, 0), (-1, 0), (0, -1), (-1, -1)] {
-                let cells = [(x + ox, y + oy), (x + ox + 1, y + oy),
-                             (x + ox, y + oy + 1), (x + ox + 1, y + oy + 1)]
-                if cells.allSatisfy({ (cx, cy) in (cx == x && cy == y) || openAt(cx, cy) }) { return true }
+        if braid > 0 {
+            let ortho = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+            func openAt(_ x: Int, _ y: Int) -> Bool {
+                x >= 0 && x < mw && y >= 0 && y < mh && isOpen[idx(x, y)]
             }
-            return false
-        }
-        for y in 1..<(mh - 1) {
-            for x in 1..<(mw - 1) where !isOpen[idx(x, y)] {
-                guard Double.random(in: 0..<1) < braid else { continue }
-                let openNbrs = ortho.filter { openAt(x + $0.0, y + $0.1) }.count
-                guard openNbrs >= 2, !wouldMake2x2(x, y) else { continue }
-                isOpen[idx(x, y)] = true
+            func wouldMake2x2(_ x: Int, _ y: Int) -> Bool {
+                for (ox, oy) in [(0, 0), (-1, 0), (0, -1), (-1, -1)] {
+                    let cells = [(x + ox, y + oy), (x + ox + 1, y + oy),
+                                 (x + ox, y + oy + 1), (x + ox + 1, y + oy + 1)]
+                    if cells.allSatisfy({ (a, b) in (a == x && b == y) || openAt(a, b) }) { return true }
+                }
+                return false
             }
+            for y in 1..<(mh - 1) {
+                for x in 1..<(mw - 1) where !isOpen[idx(x, y)] {
+                    guard Double.random(in: 0..<1) < braid else { continue }
+                    let openNbrs = ortho.filter { openAt(x + $0.0, y + $0.1) }.count
+                    guard openNbrs >= 2, !wouldMake2x2(x, y) else { continue }
+                    isOpen[idx(x, y)] = true
+                }
+            }
+        }
+        return isOpen
+    }
+
+    /// True if, sliding from cell 0, every open cell is either a place the
+    /// marble can come to rest or a cell some slide passes over — i.e. every
+    /// tile is paintable.
+    private static func paintableBySliding(_ isOpen: [Bool], mw: Int, mh: Int) -> Bool {
+        func idx(_ x: Int, _ y: Int) -> Int { y * mw + x }
+        let dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+
+        func slide(_ from: Int, _ dx: Int, _ dy: Int) -> (dest: Int, path: [Int]) {
+            var x = from % mw, y = from / mw
+            var path: [Int] = []
+            while true {
+                let nx = x + dx, ny = y + dy
+                if nx < 0 || nx >= mw || ny < 0 || ny >= mh || !isOpen[idx(nx, ny)] { break }
+                x = nx; y = ny
+                path.append(idx(x, y))
+            }
+            return (idx(x, y), path)
         }
 
-        cols = mw
-        rows = mh
-        var w = Set<Int>(); var o = Set<Int>()
-        for i in 0..<(mw * mh) { if isOpen[i] { o.insert(i) } else { w.insert(i) } }
-        walls = w
-        openCells = o
-        pos = 0
-        visited = [0]
-        cleared = false
+        guard isOpen[0] else { return false }
+        var rest: Set<Int> = [0]
+        var queue = [0]
+        var covered: Set<Int> = [0]
+        var qi = 0
+        while qi < queue.count {
+            let cur = queue[qi]; qi += 1
+            for (dx, dy) in dirs {
+                let (dest, path) = slide(cur, dx, dy)
+                for p in path { covered.insert(p) }
+                if dest != cur, !rest.contains(dest) {
+                    rest.insert(dest)
+                    queue.append(dest)
+                }
+            }
+        }
+        for i in 0..<(mw * mh) where isOpen[i] {
+            if !covered.contains(i) { return false }
+        }
+        return true
     }
 }
