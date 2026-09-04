@@ -21,6 +21,7 @@ struct MergeView: View {
     @State private var over = false
     @State private var moveTick = 0
     @State private var mergeTick = 0
+    @State private var tripleTick = 0
     @State private var pulse: CGFloat = 1
     @State private var restored = false
 
@@ -67,6 +68,7 @@ struct MergeView: View {
         )
         .sensoryFeedback(.impact(weight: .light), trigger: moveTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(weight: .medium), trigger: mergeTick) { _, _ in app.haptics }
+        .sensoryFeedback(.success, trigger: tripleTick) { _, _ in app.haptics }
         .onAppear {
             guard !restored else { return }
             restored = true
@@ -171,6 +173,7 @@ struct MergeView: View {
         guard !over else { return }
         var changed = false
         var didMerge = false
+        var didTriple = false
 
         for i in 0..<4 {
             let idxs = lineIndices(i, dir)
@@ -180,7 +183,15 @@ struct MergeView: View {
             var out: [Int] = []
             var j = 0
             while j < vals.count {
-                if j + 1 < vals.count && vals[j] == vals[j + 1] {
+                if j + 2 < vals.count && vals[j] == vals[j + 1] && vals[j] == vals[j + 2] {
+                    // three in a row collapse into one, as if two merges landed
+                    let merged = vals[j] * 4
+                    out.append(merged)
+                    score += merged
+                    didMerge = true
+                    didTriple = true
+                    j += 3
+                } else if j + 1 < vals.count && vals[j] == vals[j + 1] {
                     let merged = vals[j] * 2
                     out.append(merged)
                     score += merged
@@ -203,19 +214,20 @@ struct MergeView: View {
             spawn()
             moveTick += 1
             if didMerge { mergeTick += 1 }
+            if didTriple { tripleTick += 1 }
             best = max(best, score)
             if !anyMoveLeft() { over = true }
-            if didMerge { pop() }
+            if didMerge { pop(big: didTriple) }
             persist()
         }
     }
 
-    /// A tiny, non-directional squeeze when tiles merge — acknowledges the
-    /// move without the board lurching around.
-    private func pop() {
-        withAnimation(.easeOut(duration: 0.07)) { pulse = 0.97 }
+    /// A tiny, non-directional squeeze when tiles merge — a bigger one for a
+    /// triple collapse — without the board lurching around.
+    private func pop(big: Bool = false) {
+        withAnimation(.easeOut(duration: 0.07)) { pulse = big ? 0.92 : 0.97 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.07) {
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.6)) { pulse = 1 }
+            withAnimation(.spring(response: big ? 0.4 : 0.34, dampingFraction: big ? 0.5 : 0.6)) { pulse = 1 }
         }
     }
 

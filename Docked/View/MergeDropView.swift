@@ -29,6 +29,7 @@ struct MergeDropView: View {
     @State private var dropTick = 0
     @State private var mergeTick = 0
     @State private var bigMergeTick = 0
+    @State private var tripleTick = 0
     /// Whole-board squeeze when a merge resolves.
     @State private var pulse: CGFloat = 1
 
@@ -124,6 +125,7 @@ struct MergeDropView: View {
         .sensoryFeedback(.impact(weight: .light), trigger: dropTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: mergeTick) { _, _ in app.haptics }
         .sensoryFeedback(.success, trigger: bigMergeTick) { _, _ in app.haptics }
+        .sensoryFeedback(.impact(flexibility: .rigid, intensity: 1.0), trigger: tripleTick) { _, _ in app.haptics }
         .onAppear {
             guard !restored else { return }
             restored = true
@@ -241,6 +243,36 @@ struct MergeDropView: View {
         var again = true
         while again {
             again = false
+
+            // TRIPLES first: three equal in a line collapse into one tier two
+            // higher (as if two merges landed at once).
+            // vertical triples
+            for c in 0..<cols {
+                for r in 0..<(rows - 2) {
+                    let a = r * cols + c, b = (r + 1) * cols + c, d = (r + 2) * cols + c
+                    if grid[a] != 0 && grid[a] == grid[b] && grid[a] == grid[d] {
+                        grid[d] += 2
+                        grid[a] = 0; grid[b] = 0
+                        score += 1 << grid[d]
+                        mergeTick += 1; tripleTick += 1
+                        again = true
+                    }
+                }
+            }
+            // horizontal triples
+            for r in 0..<rows {
+                for c in 0..<(cols - 2) {
+                    let a = r * cols + c, b = r * cols + c + 1, d = r * cols + c + 2
+                    if grid[a] != 0 && grid[a] == grid[b] && grid[a] == grid[d] {
+                        grid[d] += 2
+                        grid[a] = 0; grid[b] = 0
+                        score += 1 << grid[d]
+                        mergeTick += 1; tripleTick += 1
+                        again = true
+                    }
+                }
+            }
+
             // vertical merges (a block falling onto its equal below)
             for c in 0..<cols {
                 for r in stride(from: rows - 1, through: 1, by: -1) {
