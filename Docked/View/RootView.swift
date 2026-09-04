@@ -21,6 +21,8 @@ struct RootView: View {
     @State private var showOnboarding = false
     @State private var showPicker = false
     @State private var showPlus = false
+    /// Set just before opening the paywall so it can name what the user tapped.
+    @State private var plusContext: String? = nil
     @State private var hintDim = false
     @State private var stretchStart: CGFloat? = nil
     @State private var stretching = false
@@ -61,11 +63,13 @@ struct RootView: View {
                     .frame(width: s.video.width, height: s.video.height)
                     .position(x: s.video.midX, y: s.video.midY)
 
+                // drag anywhere along the bottom bar of the TV to stretch the
+                // screen — drawn BEFORE the knobs so the knob buttons stay on
+                // top and keep taking taps
+                stretchHandle(s)
+
                 // real knob buttons, dropped onto the drawn wells
                 consoleKnobs(s)
-
-                // the speaker grille doubles as the "stretch screen" control
-                stretchHandle(s)
 
                 if app.debugOverlay {
                     DebugOverlay(solved: s)
@@ -76,10 +80,11 @@ struct RootView: View {
                         solved: s,
                         current: app.module,
                         favorites: app.favorites,
-                        hasPlus: store.hasPlus,
+                        hasPlus: store.entitled,
                         themeTint: app.tvTheme.palette.mid,
                         onPick: { picked in
-                            if picked.isPlus && !store.hasPlus {
+                            if picked.isPlus && !store.entitled {
+                                plusContext = "\(picked.title) — \(picked.blurb)"
                                 showPicker = false
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) { showPlus = true }
                             } else {
@@ -115,14 +120,14 @@ struct RootView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView(onShowPlus: {
                 showSettings = false
+                plusContext = nil
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showPlus = true }
             })
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showPlus) {
-            PlusSheet()
-                .presentationDetents([.medium, .large])
+        .sheet(isPresented: $showPlus, onDismiss: { plusContext = nil }) {
+            PlusSheet(context: plusContext)
                 .presentationDragIndicator(.visible)
         }
         .task {
@@ -152,26 +157,28 @@ struct RootView: View {
             #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    /// The speaker grille on the bottom-left of the console is the screen-fit
-    /// control: drag it up or down to stretch the TV so the border wraps
-    /// whatever video is playing. It's always on screen, so there's no
-    /// separate grabber to find. Onboarding + Settings ▸ How to use explain it.
+    /// The whole bottom bar of the TV cabinet is the screen-fit control: press
+    /// and drag anywhere along it — the wood strip, the speaker grille, between
+    /// and around the knobs — up or down to stretch the screen so the border
+    /// wraps whatever video is playing. The knob buttons are drawn on top and
+    /// still take taps; a drag that starts off a knob grabs the bar.
+    /// Onboarding + Settings ▸ How to use explain it.
     private func stretchHandle(_ s: SolvedLayout) -> some View {
-        let zoneW: CGFloat = 84
-        let cx = s.console.minX + 8 + zoneW / 2
-        return ZStack {
-            // A faint up/down cue sitting just right of the drawn grille bars,
-            // so the grille reads as a control without adding clutter.
+        // A little taller than the console so the very bottom edge is grabbable.
+        let zoneH = s.console.height + 14
+        return ZStack(alignment: .bottomLeading) {
+            Color.clear
             Image(systemName: "arrow.up.and.down")
                 .font(.system(size: 11, weight: .black))
-                .foregroundStyle(app.tvTheme.palette.hi.opacity(stretching ? 0.9 : 0.4))
-                .offset(x: 30)
+                .foregroundStyle(app.tvTheme.palette.hi.opacity(stretching ? 0.95 : 0.42))
+                .padding(.leading, 12)
+                .padding(.bottom, 9)
         }
-        .frame(width: zoneW, height: s.console.height)
+        .frame(width: s.console.width, height: zoneH)
         .contentShape(Rectangle())
-        .position(x: cx, y: s.console.midY)
+        .position(x: s.console.midX, y: s.console.midY + 4)
         .gesture(
-            DragGesture(minimumDistance: 1)
+            DragGesture(minimumDistance: 6)
                 .onChanged { v in
                     if stretchStart == nil {
                         stretchStart = app.tvStretch
@@ -186,7 +193,7 @@ struct RootView: View {
                     withAnimation(.easeOut(duration: 0.2)) { stretching = false }
                 }
         )
-        .accessibilityLabel("Stretch TV screen to fit your video")
+        .accessibilityLabel("Drag to stretch the TV screen to fit your video")
     }
 
     /// The three console knobs, positioned over the wells drawn by VideoFrameView.
@@ -202,16 +209,18 @@ struct RootView: View {
                 .position(centers[0])
 
                 TVKnob(icon: "paintpalette.fill", palette: pal) {
-                    if store.hasPlus {
+                    if store.entitled {
                         withAnimation(.easeInOut(duration: 0.25)) { app.tvTheme = app.tvTheme.next }
                     } else {
-                        endEditing(); showPlus = true
+                        endEditing()
+                        plusContext = "This knob switches the TV between colour themes."
+                        showPlus = true
                     }
                 }
                 .position(centers[1])
 
                 TVKnob(icon: "sparkles", palette: pal) {
-                    endEditing(); showPlus = true
+                    endEditing(); plusContext = nil; showPlus = true
                 }
                 .position(centers[2])
             }
@@ -233,18 +242,14 @@ struct RootView: View {
         switch app.module {
         case .doodle:    DoodlePadView()
         case .notes:     NotesView()
-        case .mindmap:   MindMapView()
         case .game:      RunnerGameView()
         case .flow:      FlowView()
-        case .idle:      IdleGameView()
-        case .sand:      SandSortView()
         case .merge:     MergeView()
         case .drop:      MergeDropView()
         case .marble:    MarbleView()
         case .pop:       PopView()
         case .click:     ClickPenView()
         case .scratch:   ScratchGameView()
-        case .spinner:   SpinnerView()
         case .ksand:     KineticSandView()
         case .tictactoe: TicTacToeView()
         case .connect4:  ConnectFourView()

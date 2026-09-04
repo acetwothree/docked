@@ -9,6 +9,7 @@
 import SwiftUI
 
 struct MergeView: View {
+    @Environment(AppModel.self) private var app
     @AppStorage("docked.merge.best") private var best: Int = 0
 
     @State private var grid: [Int] = Array(repeating: 0, count: 16)
@@ -59,8 +60,8 @@ struct MergeView: View {
                     else { move(dy > 0 ? .down : .up) }
                 }
         )
-        .sensoryFeedback(.impact(weight: .light), trigger: moveTick)
-        .sensoryFeedback(.impact(weight: .medium), trigger: mergeTick)
+        .sensoryFeedback(.impact(weight: .light), trigger: moveTick) { _, _ in app.haptics }
+        .sensoryFeedback(.impact(weight: .medium), trigger: mergeTick) { _, _ in app.haptics }
         .onAppear { if grid.allSatisfy({ $0 == 0 }) { newGame() } }
     }
 

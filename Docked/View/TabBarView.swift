@@ -45,13 +45,12 @@ struct TabBarView: View {
 
 // MARK: - Activity picker panel
 
-/// A not-yet-built activity, shown greyed with a "SOON" tag so the roadmap
+/// A not-yet-available activity, shown greyed with a "SOON" tag so the roadmap
 /// is visible inside the picker.
 private struct ComingSoon: Identifiable {
     let id = UUID()
     let title: String
     let systemImage: String
-    let category: ActivityCategory
 }
 
 /// Categorised activity picker. Rendered as an overlay sized to the module
@@ -69,10 +68,20 @@ struct ActivityPickerPanel: View {
 
     private let cols = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
-    private let soon: [ComingSoon] = []
+    private let soon: [ComingSoon] = [
+        ComingSoon(title: "Mind Map", systemImage: "brain"),
+        ComingSoon(title: "Garden Idle", systemImage: "leaf.fill"),
+        ComingSoon(title: "Spinner", systemImage: "fan.fill"),
+        ComingSoon(title: "Sand Sort", systemImage: "chart.bar.fill"),
+    ]
 
     var body: some View {
-        ZStack {
+        // Start higher than the module area — it's fine for the panel to cover
+        // the bottom lip of the TV cabinet, it just makes the list taller.
+        let top = solved.console.midY
+        let bottom = solved.tab.minY - 8
+        let h = max(220, bottom - top)
+        return ZStack {
             Color.black.opacity(0.5)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
@@ -80,8 +89,8 @@ struct ActivityPickerPanel: View {
                 .transition(.opacity)
 
             panel
-                .frame(width: solved.content.width, height: solved.content.height)
-                .position(x: solved.content.midX, y: solved.content.midY)
+                .frame(width: solved.tab.width - 16, height: h)
+                .position(x: solved.tab.midX, y: top + h / 2)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
@@ -114,7 +123,9 @@ struct ActivityPickerPanel: View {
                     if !favMods.isEmpty {
                         favSection
                     }
-                    ForEach(ActivityCategory.allCases) { section($0) }
+                    ForEach(ActivityCategory.allCases) { freeSection($0) }
+                    premiumSection
+                    comingSoonSection
                     Color.clear.frame(height: 12)
                 }
                 .padding(.horizontal, 16)
@@ -154,19 +165,45 @@ struct ActivityPickerPanel: View {
         }
     }
 
+    /// One category's free activities. Premium ones live in `premiumSection`.
     @ViewBuilder
-    private func section(_ cat: ActivityCategory) -> some View {
-        let mods = ActivityModule.allCases.filter { $0.category == cat }
-        let placeholders = soon.filter { $0.category == cat }
+    private func freeSection(_ cat: ActivityCategory) -> some View {
+        let mods = ActivityModule.allCases.filter { $0.category == cat && !$0.isPlus }
+        if !mods.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(cat.rawValue.uppercased())
+                    .font(.system(size: 11, weight: .heavy)).tracking(1)
+                    .foregroundStyle(.secondary)
+                LazyVGrid(columns: cols, spacing: 10) {
+                    ForEach(mods) { liveCard($0) }
+                }
+            }
+        }
+    }
 
-        VStack(alignment: .leading, spacing: 8) {
-            Text(cat.rawValue.uppercased())
+    private var premiumSection: some View {
+        let mods = ActivityModule.allCases.filter { $0.isPlus }
+        let heading = hasPlus ? "PREMIUM" : "PREMIUM · DOCKED PLUS"
+        return VStack(alignment: .leading, spacing: 8) {
+            Label(heading, systemImage: "sparkles")
                 .font(.system(size: 11, weight: .heavy)).tracking(1)
-                .foregroundStyle(.secondary)
-
+                .foregroundStyle(Theme.accent)
             LazyVGrid(columns: cols, spacing: 10) {
                 ForEach(mods) { liveCard($0) }
-                ForEach(placeholders) { soonCard($0) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var comingSoonSection: some View {
+        if !soon.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("COMING SOON")
+                    .font(.system(size: 11, weight: .heavy)).tracking(1)
+                    .foregroundStyle(.secondary)
+                LazyVGrid(columns: cols, spacing: 10) {
+                    ForEach(soon) { soonCard($0) }
+                }
             }
         }
     }

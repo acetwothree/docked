@@ -62,7 +62,7 @@ struct FlowView: View {
                     }
             )
         }
-        .sensoryFeedback(.success, trigger: model.completions)
+        .sensoryFeedback(.success, trigger: model.completions) { _, _ in app.haptics }
         .onAppear {
             if !didResume { model.resume(at: app.flowLevel); didResume = true }
         }

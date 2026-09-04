@@ -24,6 +24,12 @@ struct SettingsView: View {
         self.onShowPlus = onShowPlus
     }
 
+    private var plusSubtitle: String {
+        if store.hasPlus { return "Subscription active — thank you!" }
+        if store.devUnlock { return "Developer unlock on" }
+        return "Free app · optional premium activities"
+    }
+
     var body: some View {
         @Bindable var app = app
 
@@ -39,9 +45,7 @@ struct SettingsView: View {
                                 .frame(width: 22)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Docked Plus").font(.system(size: 15, weight: .semibold))
-                                Text(store.hasPlus
-                                     ? "Subscription active — thank you!"
-                                     : "Free app · optional premium activities")
+                                Text(plusSubtitle)
                                     .font(.system(size: 11)).foregroundStyle(.secondary)
                             }
                             Spacer(minLength: 8)
@@ -105,6 +109,12 @@ struct SettingsView: View {
                             }
                             divider
                             VStack(spacing: 0) {
+                                row(icon: "lock.open.fill", "Unlock Plus (testing)") {
+                                    Toggle("", isOn: Binding(
+                                        get: { store.devUnlock },
+                                        set: { store.devUnlock = $0 })).labelsHidden()
+                                }
+                                divider
                                 row(icon: "tv", "Etched badge on the TV") {
                                     Toggle("", isOn: $app.tvBadge).labelsHidden()
                                 }

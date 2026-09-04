@@ -2,11 +2,12 @@
 //  PlusSheet.swift
 //  Docked
 //
-//  The paid tier. Docked is free with no ads; "Docked Plus" is a small
-//  auto-renewing monthly subscription that unlocks every activity and the TV
-//  colour themes. This sheet is the paywall — it must show the price, the
-//  term, and links to the Privacy Policy and Terms of Use (Apple rejects
-//  subscription paywalls that don't).
+//  The paywall. Docked is free with no ads; "Docked Plus" is a small
+//  auto-renewing monthly subscription that unlocks the premium activities and
+//  the TV colour themes. Must show the price, the term, and links to the
+//  Privacy Policy and Terms of Use (Apple rejects subscription paywalls that
+//  don't). Scrolls, with the action buttons pinned so "Maybe later" is always
+//  reachable.
 //
 
 import SwiftUI
@@ -16,85 +17,116 @@ struct PlusSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(StoreManager.self) private var store
 
+    /// Optional line naming exactly what the user just tapped, e.g.
+    /// "The colour-theme knob is part of Docked Plus."
+    var context: String? = nil
+
     // TODO: before submitting, host a real privacy policy and put its URL here.
     private let privacyURL = URL(string: "https://acetwothree.github.io/docked/privacy")!
     // Apple's standard EULA — acceptable unless you ship your own terms.
     private let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 32, weight: .semibold))
-                .foregroundStyle(Theme.accent)
-                .padding(.top, 18)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 14) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .padding(.top, 18)
 
-            Text(store.hasPlus ? "You have Docked Plus" : "Docked Plus")
-                .font(.system(size: 19, weight: .heavy))
+                    Text(store.entitled ? "You have Docked Plus" : "Docked Plus")
+                        .font(.system(size: 19, weight: .heavy))
+                        .multilineTextAlignment(.center)
 
-            Text("No ads, no tracking. Plus unlocks every activity and the TV colour themes — and backs a solo developer.")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 8)
+                    if let context, !store.entitled {
+                        Text(context)
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 10).padding(.vertical, 7)
+                            .frame(maxWidth: .infinity)
+                            .background(Theme.accent.opacity(0.12),
+                                       in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
 
-            VStack(spacing: 0) {
-                perk("gamecontroller.fill", "Every activity", "All games, fidgets and 2-player boards — no locks")
-                divider
-                perk("paintpalette.fill", "TV colour themes", "Switch the cabinet between every colourway")
-                divider
-                perk("checkmark.seal.fill", "Core app stays free", "Doodle, notes and the starter set never lock")
-            }
-            .background(Theme.paper, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.hairline))
+                    Text("No ads, no tracking. Plus unlocks the premium activities and the TV colour themes — and backs a solo developer.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
 
-            Spacer(minLength: 0)
+                    VStack(spacing: 0) {
+                        perk("gamecontroller.fill", "Premium activities",
+                             "Flow, Merge, Roll, Scratcher, Kinetic Sand, Connect 4 and Dots & Boxes")
+                        divider
+                        perk("paintpalette.fill", "TV colour themes",
+                             "Switch the cabinet between every colourway")
+                    }
+                    .background(Theme.paper, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.hairline))
 
-            if store.hasPlus {
-                Label("Subscription active", systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 15, weight: .heavy))
-                    .foregroundStyle(Theme.accent)
-                Text("Manage or cancel any time in Settings ▸ Apple Account ▸ Subscriptions.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-            } else {
-                buyButton
-
-                Button {
-                    Task { await store.restore() }
-                } label: {
-                    if store.restoring {
-                        ProgressView()
-                    } else {
-                        Text("Restore Purchases").font(.system(size: 13, weight: .semibold))
+                    if !store.entitled {
+                        Text(fineprint)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 4)
                     }
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(Theme.accent)
-                .disabled(store.restoring)
-
-                Text(fineprint)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 4)
-
-                HStack(spacing: 6) {
-                    Link("Privacy Policy", destination: privacyURL)
-                    Text("·").foregroundStyle(.tertiary)
-                    Link("Terms of Use", destination: termsURL)
-                }
-                .font(.system(size: 10, weight: .semibold))
+                .padding(.horizontal, 22)
+                .padding(.bottom, 12)
             }
 
-            Button(store.hasPlus ? "Done" : "Maybe later") { dismiss() }
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .padding(.bottom, 12)
+            // Pinned footer — always visible without scrolling.
+            VStack(spacing: 10) {
+                Divider()
+                if store.entitled {
+                    let activeLabel = store.hasPlus ? "Subscription active" : "Developer unlock active"
+                    Label(activeLabel, systemImage: "checkmark.circle.fill")
+                        .font(.system(size: 15, weight: .heavy))
+                        .foregroundStyle(Theme.accent)
+                    if store.hasPlus {
+                        Text("Manage or cancel in Settings ▸ Apple Account ▸ Subscriptions.")
+                            .font(.system(size: 11)).foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                    }
+                } else {
+                    buyButton
+                    Button {
+                        Task { await store.restore() }
+                    } label: {
+                        if store.restoring {
+                            ProgressView()
+                        } else {
+                            Text("Restore Purchases").font(.system(size: 13, weight: .semibold))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Theme.accent)
+                    .disabled(store.restoring)
+
+                    HStack(spacing: 8) {
+                        Link("Privacy Policy", destination: privacyURL)
+                        Text("·").foregroundStyle(.tertiary)
+                        Link("Terms of Use", destination: termsURL)
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                }
+                Button(store.entitled ? "Done" : "Maybe later") { dismiss() }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 6)
+            .padding(.bottom, 14)
+            .background(.ultraThinMaterial)
         }
-        .padding(.horizontal, 22)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.backdrop)
+        .presentationDetents([.large])
         .alert(
             "Something went wrong",
             isPresented: Binding(
@@ -107,7 +139,7 @@ struct PlusSheet: View {
             Text(store.errorMessage ?? "")
         }
         .onChange(of: store.hasPlus) { _, nowPlus in
-            if nowPlus { dismiss() }
+            if nowPlus { dismiss() }   // real purchase completed — leave the sheet
         }
     }
 
@@ -145,7 +177,7 @@ struct PlusSheet: View {
     }
 
     private func perk(_ icon: String, _ title: String, _ detail: String) -> some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.accent)
@@ -153,6 +185,7 @@ struct PlusSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(size: 14, weight: .semibold))
                 Text(detail).font(.system(size: 11)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }

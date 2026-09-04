@@ -10,6 +10,7 @@ import SwiftUI
 
 struct PopView: View {
     @Environment(AppModel.self) private var app
+    @AppStorage("docked.pop.sound") private var soundOn = true
     @State private var popped: Set<Int> = []
     @State private var resetting = false
 
@@ -45,13 +46,27 @@ struct PopView: View {
                     .padding(.top, 6)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .sensoryFeedback(.impact(weight: .medium), trigger: popped.count)
+            .overlay(alignment: .topTrailing) {
+                Button {
+                    soundOn.toggle()
+                } label: {
+                    Image(systemName: soundOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 2)
+            }
+            .sensoryFeedback(.impact(weight: .medium), trigger: popped.count) { _, _ in app.haptics }
             .onChange(of: total) { _, _ in popped.removeAll() }
         }
     }
 
     private func pop(_ i: Int, total: Int) {
         guard !resetting, !popped.contains(i) else { return }
+        if soundOn { PopSound.shared.play() }
         withAnimation(.spring(response: 0.22, dampingFraction: 0.5)) {
             _ = popped.insert(i)
         }

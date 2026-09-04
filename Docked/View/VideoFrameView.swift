@@ -102,17 +102,19 @@ struct VideoFrameView: View {
             gx += 6
         }
 
-        // --- engraved badge on the console ---
+        // --- engraved badge on the console (shifted right of the grille so the
+        // drag cue near the bottom-left corner doesn't collide with it) ---
         if showBadge {
-            let badge = "DOCKED · FREE APP"
+            let badge = "DOCKED · FREE iOS APP"
+            let bx = gx + 22
             ctx.draw(Text(badge)
                         .font(.system(size: 9.5, weight: .black, design: .rounded))
                         .foregroundColor(palette.key.opacity(0.55)),
-                     at: CGPoint(x: gx + 12, y: consoleRect.midY + 0.5), anchor: .leading)
+                     at: CGPoint(x: bx, y: consoleRect.midY + 0.5), anchor: .leading)
             ctx.draw(Text(badge)
                         .font(.system(size: 9.5, weight: .black, design: .rounded))
                         .foregroundColor(palette.hi.opacity(0.32)),
-                     at: CGPoint(x: gx + 12, y: consoleRect.midY - 0.5), anchor: .leading)
+                     at: CGPoint(x: bx, y: consoleRect.midY - 0.5), anchor: .leading)
         }
 
         // --- knob wells ---

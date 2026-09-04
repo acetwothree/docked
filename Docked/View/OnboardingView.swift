@@ -87,7 +87,7 @@ struct OnboardingView: View {
 
     private var page4: some View {
         card(emoji: "🔊", title: "Make it fit your video") {
-            Text("Videos come in different shapes. **Drag the speaker grille** — the ribbed lines on the bottom-left of the TV — up or down to stretch the screen until the wood border hugs your video exactly. It's always right there whenever you need to adjust.")
+            Text("Videos come in different shapes. **Press and drag anywhere along the bottom bar of the TV** — the wood strip, the speaker grille, around the knobs — up or down to stretch the screen until the border hugs your video. The little ↕ by the bottom-left corner is the reminder.")
         }
     }
 

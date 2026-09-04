@@ -10,6 +10,7 @@
 import SwiftUI
 
 struct KineticSandView: View {
+    @Environment(AppModel.self) private var app
     @State private var strokes: [[CGPoint]] = []
     @State private var current: [CGPoint] = []
     /// 0 = grooves visible, 1 = fresh sand fully swept over the tray.
@@ -61,7 +62,7 @@ struct KineticSandView: View {
             .disabled(isSmooth)
             .padding(14)
         }
-        .sensoryFeedback(.impact(flexibility: .soft), trigger: smoothCount)
+        .sensoryFeedback(.impact(flexibility: .soft), trigger: smoothCount) { _, _ in app.haptics }
     }
 
     private func smoothOver() {

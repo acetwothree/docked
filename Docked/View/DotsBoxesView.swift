@@ -9,6 +9,7 @@
 import SwiftUI
 
 struct DotsBoxesView: View {
+    @Environment(AppModel.self) private var app
     private let n = 3                        // boxes per side (4 dots per side)
 
     @State private var hEdges: Set<Int> = [] // (n+1) rows × n : index r*n + c
@@ -51,8 +52,8 @@ struct DotsBoxesView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .sensoryFeedback(.impact(weight: .light), trigger: moveTick)
-        .sensoryFeedback(.success, trigger: boxTick)
+        .sensoryFeedback(.impact(weight: .light), trigger: moveTick) { _, _ in app.haptics }
+        .sensoryFeedback(.success, trigger: boxTick) { _, _ in app.haptics }
     }
 
     private var statusText: String {

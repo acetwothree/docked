@@ -10,6 +10,7 @@
 import SwiftUI
 
 struct MergeDropView: View {
+    @Environment(AppModel.self) private var app
     @AppStorage("docked.drop.best") private var best: Int = 0
 
     private let cols = 5
@@ -110,8 +111,8 @@ struct MergeDropView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .sensoryFeedback(.impact(weight: .light), trigger: dropTick)
-        .sensoryFeedback(.impact(weight: .medium), trigger: mergeTick)
+        .sensoryFeedback(.impact(weight: .light), trigger: dropTick) { _, _ in app.haptics }
+        .sensoryFeedback(.impact(weight: .medium), trigger: mergeTick) { _, _ in app.haptics }
         .onAppear { if grid.allSatisfy({ $0 == 0 }) { newGame() } }
     }
 

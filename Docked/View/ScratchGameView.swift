@@ -10,6 +10,7 @@
 import SwiftUI
 
 struct ScratchGameView: View {
+    @Environment(AppModel.self) private var app
     @AppStorage("docked.scratch.total") private var total: Int = 0
 
     // symbol index 0..<6, richer = higher
@@ -97,7 +98,7 @@ struct ScratchGameView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .sensoryFeedback(.success, trigger: revealed) { _, now in now }
+        .sensoryFeedback(.success, trigger: revealed) { _, now in now && app.haptics }
         .onAppear { if scratched.isEmpty && !revealed { deal() } }
     }
 

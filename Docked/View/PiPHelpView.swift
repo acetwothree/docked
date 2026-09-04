@@ -30,8 +30,8 @@ struct PiPHelpView: View {
             }
 
             Section("Fit the frame to your video") {
-                Text("The **speaker grille** — the ribbed vertical lines on the bottom-left of the TV console — is also the size control. **Drag it up or down** to stretch the screen taller or shorter until the wood border wraps your video with no black bars.")
-                Text("It stays in the same spot no matter what you're doing, so you can re-adjust any time you switch to a video with a different shape.")
+                Text("**Press and drag anywhere along the bottom bar of the TV** — the wood strip, the speaker grille, in between and around the knob buttons — **up or down** to stretch the screen taller or shorter until the wood border wraps your video with no black bars. The knobs still tap normally; a drag that starts off a knob grabs the bar.")
+                Text("The small ↕ near the bottom-left corner is just the reminder. The bar is always there, so you can re-adjust any time you switch to a video with a different shape.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

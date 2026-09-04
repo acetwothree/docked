@@ -52,8 +52,8 @@ struct ClickPenView: View {
             muteButton
                 .padding(14)
         }
-        .sensoryFeedback(.impact(flexibility: .rigid, intensity: 1.0), trigger: downHaptic)
-        .sensoryFeedback(.impact(weight: .light, intensity: 0.5), trigger: upHaptic)
+        .sensoryFeedback(.impact(flexibility: .rigid, intensity: 1.0), trigger: downHaptic) { _, _ in app.haptics }
+        .sensoryFeedback(.impact(weight: .light, intensity: 0.5), trigger: upHaptic) { _, _ in app.haptics }
     }
 
     private var muteButton: some View {

@@ -23,6 +23,15 @@ final class StoreManager {
     private(set) var plusProduct: Product?
     /// True while the user has an active, non-revoked Plus subscription.
     private(set) var hasPlus = false
+
+    /// Developer override (Settings ▸ Developer) so premium content can be
+    /// exercised in a TestFlight build without a sandbox purchase.
+    var devUnlock: Bool = UserDefaults.standard.bool(forKey: "docked.dev.plusUnlock") {
+        didSet { UserDefaults.standard.set(devUnlock, forKey: "docked.dev.plusUnlock") }
+    }
+
+    /// What content gating should check: a real subscription OR the dev override.
+    var entitled: Bool { hasPlus || devUnlock }
     /// Flips true once the first entitlement check has completed, so callers
     /// can tell "not Plus" from "haven't checked yet".
     private(set) var ready = false

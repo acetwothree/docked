@@ -10,6 +10,7 @@
 import SwiftUI
 
 struct MarbleView: View {
+    @Environment(AppModel.self) private var app
     @AppStorage("docked.marble.level") private var level: Int = 1
 
     @State private var cols = 4
@@ -52,15 +53,15 @@ struct MarbleView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .gesture(
-            DragGesture(minimumDistance: 20)
+            DragGesture(minimumDistance: 14)
                 .onEnded { v in
                     let dx = v.translation.width, dy = v.translation.height
                     if abs(dx) > abs(dy) { roll(dx > 0 ? 1 : -1, 0) }
                     else { roll(0, dy > 0 ? 1 : -1) }
                 }
         )
-        .sensoryFeedback(.impact(weight: .light), trigger: moveTick)
-        .sensoryFeedback(.success, trigger: winTick)
+        .sensoryFeedback(.impact(weight: .light), trigger: moveTick) { _, _ in app.haptics }
+        .sensoryFeedback(.success, trigger: winTick) { _, _ in app.haptics }
         .onAppear { if walls.isEmpty && visited.count <= 1 { load(level) } }
     }
 
@@ -132,16 +133,19 @@ struct MarbleView: View {
     }
 
     private func load(_ n: Int) {
-        // (cols, rows, start, wall indices) — every layout is a 1-wide
-        // serpentine corridor, so a full sweep is always possible. Mix of
-        // horizontal and vertical combs, growing in size.
+        // (cols, rows, start, wall indices). Walls are spaced single-cell
+        // "teeth" (dashed vertical lines), not solid bars — they scatter across
+        // the board but still shape a snake path, so painting every open tile
+        // stays possible. Each layout below is hand-verified solvable.
         let layouts: [(Int, Int, Int, [Int])] = [
-            (4, 4, 0, [4, 5, 6, 13, 14, 15]),
-            (5, 5, 0, [5, 6, 7, 8, 16, 17, 18, 19]),
+            (4, 4, 0, [1, 5, 9]),
+            (4, 5, 0, [1, 5, 9, 13]),
+            (5, 5, 0, [1, 6, 11, 16, 8, 13, 18, 23]),
+            (6, 5, 0, [1, 7, 13, 19, 9, 15, 21, 27]),
+            (6, 6, 0, [1, 7, 13, 19, 25, 9, 15, 21, 27, 33]),
+            (7, 5, 0, [1, 8, 15, 22, 10, 17, 24, 31, 5, 12, 19, 26]),
             (5, 6, 0, [1, 6, 11, 16, 21, 8, 13, 18, 23, 28]),
-            (6, 6, 0, [6, 7, 8, 9, 10, 19, 20, 21, 22, 23, 30, 31, 32, 33, 34]),
-            (7, 5, 0, [7, 8, 9, 10, 11, 12, 22, 23, 24, 25, 26, 27]),
-            (5, 7, 0, [1, 6, 11, 16, 21, 26, 8, 13, 18, 23, 28, 33]),
+            (7, 6, 0, [1, 8, 15, 22, 29, 10, 17, 24, 31, 38, 5, 12, 19, 26, 33]),
         ]
         let picked = layouts[(max(1, n) - 1) % layouts.count]
         cols = picked.0

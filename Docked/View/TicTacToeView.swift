@@ -50,8 +50,8 @@ struct TicTacToeView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .sensoryFeedback(.impact(weight: .light), trigger: moveTick)
-        .sensoryFeedback(.success, trigger: winTick)
+        .sensoryFeedback(.impact(weight: .light), trigger: moveTick) { _, _ in app.haptics }
+        .sensoryFeedback(.success, trigger: winTick) { _, _ in app.haptics }
     }
 
     private var header: some View {

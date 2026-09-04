@@ -9,6 +9,7 @@
 import SwiftUI
 
 struct ConnectFourView: View {
+    @Environment(AppModel.self) private var app
     private let cols = 7
     private let rows = 6
 
@@ -63,8 +64,8 @@ struct ConnectFourView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .sensoryFeedback(.impact(weight: .light), trigger: dropTick)
-        .sensoryFeedback(.success, trigger: winTick)
+        .sensoryFeedback(.impact(weight: .light), trigger: dropTick) { _, _ in app.haptics }
+        .sensoryFeedback(.success, trigger: winTick) { _, _ in app.haptics }
     }
 
     private var statusText: String {

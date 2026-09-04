@@ -30,10 +30,11 @@ struct ZenPuzzleView: View {
         var location: CGPoint
     }
 
-    private let dockH: CGFloat = 122
-
     var body: some View {
         GeometryReader { geo in
+            // Dock shrinks with the available height so a stretched TV never
+            // pushes the board off the bottom — it scales instead of clipping.
+            let dockH = min(120, max(76, geo.size.height * 0.30))
             let g = Self.geom(size: geo.size, dockH: dockH, dockAtTop: tabsAreHeader)
 
             ZStack(alignment: .topLeading) {
@@ -42,7 +43,7 @@ struct ZenPuzzleView: View {
 
                 clearFlash(g)
 
-                dockBar(g)
+                dockBar(g, dockH: dockH)
                     .frame(maxWidth: .infinity, maxHeight: .infinity,
                            alignment: tabsAreHeader ? .top : .bottom)
 
@@ -71,9 +72,9 @@ struct ZenPuzzleView: View {
             }
         }
         .onChange(of: model.highScore) { _, v in app.zenHighScore = v }
-        .sensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: model.placeEvents)
-        .sensoryFeedback(.success, trigger: model.clearEvents)
-        .sensoryFeedback(.error, trigger: model.phase) { _, phase in phase == .over }
+        .sensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: model.placeEvents) { _, _ in app.haptics }
+        .sensoryFeedback(.success, trigger: model.clearEvents) { _, _ in app.haptics }
+        .sensoryFeedback(.error, trigger: model.phase) { _, phase in app.haptics && phase == .over }
     }
 
     private struct ConfigKey: Equatable { var size: CGSize; var header: Bool }
@@ -101,10 +102,13 @@ struct ZenPuzzleView: View {
 
     // MARK: Dock
 
-    private func dockBar(_ g: ZenGeom) -> some View {
-        VStack(spacing: 10) {
+    private func dockBar(_ g: ZenGeom, dockH: CGFloat) -> some View {
+        let compact = dockH < 104
+        let slotH = min(58, dockH * 0.46)
+        let slotW = slotH * 1.72
+        return VStack(spacing: compact ? 5 : 10) {
             HStack(spacing: 6) {
-                Text("\(model.score)").font(.system(size: 20, weight: .black)).monospacedDigit()
+                Text("\(model.score)").font(.system(size: compact ? 17 : 20, weight: .black)).monospacedDigit()
                 Text("BEST \(max(model.highScore, model.score))")
                     .font(.system(size: 11, weight: .heavy)).monospacedDigit()
                     .foregroundStyle(.secondary)
@@ -115,22 +119,21 @@ struct ZenPuzzleView: View {
 
             HStack(spacing: 10) {
                 ForEach(0..<3, id: \.self) { i in
-                    dockSlot(i, g)
+                    dockSlot(i, g, slotW: slotW, slotH: slotH)
                     if i < 2 { Spacer(minLength: 0) }
                 }
             }
             .padding(.horizontal, 18)
         }
-        .padding(.top, tabsAreHeader ? 14 : 10)
-        .padding(.bottom, tabsAreHeader ? 10 : 14)
+        .padding(.top, tabsAreHeader ? (compact ? 8 : 14) : (compact ? 6 : 10))
+        .padding(.bottom, tabsAreHeader ? (compact ? 6 : 10) : (compact ? 8 : 14))
         .frame(height: dockH)
         .frame(maxWidth: .infinity)
         .background(Theme.elevated.opacity(0.92))
     }
 
-    private func dockSlot(_ i: Int, _ g: ZenGeom) -> some View {
-        let slotW: CGFloat = 104, slotH: CGFloat = 60
-        return ZStack {
+    private func dockSlot(_ i: Int, _ g: ZenGeom, slotW: CGFloat, slotH: CGFloat) -> some View {
+        ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Theme.paper)
                 .overlay {
@@ -169,7 +172,13 @@ struct ZenPuzzleView: View {
         DragGesture(minimumDistance: 0, coordinateSpace: .named("zen"))
             .onChanged { v in
                 guard model.phase == .play, let shape = model.dock[i] else { return }
-                drag = DragState(slot: i, shape: shape, location: v.location)
+                // Amplify the travel a touch so the piece keeps up with the
+                // thumb without a 1:1 slog.
+                let amp: CGFloat = 1.12
+                let loc = CGPoint(
+                    x: v.startLocation.x + (v.location.x - v.startLocation.x) * amp,
+                    y: v.startLocation.y + (v.location.y - v.startLocation.y) * amp)
+                drag = DragState(slot: i, shape: shape, location: loc)
             }
             .onEnded { _ in
                 guard let d = drag else { return }
@@ -198,7 +207,7 @@ struct ZenPuzzleView: View {
         }
         .frame(width: w, height: h)
         .opacity(ok ? 0.95 : 0.55)
-        .position(x: d.location.x, y: d.location.y - h / 2 - 18)
+        .position(x: d.location.x, y: d.location.y - h / 2 - 24)
         .allowsHitTesting(false)
     }
 
@@ -256,7 +265,7 @@ struct ZenPuzzleView: View {
         let w = CGFloat(shape.width) * (g.cell + g.gap) - g.gap
         let h = CGFloat(shape.height) * (g.cell + g.gap) - g.gap
         let topLeftX = location.x - w / 2
-        let topLeftY = location.y - h - 18
+        let topLeftY = location.y - h - 24
         let col = Int(((topLeftX - g.ox) / (g.cell + g.gap)).rounded())
         let row = Int(((topLeftY - g.oy) / (g.cell + g.gap)).rounded())
         return (row, col)
@@ -272,7 +281,9 @@ struct ZenPuzzleView: View {
         let gw = W - 12, gh = max(40, bot - top)
         let n: CGFloat = 6
         let gap: CGFloat = 5
-        let cell = min(max((min((gw - (n - 1) * gap) / n, (gh - (n - 1) * gap) / n)).rounded(.down), 38), 66)
+        // Floor low enough that the board always fits the space it's given
+        // (a stretched TV shrinks it rather than clipping the bottom row).
+        let cell = min(max((min((gw - (n - 1) * gap) / n, (gh - (n - 1) * gap) / n)).rounded(.down), 24), 66)
         let used = n * cell + (n - 1) * gap
         let ox = (W - used) / 2
         let oy = top + (gh - used) / 2
