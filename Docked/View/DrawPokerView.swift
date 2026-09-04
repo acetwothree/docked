@@ -100,7 +100,7 @@ struct DrawPokerView: View {
 
     // MARK: hands
 
-    private func hand(cards: [Int], faceUp: (Int) -> Bool, showHolds: Bool, label: String, rankText: String?) -> some View {
+    private func hand(cards: [Int], faceUp: @escaping (Int) -> Bool, showHolds: Bool, label: String, rankText: String?) -> some View {
         VStack(spacing: 3) {
             HStack(spacing: 5) {
                 Text(label).font(.system(size: 9, weight: .heavy)).tracking(1).foregroundStyle(.secondary)
