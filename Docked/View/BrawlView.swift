@@ -109,20 +109,15 @@ struct BrawlView: View {
                 }
             }
 
-            // enemies
+            // enemies — always the same look; no colour change near the ring
             for e in game.enemies {
                 let d = dirs[e.dir]
                 let px = c.x + d.x * reach * e.dist
                 let py = c.y + d.y * reach * e.dist
-                let inRing = e.dist <= BrawlModel.strikeDist
-                let s: CGFloat = inRing ? 24 : 20
-                let col = inRing ? Theme.accent : Theme.ink.opacity(0.78)
+                let s: CGFloat = 22
                 let r = CGRect(x: px - s / 2, y: py - s / 2, width: s, height: s)
-                ctx.fill(Path(roundedRect: r, cornerRadius: 5, style: .continuous), with: .color(col))
-                if inRing {
-                    ctx.stroke(Path(roundedRect: r.insetBy(dx: -3, dy: -3), cornerRadius: 7),
-                               with: .color(Theme.accent.opacity(0.3)), lineWidth: 2)
-                }
+                ctx.fill(Path(roundedRect: r, cornerRadius: 5, style: .continuous),
+                         with: .color(Theme.ink.opacity(0.8)))
             }
 
             // player — soft glow + a slow idle bob
@@ -199,18 +194,22 @@ final class BrawlModel {
         switch phase {
         case .ready, .over:
             enemies.removeAll(); score = 0; lives = 3
-            spawnCountdown = 0.9; speed = 0.14; elapsed = 0
+            spawnCountdown = 0.7; speed = 0.17; elapsed = 0
             phase = .running
         case .running:
             break
         }
     }
 
+    /// A little slack so an enemy whose edge is just touching the ring still
+    /// counts — roughly one enemy-radius past the ring line.
+    static let strikeSlack: CGFloat = 0.08
+
     @discardableResult
     func strike(_ dir: Int) -> Bool {
         guard phase == .running else { return false }
         let inRange = enemies.enumerated()
-            .filter { $0.element.dir == dir && $0.element.dist <= Self.strikeDist }
+            .filter { $0.element.dir == dir && $0.element.dist <= Self.strikeDist + Self.strikeSlack }
             .min(by: { $0.element.dist < $1.element.dist })
         guard let hit = inRange else { return false }
         enemies.remove(at: hit.offset)
@@ -222,7 +221,7 @@ final class BrawlModel {
         guard phase == .running else { return }
         let dt = min(rawDt, 1.0 / 30.0)
         elapsed += dt
-        speed = 0.12 + elapsed * 0.005
+        speed = 0.17 + elapsed * 0.005
 
         for i in enemies.indices { enemies[i].dist -= speed * dt }
 

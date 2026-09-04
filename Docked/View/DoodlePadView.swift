@@ -48,7 +48,7 @@ struct DoodlePadView: View {
 
     private var toolbar: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 5) {
+            HStack(spacing: 0) {
                 ForEach(palette, id: \.self) { hex in
                     Circle()
                         .fill(Color(hex: hex))
@@ -56,12 +56,13 @@ struct DoodlePadView: View {
                         .overlay {
                             Circle().strokeBorder(.white.opacity(!erasing && colorHex == hex ? 0.95 : 0.15), lineWidth: 2.5)
                         }
+                        .frame(maxWidth: .infinity)
                         .contentShape(Circle())
                         .onTapGesture { colorHex = hex; erasing = false }
                 }
             }
 
-            HStack(spacing: 5) {
+            HStack(spacing: 0) {
                 ForEach(Array(widths.enumerated()), id: \.offset) { pair in
                     let w = pair.element
                     let on = abs(lineWidth - w) < 0.5
@@ -69,49 +70,51 @@ struct DoodlePadView: View {
                         Circle()
                             .fill(erasing ? Color.secondary : Color(hex: colorHex))
                             .frame(width: min(w + 6, 24), height: min(w + 6, 24))
-                            .frame(width: 33, height: 34)
+                            .frame(width: 34, height: 34)
                             .background(on ? Color.primary.opacity(0.12) : Color.clear,
                                        in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .frame(maxWidth: .infinity)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
 
-                Button { erasing.toggle() } label: {
-                    Image(systemName: "eraser.fill")
-                        .frame(width: 33, height: 34)
-                        .foregroundStyle(erasing ? Theme.accent : Color.secondary)
-                        .background(erasing ? Theme.accent.opacity(0.15) : Color.clear,
-                                   in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                Spacer(minLength: 2)
+                toolButton("eraser.fill", tint: erasing ? Theme.accent : Color.secondary,
+                           bg: erasing ? Theme.accent.opacity(0.15) : .clear) { erasing.toggle() }
 
                 if let exportImage {
-                    ShareLink(item: exportImage,
-                              preview: SharePreview("Doodle", image: exportImage)) {
-                        Image(systemName: "square.and.arrow.up").frame(width: 34, height: 34).contentShape(Rectangle())
+                    ShareLink(item: exportImage, preview: SharePreview("Doodle", image: exportImage)) {
+                        Image(systemName: "square.and.arrow.up")
+                            .frame(width: 34, height: 34).frame(maxWidth: .infinity).contentShape(Rectangle())
                     }
                 } else {
                     Image(systemName: "square.and.arrow.up")
-                        .frame(width: 34, height: 34)
+                        .frame(width: 34, height: 34).frame(maxWidth: .infinity)
                         .foregroundStyle(.tertiary)
                 }
-                Button { store.undo() } label: {
-                    Image(systemName: "arrow.uturn.backward").frame(width: 34, height: 34).contentShape(Rectangle())
-                }
-                .disabled(store.strokes.isEmpty)
-                Button(role: .destructive) { store.clear() } label: {
-                    Image(systemName: "trash").frame(width: 34, height: 34).contentShape(Rectangle())
-                }
-                .disabled(store.strokes.isEmpty)
+
+                toolButton("arrow.uturn.backward") { store.undo() }
+                    .disabled(store.strokes.isEmpty)
+                toolButton("trash", tint: .red) { store.clear() }
+                    .disabled(store.strokes.isEmpty)
             }
             .font(.system(size: 15, weight: .semibold))
         }
-        .padding(.horizontal, 10).padding(.vertical, 8)
+        .padding(.horizontal, 12).padding(.vertical, 8)
         .background(.ultraThinMaterial)
+    }
+
+    private func toolButton(_ icon: String, tint: Color = .secondary, bg: Color = .clear,
+                            _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .foregroundStyle(tint)
+                .frame(width: 34, height: 34)
+                .background(bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func drawGesture(in size: CGSize) -> some Gesture {

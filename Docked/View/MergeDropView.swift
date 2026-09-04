@@ -175,7 +175,7 @@ struct MergeDropView: View {
             }
             .frame(width: cw - 4, height: ch - 4)
             .position(x: CGFloat(c) * cw + cw / 2, y: CGFloat(r) * ch + ch / 2)
-            .animation(.snappy(duration: 0.12), value: grid)
+            .animation(.easeInOut(duration: 0.2), value: grid)
     }
 
     private func color(_ v: Int) -> Color {
@@ -211,19 +211,15 @@ struct MergeDropView: View {
 
         let endY = CGFloat(landing) * ch + ch / 2
         falling = FallingPiece(col: col, val: val, y: ch / 2)
-        let dur = min(0.36, 0.08 + Double(max(1, landing)) * 0.035)
+        let dur = min(0.4, 0.12 + Double(max(1, landing)) * 0.04)
         withAnimation(.easeIn(duration: dur)) {
             falling?.y = endY
         } completion: {
             grid[landing * cols + col] = val
             falling = nil
             dropTick += 1
-            let mergesBefore = mergeTick
-            resolve()
-            best = max(best, score)
-            if topRowFull() { over = true }
-            if mergeTick > mergesBefore { squeeze() }
             persist()
+            resolveStep(origin: landing * cols + col)
         }
     }
 
@@ -239,80 +235,82 @@ struct MergeDropView: View {
         return true
     }
 
-    private func resolve() {
-        var again = true
-        while again {
-            again = false
+    // MARK: resolution — one visible step at a time
 
-            // TRIPLES first: three equal in a line collapse into one tier two
-            // higher (as if two merges landed at once).
-            // vertical triples
-            for c in 0..<cols {
-                for r in 0..<(rows - 2) {
-                    let a = r * cols + c, b = (r + 1) * cols + c, d = (r + 2) * cols + c
-                    if grid[a] != 0 && grid[a] == grid[b] && grid[a] == grid[d] {
-                        grid[d] += 2
-                        grid[a] = 0; grid[b] = 0
-                        score += 1 << grid[d]
-                        mergeTick += 1; tripleTick += 1
-                        again = true
-                    }
-                }
-            }
-            // horizontal triples
-            for r in 0..<rows {
-                for c in 0..<(cols - 2) {
-                    let a = r * cols + c, b = r * cols + c + 1, d = r * cols + c + 2
-                    if grid[a] != 0 && grid[a] == grid[b] && grid[a] == grid[d] {
-                        grid[d] += 2
-                        grid[a] = 0; grid[b] = 0
-                        score += 1 << grid[d]
-                        mergeTick += 1; tripleTick += 1
-                        again = true
-                    }
-                }
-            }
+    /// Do a single merge (any connected group of 2+ equal tiles collapses into
+    /// one), animate it, drop the board, then recurse for the cascade so the
+    /// player can see each stage.
+    private func resolveStep(origin: Int?) {
+        guard let group = firstMergeGroup() else {
+            best = max(best, score)
+            if topRowFull() { over = true }
+            persist()
+            return
+        }
+        let v = grid[group[0]]
+        let target: Int = {
+            if let o = origin, group.contains(o) { return o }
+            return group.sorted { a, b in
+                let ra = a / cols, rb = b / cols
+                if ra != rb { return ra > rb }        // lowest row wins
+                return (a % cols) > (b % cols)         // then right-most
+            }[0]
+        }()
+        let bump = group.count >= 3 ? 2 : 1
 
-            // vertical merges (a block falling onto its equal below)
-            for c in 0..<cols {
-                for r in stride(from: rows - 1, through: 1, by: -1) {
-                    let i = r * cols + c
-                    let up = (r - 1) * cols + c
-                    if grid[i] != 0 && grid[i] == grid[up] {
-                        grid[i] += 1
-                        grid[up] = 0
-                        score += 1 << grid[i]
-                        mergeTick += 1
-                        if grid[i] >= 6 { bigMergeTick += 1 }   // 64+ tier
-                        again = true
+        withAnimation(.easeInOut(duration: 0.18)) {
+            for i in group where i != target { grid[i] = 0 }
+            grid[target] = v + bump
+        }
+        score += (1 << grid[target])
+        mergeTick += 1
+        if bump == 2 { tripleTick += 1 }
+        if grid[target] >= 6 { bigMergeTick += 1 }
+        squeeze()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.19) {
+            withAnimation(.easeInOut(duration: 0.16)) { applyGravity() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                resolveStep(origin: nil)
+            }
+        }
+    }
+
+    /// Smallest-index cell of the first connected same-value group of size ≥ 2.
+    private func firstMergeGroup() -> [Int]? {
+        var seen = Set<Int>()
+        for start in 0..<(cols * rows) where grid[start] != 0 && !seen.contains(start) {
+            let v = grid[start]
+            var comp: [Int] = []
+            var q = [start]
+            seen.insert(start)
+            while let cur = q.popLast() {
+                comp.append(cur)
+                let r = cur / cols, c = cur % cols
+                for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                    let nr = r + dr, nc = c + dc
+                    guard nr >= 0, nr < rows, nc >= 0, nc < cols else { continue }
+                    let ni = nr * cols + nc
+                    if !seen.contains(ni) && grid[ni] == v {
+                        seen.insert(ni)
+                        q.append(ni)
                     }
                 }
             }
-            // horizontal merges (equal blocks sitting side by side) — the
-            // higher-index cell absorbs its left neighbour
-            for r in 0..<rows {
-                for c in 1..<cols {
-                    let i = r * cols + c
-                    let left = r * cols + (c - 1)
-                    if grid[i] != 0 && grid[i] == grid[left] {
-                        grid[i] += 1
-                        grid[left] = 0
-                        score += 1 << grid[i]
-                        mergeTick += 1
-                        if grid[i] >= 6 { bigMergeTick += 1 }
-                        again = true
-                    }
-                }
-            }
-            for c in 0..<cols {
-                var write = rows - 1
-                for r in stride(from: rows - 1, through: 0, by: -1) {
-                    let i = r * cols + c
-                    if grid[i] != 0 {
-                        let wi = write * cols + c
-                        if wi != i { grid[wi] = grid[i]; grid[i] = 0 }
-                        write -= 1
-                    }
+            if comp.count >= 2 { return comp }
+        }
+        return nil
+    }
+
+    private func applyGravity() {
+        for c in 0..<cols {
+            var write = rows - 1
+            for r in stride(from: rows - 1, through: 0, by: -1) {
+                let i = r * cols + c
+                if grid[i] != 0 {
+                    let wi = write * cols + c
+                    if wi != i { grid[wi] = grid[i]; grid[i] = 0 }
+                    write -= 1
                 }
             }
         }
