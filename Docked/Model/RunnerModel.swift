@@ -94,7 +94,7 @@ final class RunnerModel {
         if hopTime > 0 {
             hopTime -= dt
             let t = max(0, 1 - hopTime / hopDuration)   // 0 → 1 over the hop
-            hop = sin(t * .pi)                           // up then back down
+            hop = CGFloat(sin(Double(t) * Double.pi))    // up then back down
             if hopTime <= 0 { hop = 0; hopTime = 0 }
         }
 

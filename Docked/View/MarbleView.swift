@@ -18,7 +18,7 @@ struct MarbleView: View {
     @State private var cols = 5
     @State private var rows = 5
     @State private var walls: Set<Int> = []
-    @State private var open: Set<Int> = []
+    @State private var openCells: Set<Int> = []
     @State private var visited: Set<Int> = []
     @State private var pos = 0
     @State private var cleared = false
@@ -34,7 +34,7 @@ struct MarbleView: View {
                     .font(.system(size: 13, weight: .heavy)).tracking(1)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("\(visited.count)/\(open.count)")
+                Text("\(visited.count)/\(openCells.count)")
                     .font(.system(size: 11, weight: .heavy)).monospacedDigit()
                     .foregroundStyle(cleared ? Color.green : Color.secondary)
                 Spacer()
@@ -127,7 +127,7 @@ struct MarbleView: View {
         pos = r * cols + c
         moveTick += 1
         if hitWall { hitTick += 1 }
-        if visited.count >= open.count {
+        if visited.count >= openCells.count {
             cleared = true
             winTick += 1
             let next = level + 1
@@ -151,10 +151,11 @@ struct MarbleView: View {
         var isOpen = [Bool](repeating: false, count: mw * mh)
         func idx(_ x: Int, _ y: Int) -> Int { y * mw + x }
 
-        var stack = [(0, 0)]
+        var stack: [(Int, Int)] = [(0, 0)]
         isOpen[idx(0, 0)] = true
         let dirs = [(2, 0), (-2, 0), (0, 2), (0, -2)]
-        while let (x, y) = stack.last {
+        while let top = stack.last {
+            let (x, y) = top
             let options = dirs.compactMap { d -> (Int, Int)? in
                 let nx = x + d.0, ny = y + d.1
                 guard nx >= 0, nx < mw, ny >= 0, ny < mh, !isOpen[idx(nx, ny)] else { return nil }
@@ -169,10 +170,10 @@ struct MarbleView: View {
 
         cols = mw
         rows = mh
-        var w = Set<Int>(), o = Set<Int>()
+        var w = Set<Int>(); var o = Set<Int>()
         for i in 0..<(mw * mh) { if isOpen[i] { o.insert(i) } else { w.insert(i) } }
         walls = w
-        open = o
+        openCells = o
         pos = 0
         visited = [0]
         cleared = false

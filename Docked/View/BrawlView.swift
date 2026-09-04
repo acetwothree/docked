@@ -12,6 +12,7 @@ import Combine
 
 struct BrawlView: View {
     @Environment(AppModel.self) private var app
+    @AppStorage("docked.brawl.best") private var best = 0
 
     @State private var game = BrawlModel()
     @State private var lastTick = Date()
@@ -55,8 +56,6 @@ struct BrawlView: View {
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: hitTick) { _, _ in app.haptics }
         .sensoryFeedback(.error, trigger: hurtTick) { _, _ in app.haptics }
     }
-
-    @AppStorage("docked.brawl.best") private var best = 0
 
     private func canvas(size: CGSize, tick: Date) -> some View {
         _ = tick

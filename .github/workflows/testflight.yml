@@ -145,7 +145,8 @@ jobs:
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          set -euo pipefail
+          set -o pipefail
+          set +e
           xcodebuild clean archive \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
@@ -156,7 +157,17 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
-            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" 2>&1 | tee /tmp/build.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" != "0" ]; then
+            {
+              echo '### Build failed — Swift errors'
+              echo '```'
+              grep -E 'error:|warning: .*deprecated' /tmp/build.log | grep -v 'Node.js' | tail -n 60 || tail -n 60 /tmp/build.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit $rc
 
       - name: Upload archive artifact
         if: always()
