@@ -30,7 +30,7 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
 
 enum ActivityModule: String, CaseIterable, Identifiable {
     case doodle, notes
-    case game, zen, flow, merge, drop, marble
+    case game, zen, flow, merge, drop, marble, brawl
     case pop, click, ksand
     case scratch, blackjack
     case tictactoe, connect4, dots
@@ -39,7 +39,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
     var category: ActivityCategory {
         switch self {
         case .doodle, .notes: .create
-        case .game, .zen, .flow, .merge, .drop, .marble: .play
+        case .game, .zen, .flow, .merge, .drop, .marble, .brawl: .play
         case .pop, .click, .ksand: .fidget
         case .scratch, .blackjack: .gamble
         case .tictactoe, .connect4, .dots: .versus
@@ -56,6 +56,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .merge: "2048"
         case .drop: "Merge"
         case .marble: "Roll"
+        case .brawl: "Brawl"
         case .pop: "Pop"
         case .click: "Clicker"
         case .ksand: "Kinetic Sand"
@@ -76,6 +77,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .merge: "square.stack.3d.up.fill"
         case .drop: "circle.grid.2x2.fill"
         case .marble: "circle.fill"
+        case .brawl: "burst.fill"
         case .pop: "circle.hexagongrid.fill"
         case .click: "hand.tap.fill"
         case .ksand: "hand.draw.fill"
@@ -95,7 +97,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .doodle, .notes, .zen, .drop, .marble, .pop, .click,
              .scratch, .blackjack, .tictactoe:
             return false
-        case .game, .flow, .merge, .ksand, .connect4, .dots:
+        case .game, .flow, .merge, .brawl, .ksand, .connect4, .dots:
             return true
         }
     }
@@ -111,7 +113,8 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .flow: "Connect the matching dots without crossing."
         case .merge: "Slide-to-merge number tiles (2048)."
         case .drop: "Drop blocks into columns; equal ones merge."
-        case .marble: "Slide a marble through a maze to the goal."
+        case .marble: "Slide a marble to paint every tile of the maze."
+        case .brawl: "Swipe to fend off enemies from all four sides."
         case .pop: "A sheet of endless bubble wrap."
         case .click: "A tally clicker with a satisfying tick."
         case .scratch: "Scratch-off cards — match three to win chips."

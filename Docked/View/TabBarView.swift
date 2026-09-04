@@ -45,14 +45,6 @@ struct TabBarView: View {
 
 // MARK: - Activity picker panel
 
-/// A not-yet-available activity, shown greyed with a "SOON" tag so the roadmap
-/// is visible inside the picker.
-private struct ComingSoon: Identifiable {
-    let id = UUID()
-    let title: String
-    let systemImage: String
-}
-
 /// Categorised activity picker. Rendered as an overlay sized to the module
 /// area (never under the video or the tab bar), and closed by a tap outside,
 /// a tap on the grab handle, or one swipe toward the tab-bar edge.
@@ -61,19 +53,14 @@ struct ActivityPickerPanel: View {
     var current: ActivityModule
     var favorites: [ActivityModule]
     var hasPlus: Bool
+    var chips: Int
+    var chipRefillAt: Date?
     var themeTint: Color
     var onPick: (ActivityModule) -> Void
     var onToggleFav: (ActivityModule) -> Void
     var onClose: () -> Void
 
     private let cols = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
-
-    private let soon: [ComingSoon] = [
-        ComingSoon(title: "Mind Map", systemImage: "brain"),
-        ComingSoon(title: "Garden Idle", systemImage: "leaf.fill"),
-        ComingSoon(title: "Spinner", systemImage: "fan.fill"),
-        ComingSoon(title: "Sand Sort", systemImage: "chart.bar.fill"),
-    ]
 
     var body: some View {
         // Start higher than the module area — it's fine for the panel to cover
@@ -125,7 +112,6 @@ struct ActivityPickerPanel: View {
                     }
                     ForEach(ActivityCategory.allCases) { freeSection($0) }
                     premiumSection
-                    comingSoonSection
                     Color.clear.frame(height: 12)
                 }
                 .padding(.horizontal, 16)
@@ -171,11 +157,35 @@ struct ActivityPickerPanel: View {
         let mods = ActivityModule.allCases.filter { $0.category == cat && !$0.isPlus }
         if !mods.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                Text(cat.rawValue.uppercased())
-                    .font(.system(size: 11, weight: .heavy)).tracking(1)
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Text(cat.rawValue.uppercased())
+                        .font(.system(size: 11, weight: .heavy)).tracking(1)
+                        .foregroundStyle(.secondary)
+                    if cat == .gamble {
+                        Spacer()
+                        gambleChips
+                    }
+                }
                 LazyVGrid(columns: cols, spacing: 10) {
                     ForEach(mods) { liveCard($0) }
+                }
+            }
+        }
+    }
+
+    /// Chip balance for the whole Gambling section, plus the refill countdown
+    /// when you've hit zero.
+    @ViewBuilder private var gambleChips: some View {
+        HStack(spacing: 6) {
+            Label("\(chips)", systemImage: "circle.fill")
+                .font(.system(size: 11, weight: .heavy)).monospacedDigit()
+                .foregroundStyle(Color(hex: "F5C518"))
+            if chips == 0, let at = chipRefillAt {
+                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                    let secs = max(0, Int(at.timeIntervalSince(ctx.date).rounded(.up)))
+                    Text("+50 in \(secs)s")
+                        .font(.system(size: 10, weight: .heavy)).monospacedDigit()
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -190,20 +200,6 @@ struct ActivityPickerPanel: View {
                 .foregroundStyle(Theme.accent)
             LazyVGrid(columns: cols, spacing: 10) {
                 ForEach(mods) { liveCard($0) }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var comingSoonSection: some View {
-        if !soon.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("COMING SOON")
-                    .font(.system(size: 11, weight: .heavy)).tracking(1)
-                    .foregroundStyle(.secondary)
-                LazyVGrid(columns: cols, spacing: 10) {
-                    ForEach(soon) { soonCard($0) }
-                }
             }
         }
     }
@@ -255,24 +251,4 @@ struct ActivityPickerPanel: View {
         }
     }
 
-    private func soonCard(_ item: ComingSoon) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: item.systemImage).font(.system(size: 21, weight: .semibold))
-            Text(item.title).font(.system(size: 12, weight: .bold))
-                .lineLimit(1).minimumScaleFactor(0.8)
-            Text("SOON")
-                .font(.system(size: 7.5, weight: .heavy)).tracking(1.5)
-                .padding(.horizontal, 5).padding(.vertical, 1.5)
-                .background(Color.secondary.opacity(0.25), in: Capsule())
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 84)
-        .background(Theme.paper.opacity(0.45), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Theme.hairline, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-        }
-        .foregroundStyle(.tertiary)
-        .accessibilityLabel("\(item.title), coming soon")
-    }
 }

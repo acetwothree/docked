@@ -53,10 +53,22 @@ final class ZenPuzzleModel {
     var highScore: Int
 
     private var pendingWipe = true
+    /// A board restored from disk (palette indices, 0 = empty), applied by
+    /// `configure` once the grid size is known and matches.
+    private var pendingRestore: [[Int]]? = nil
+
+    private static let boardKey = "docked.zen.board"
+    private static let scoreKey = "docked.zen.score"
 
     init(highScore: Int) {
         self.highScore = highScore
         dock = [Self.roll(), Self.roll(), Self.roll()]
+        if let data = UserDefaults.standard.data(forKey: Self.boardKey),
+           let grid = try? JSONDecoder().decode([[Int]].self, from: data),
+           !grid.isEmpty, grid.contains(where: { $0.contains { $0 != 0 } }) {
+            pendingRestore = grid
+            score = UserDefaults.standard.integer(forKey: Self.scoreKey)
+        }
     }
 
     // MARK: Layout — called by the view when the grid size / video hole changes
@@ -67,15 +79,48 @@ final class ZenPuzzleModel {
     }
 
     /// Set the grid dimensions; wipes the board when they change or a reset
-    /// is pending.
+    /// is pending — unless a saved board of the same size is waiting.
     func configure(cols: Int, rows: Int) {
         let dimsChanged = cols != self.cols || rows != self.rows
         self.cols = max(1, cols)
         self.rows = max(1, rows)
+
+        if let grid = pendingRestore, grid.count == self.rows,
+           grid.allSatisfy({ $0.count == self.cols }) {
+            board = grid.map { row in
+                row.map { $0 == 0 ? nil : Self.palettes[($0 - 1) % Self.palettes.count] }
+            }
+            pendingRestore = nil
+            pendingWipe = false
+            return
+        }
+        pendingRestore = nil
+
         if pendingWipe || dimsChanged {
             board = emptyBoard(cols: self.cols, rows: self.rows)
             pendingWipe = false
         }
+    }
+
+    // MARK: Persistence
+
+    private func paletteIndex(_ colors: [Color]) -> Int {
+        Self.palettes.firstIndex(of: colors) ?? 0
+    }
+
+    private func saveBoard() {
+        let grid = board.map { row in
+            row.map { $0 == nil ? 0 : paletteIndex($0!) + 1 }
+        }
+        if let data = try? JSONEncoder().encode(grid) {
+            UserDefaults.standard.set(data, forKey: Self.boardKey)
+        }
+        UserDefaults.standard.set(score, forKey: Self.scoreKey)
+    }
+
+    private func clearSaved() {
+        UserDefaults.standard.removeObject(forKey: Self.boardKey)
+        UserDefaults.standard.removeObject(forKey: Self.scoreKey)
     }
 
     // MARK: Run control
@@ -85,11 +130,13 @@ final class ZenPuzzleModel {
         phase = .play
         clearing.removeAll()
         pendingWipe = true
+        pendingRestore = nil
         dock = [Self.roll(), Self.roll(), Self.roll()]
         if cols > 0, rows > 0 {
             board = emptyBoard(cols: cols, rows: rows)
             pendingWipe = false
         }
+        clearSaved()
     }
 
     // MARK: Placement
@@ -122,6 +169,9 @@ final class ZenPuzzleModel {
         if !alive.isEmpty, !alive.contains(where: { self.fitsAnywhere($0) }) {
             phase = .over
             highScore = max(highScore, score)
+            clearSaved()
+        } else {
+            saveBoard()
         }
         return true
     }

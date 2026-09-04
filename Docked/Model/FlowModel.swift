@@ -56,30 +56,35 @@ final class FlowModel {
     // built from a hand-traced solution that tiles the grid, so the fill is
     // always reachable; the early ones are deliberately trivial.
     static let levels: [FlowLevel] = [
-        // 1 — 3×3. Three straight columns. Drag each colour top → bottom.
+        // 1 — 3×3. Three straight columns.
         FlowLevel(size: 3, pairs: [
             (0, FlowCell(r: 0, c: 0), FlowCell(r: 2, c: 0)),
             (1, FlowCell(r: 0, c: 1), FlowCell(r: 2, c: 1)),
             (2, FlowCell(r: 0, c: 2), FlowCell(r: 2, c: 2)),
         ]),
-        // 2 — 4×4. Snake the top two rows with red, then rows 2 and 3.
+        // 2 — 4×4. Four straight rows — fills the grid.
         FlowLevel(size: 4, pairs: [
             (0, FlowCell(r: 0, c: 0), FlowCell(r: 0, c: 3)),
-            (1, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 3)),
-            (2, FlowCell(r: 3, c: 0), FlowCell(r: 3, c: 3)),
+            (1, FlowCell(r: 1, c: 0), FlowCell(r: 1, c: 3)),
+            (2, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 3)),
+            (3, FlowCell(r: 3, c: 0), FlowCell(r: 3, c: 3)),
         ]),
-        // 3 — 5×5. Two hairpins + a straight middle row.
+        // 3 — 5×5. Five pairs spread across the grid.
         FlowLevel(size: 5, pairs: [
-            (0, FlowCell(r: 0, c: 0), FlowCell(r: 1, c: 0)),
-            (1, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 4)),
-            (2, FlowCell(r: 3, c: 0), FlowCell(r: 4, c: 0)),
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 0, c: 4)),
+            (1, FlowCell(r: 1, c: 0), FlowCell(r: 1, c: 4)),
+            (2, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 4)),
+            (3, FlowCell(r: 3, c: 0), FlowCell(r: 4, c: 2)),
+            (4, FlowCell(r: 4, c: 3), FlowCell(r: 3, c: 4)),
         ]),
-        // 4 — 6×6. Two 2-row combs on top, two on the bottom.
+        // 4 — 6×6. Five combs / hairpins.
         FlowLevel(size: 6, pairs: [
             (0, FlowCell(r: 0, c: 0), FlowCell(r: 0, c: 5)),
-            (1, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 5)),
-            (2, FlowCell(r: 4, c: 0), FlowCell(r: 5, c: 2)),
-            (3, FlowCell(r: 5, c: 3), FlowCell(r: 4, c: 5)),
+            (1, FlowCell(r: 1, c: 0), FlowCell(r: 1, c: 5)),
+            (2, FlowCell(r: 2, c: 0), FlowCell(r: 2, c: 5)),
+            (3, FlowCell(r: 3, c: 0), FlowCell(r: 3, c: 5)),
+            (4, FlowCell(r: 4, c: 0), FlowCell(r: 5, c: 2)),
+            (5, FlowCell(r: 5, c: 3), FlowCell(r: 4, c: 5)),
         ]),
         // 5 — 7×7.
         FlowLevel(size: 7, pairs: [
@@ -89,11 +94,13 @@ final class FlowModel {
             (3, FlowCell(r: 5, c: 0), FlowCell(r: 6, c: 3)),
             (4, FlowCell(r: 5, c: 3), FlowCell(r: 6, c: 6)),
         ]),
-        // 6 — 5×5, vertical thirds.
+        // 6 — 5×5, five vertical runs.
         FlowLevel(size: 5, pairs: [
-            (0, FlowCell(r: 0, c: 0), FlowCell(r: 4, c: 1)),
-            (1, FlowCell(r: 0, c: 2), FlowCell(r: 4, c: 2)),
-            (2, FlowCell(r: 0, c: 3), FlowCell(r: 4, c: 4)),
+            (0, FlowCell(r: 0, c: 0), FlowCell(r: 4, c: 0)),
+            (1, FlowCell(r: 0, c: 1), FlowCell(r: 4, c: 1)),
+            (2, FlowCell(r: 0, c: 2), FlowCell(r: 4, c: 2)),
+            (3, FlowCell(r: 0, c: 3), FlowCell(r: 4, c: 3)),
+            (4, FlowCell(r: 0, c: 4), FlowCell(r: 4, c: 4)),
         ]),
         // 7 — 6×6, three horizontal 2-row combs.
         FlowLevel(size: 6, pairs: [
@@ -197,11 +204,8 @@ final class FlowModel {
             return (path.first == a && path.last == b) || (path.first == b && path.last == a)
         }
         guard linked else { return }
-        // Every cell must be covered. Paths never overlap (extend() forbids
-        // it), so summing their lengths is enough.
-        let filled = paths.values.reduce(0) { $0 + $1.count }
-        guard filled == size * size else { return }
-
+        // Completing the level just means every pair is connected — filling the
+        // whole grid is an optional flourish, shown as a percentage in the HUD.
         completions += 1
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) { [weak self] in
             guard let self else { return }

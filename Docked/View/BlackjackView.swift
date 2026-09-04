@@ -3,8 +3,8 @@
 //  Docked
 //
 //  Dead-simple blackjack for the Gambling section. Bet play-money chips, hit
-//  or stand, dealer draws to 17. Blackjack pays 3:2. Chips can never run out —
-//  a low balance quietly tops itself back up.
+//  or stand, dealer draws to 17. Blackjack pays 3:2. If you run out of chips a
+//  short timer (running while the app is open) hands you 50 more.
 //
 
 import SwiftUI
@@ -12,20 +12,24 @@ import SwiftUI
 struct BlackjackView: View {
     @Environment(AppModel.self) private var app
 
-    private enum Phase { case betting, player, dealer, done }
+    private enum Phase { case betting, dealing, player, dealer, done }
 
     @State private var phase: Phase = .betting
     @State private var bet = 25
     @State private var player: [Int] = []
     @State private var dealer: [Int] = []
     @State private var message = "Place your bet"
+    @State private var dealTick = 0
     @State private var settleTick = 0
     @State private var winTick = 0
 
     private let minBet = 5
 
+    private var broke: Bool { app.coins < minBet }
+    private var maxBet: Int { max(minBet, min(250, app.coins)) }
+
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             HStack {
                 Text("BLACKJACK")
                     .font(.system(size: 12, weight: .black, design: .rounded)).tracking(2)
@@ -38,14 +42,12 @@ struct BlackjackView: View {
 
             Spacer(minLength: 0)
 
-            // Dealer
             VStack(spacing: 4) {
                 Text(dealerHeader)
                     .font(.system(size: 10, weight: .heavy)).tracking(1).foregroundStyle(.secondary)
-                hand(dealer, hideFirst: phase == .player)
+                hand(dealer, hideFirst: phase == .player || phase == .dealing)
             }
 
-            // Player
             VStack(spacing: 4) {
                 Text(playerHeader)
                     .font(.system(size: 10, weight: .heavy)).tracking(1).foregroundStyle(.secondary)
@@ -63,10 +65,10 @@ struct BlackjackView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .sensoryFeedback(.impact(weight: .light), trigger: player.count + dealer.count) { _, _ in app.haptics && phase != .betting }
+        .sensoryFeedback(.impact(weight: .light), trigger: dealTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: settleTick) { _, _ in app.haptics }
         .sensoryFeedback(.success, trigger: winTick) { _, _ in app.haptics }
-        .onAppear { app.ensureChips(min: minBet) }
+        .onAppear { app.checkChipRefill() }
     }
 
     // MARK: controls
@@ -74,22 +76,47 @@ struct BlackjackView: View {
     @ViewBuilder private var controls: some View {
         switch phase {
         case .betting:
-            HStack(spacing: 14) {
-                stepBtn("minus") { bet = max(minBet, bet - 5) }
-                VStack(spacing: 0) {
-                    Text("BET").font(.system(size: 9, weight: .heavy)).foregroundStyle(.secondary)
-                    Text("\(bet)").font(.system(size: 20, weight: .black)).monospacedDigit()
+            if broke {
+                VStack(spacing: 4) {
+                    Text("Out of chips").font(.system(size: 14, weight: .heavy))
+                    if let at = app.chipRefillAt {
+                        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                            let s = max(0, Int(at.timeIntervalSince(ctx.date).rounded(.up)))
+                            Text("+\(AppModel.chipRefillAmount) chips in \(s)s")
+                                .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                        }
+                    }
                 }
-                .frame(width: 74)
-                stepBtn("plus") { bet = min(maxBet, bet + 5) }
-                Button { deal() } label: {
-                    Text("Deal").font(.system(size: 16, weight: .heavy))
-                        .padding(.horizontal, 26).padding(.vertical, 11)
-                        .background(Theme.accent, in: Capsule())
-                        .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
+            } else {
+                VStack(spacing: 10) {
+                    HStack(spacing: 12) {
+                        stepBtn("minus") { bet = max(minBet, bet - 5) }
+                        VStack(spacing: 0) {
+                            Text("BET").font(.system(size: 9, weight: .heavy)).foregroundStyle(.secondary)
+                            Text("\(bet)").font(.system(size: 20, weight: .black)).monospacedDigit()
+                        }
+                        .frame(width: 64)
+                        stepBtn("plus") { bet = min(maxBet, bet + 5) }
+                        Button { deal() } label: {
+                            Text("Deal").font(.system(size: 15, weight: .heavy))
+                                .padding(.horizontal, 22).padding(.vertical, 10)
+                                .background(Theme.accent, in: Capsule())
+                                .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    HStack(spacing: 7) {
+                        chipBtn("25") { bet = min(maxBet, 25) }
+                        chipBtn("50") { bet = min(maxBet, 50) }
+                        chipBtn("100") { bet = min(maxBet, 100) }
+                        chipBtn("½") { bet = max(minBet, bet / 2) }
+                        chipBtn("2×") { bet = min(maxBet, bet * 2) }
+                        chipBtn("Max") { bet = maxBet }
+                    }
                 }
-                .buttonStyle(.plain)
             }
+        case .dealing:
+            Text("Dealing…").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
         case .player:
             HStack(spacing: 14) {
                 actionBtn("Hit") { hit() }
@@ -99,8 +126,8 @@ struct BlackjackView: View {
             Text("Dealer drawing…").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
         case .done:
             Button { phase = .betting; message = "Place your bet"; player = []; dealer = [] } label: {
-                Text("Next hand").font(.system(size: 16, weight: .heavy))
-                    .padding(.horizontal, 26).padding(.vertical, 11)
+                Text("Next hand").font(.system(size: 15, weight: .heavy))
+                    .padding(.horizontal, 24).padding(.vertical, 10)
                     .background(Theme.accent, in: Capsule())
                     .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
             }
@@ -108,13 +135,21 @@ struct BlackjackView: View {
         }
     }
 
-    private var maxBet: Int { max(minBet, min(250, app.coins)) }
-
     private func stepBtn(_ icon: String, _ act: @escaping () -> Void) -> some View {
         Button(action: act) {
             Image(systemName: icon).font(.system(size: 15, weight: .black))
-                .frame(width: 38, height: 38)
+                .frame(width: 36, height: 36)
                 .background(Color.primary.opacity(0.08), in: Circle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func chipBtn(_ label: String, _ act: @escaping () -> Void) -> some View {
+        Button(action: act) {
+            Text(label).font(.system(size: 12, weight: .heavy))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -135,9 +170,11 @@ struct BlackjackView: View {
         HStack(spacing: 6) {
             ForEach(Array(cards.enumerated()), id: \.offset) { pair in
                 cardView(pair.element, faceDown: hideFirst && pair.offset == 0)
+                    .transition(.asymmetric(insertion: .move(edge: .top).combined(with: .opacity),
+                                            removal: .opacity))
             }
             if cards.isEmpty {
-                cardView(0, faceDown: true).opacity(0.25)
+                cardView(0, faceDown: true).opacity(0.22)
             }
         }
         .frame(height: 62)
@@ -179,12 +216,14 @@ struct BlackjackView: View {
     }
 
     private var dealerShownTotal: Int {
-        if phase == .player { return dealer.count > 1 ? cardValue(dealer[1]) : 0 }
+        if phase == .player || phase == .dealing {
+            return dealer.count > 1 ? cardValue(dealer[1]) : 0
+        }
         return total(dealer)
     }
 
     private var dealerHeader: String {
-        phase == .betting ? "DEALER" : "DEALER · \(dealerShownTotal)"
+        (phase == .betting || dealer.isEmpty) ? "DEALER" : "DEALER · \(dealerShownTotal)"
     }
 
     private var playerHeader: String {
@@ -202,40 +241,63 @@ struct BlackjackView: View {
     private func draw() -> Int { Int.random(in: 1...13) }
 
     private func deal() {
-        app.ensureChips(min: minBet)
+        app.checkChipRefill()
+        guard !broke else { return }
         bet = min(bet, max(minBet, app.coins))
         _ = app.placeBet(bet)
-        player = [draw(), draw()]
-        dealer = [draw(), draw()]
-        phase = .player
-        message = "Hit or stand"
-        if total(player) == 21 {
-            // natural blackjack
-            phase = .done
-            if total(dealer) == 21 {
-                app.awardChips(bet)
-                message = "Push"
-            } else {
-                app.awardChips(bet + bet * 3 / 2)
-                message = "Blackjack! +\(bet * 3 / 2)"
-                winTick += 1
+        player = []
+        dealer = []
+        phase = .dealing
+        message = "Dealing…"
+
+        // First two cards each, one at a time.
+        let steps: [() -> Void] = [
+            { player.append(draw()) },
+            { dealer.append(draw()) },
+            { player.append(draw()) },
+            { dealer.append(draw()) },
+        ]
+        for (i, stepFn) in steps.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16 * Double(i)) {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) { stepFn() }
+                dealTick += 1
             }
-            settleTick += 1
-            app.ensureChips(min: minBet)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16 * 4 + 0.1) {
+            if total(player) == 21 {
+                phase = .done
+                settleTick += 1
+                if total(dealer) == 21 {
+                    app.awardChips(bet); message = "Push"
+                } else {
+                    app.awardChips(bet + bet * 3 / 2)
+                    message = "Blackjack! +\(bet * 3 / 2)"
+                    winTick += 1
+                }
+                app.checkChipRefill()
+            } else {
+                phase = .player
+                message = "Hit or stand"
+            }
         }
     }
 
     private func hit() {
-        player.append(draw())
-        if total(player) > 21 {
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) { player.append(draw()) }
+        dealTick += 1
+        let t = total(player)
+        if t > 21 {
             phase = .done
             message = "Bust — dealer wins"
             settleTick += 1
-            app.ensureChips(min: minBet)
+            app.checkChipRefill()
+        } else if t == 21 {
+            stand()   // 21 auto-stands
         }
     }
 
     private func stand() {
+        guard phase == .player else { return }
         phase = .dealer
         message = "Dealer drawing…"
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { dealerStep() }
@@ -243,8 +305,9 @@ struct BlackjackView: View {
 
     private func dealerStep() {
         if total(dealer) < 17 {
-            dealer.append(draw())
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { dealerStep() }
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) { dealer.append(draw()) }
+            dealTick += 1
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { dealerStep() }
         } else {
             settle()
         }
@@ -264,6 +327,6 @@ struct BlackjackView: View {
         } else {
             message = "Dealer wins"
         }
-        app.ensureChips(min: minBet)
+        app.checkChipRefill()
     }
 }

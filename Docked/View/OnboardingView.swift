@@ -69,7 +69,7 @@ struct OnboardingView: View {
                 step("3", "Swipe up to the Home Screen — the video becomes a floating window.")
 
                 Button { PiPSettings.open() } label: {
-                    Label("Open General settings", systemImage: "arrow.up.forward.app.fill")
+                    Label("Open Settings", systemImage: "arrow.up.forward.app.fill")
                         .font(.system(size: 12.5, weight: .heavy))
                 }
                 .buttonStyle(.plain)
@@ -87,7 +87,7 @@ struct OnboardingView: View {
 
     private var page4: some View {
         card(emoji: "🔊", title: "Make it fit your video") {
-            Text("Videos come in different shapes. **Press and drag anywhere along the bottom bar of the TV** — the wood strip, the speaker grille, around the knobs — up or down to stretch the screen until the border hugs your video. The little ↕ by the bottom-left corner is the reminder.")
+            Text("Drag the bottom bar of the TV up or down to stretch the screen around your video.")
         }
     }
 

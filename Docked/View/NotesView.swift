@@ -27,10 +27,19 @@ struct NotesView: View {
                 TextEditor(text: $store.text)
                     .focused($focused)
                     .scrollContentBackground(.hidden)
+                    .scrollDismissesKeyboard(.interactively)
                     .font(.body)
                     .padding(.horizontal, 12)
                     .padding(.top, 10)
                     .padding(.bottom, 40)
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Text("\(wordCount) words")
+                                .font(.footnote).foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Done") { focused = false }.fontWeight(.semibold)
+                        }
+                    }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 

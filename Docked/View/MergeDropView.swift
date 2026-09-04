@@ -12,6 +12,11 @@ import SwiftUI
 struct MergeDropView: View {
     @Environment(AppModel.self) private var app
     @AppStorage("docked.drop.best") private var best: Int = 0
+    // Board persists across activity switches (timing doesn't matter here).
+    @AppStorage("docked.drop.grid") private var savedGrid = ""
+    @AppStorage("docked.drop.score") private var savedScore = 0
+    @AppStorage("docked.drop.next") private var savedNext = 1
+    @AppStorage("docked.drop.over") private var savedOver = false
 
     private let cols = 5
     private let rows = 8
@@ -20,6 +25,7 @@ struct MergeDropView: View {
     @State private var next = 1
     @State private var score = 0
     @State private var over = false
+    @State private var restored = false
     @State private var dropTick = 0
     @State private var mergeTick = 0
     @State private var bigMergeTick = 0
@@ -118,7 +124,26 @@ struct MergeDropView: View {
         .sensoryFeedback(.impact(weight: .light), trigger: dropTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: mergeTick) { _, _ in app.haptics }
         .sensoryFeedback(.success, trigger: bigMergeTick) { _, _ in app.haptics }
-        .onAppear { if grid.allSatisfy({ $0 == 0 }) { newGame() } }
+        .onAppear {
+            guard !restored else { return }
+            restored = true
+            let parts = savedGrid.split(separator: ",").compactMap { Int($0) }
+            if parts.count == 40, parts.contains(where: { $0 != 0 }) {
+                grid = parts
+                score = savedScore
+                next = savedNext
+                over = savedOver
+            } else {
+                newGame()
+            }
+        }
+    }
+
+    private func persist() {
+        savedGrid = grid.map(String.init).joined(separator: ",")
+        savedScore = score
+        savedNext = next
+        savedOver = over
     }
 
     private func blockTile(_ v: Int, side: CGFloat) -> some View {
@@ -167,6 +192,7 @@ struct MergeDropView: View {
         falling = nil
         hoverCol = nil
         next = Int.random(in: 1...3)
+        persist()
     }
 
     private func drop(_ col: Int, ch: CGFloat) {
@@ -195,6 +221,7 @@ struct MergeDropView: View {
             best = max(best, score)
             if topRowFull() { over = true }
             if mergeTick > mergesBefore { squeeze() }
+            persist()
         }
     }
 
@@ -214,6 +241,7 @@ struct MergeDropView: View {
         var again = true
         while again {
             again = false
+            // vertical merges (a block falling onto its equal below)
             for c in 0..<cols {
                 for r in stride(from: rows - 1, through: 1, by: -1) {
                     let i = r * cols + c
@@ -224,6 +252,22 @@ struct MergeDropView: View {
                         score += 1 << grid[i]
                         mergeTick += 1
                         if grid[i] >= 6 { bigMergeTick += 1 }   // 64+ tier
+                        again = true
+                    }
+                }
+            }
+            // horizontal merges (equal blocks sitting side by side) — the
+            // higher-index cell absorbs its left neighbour
+            for r in 0..<rows {
+                for c in 1..<cols {
+                    let i = r * cols + c
+                    let left = r * cols + (c - 1)
+                    if grid[i] != 0 && grid[i] == grid[left] {
+                        grid[i] += 1
+                        grid[left] = 0
+                        score += 1 << grid[i]
+                        mergeTick += 1
+                        if grid[i] >= 6 { bigMergeTick += 1 }
                         again = true
                     }
                 }

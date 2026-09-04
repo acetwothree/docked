@@ -11,6 +11,10 @@ import SwiftUI
 struct MergeView: View {
     @Environment(AppModel.self) private var app
     @AppStorage("docked.merge.best") private var best: Int = 0
+    // Board persists across activity switches (timing doesn't matter here).
+    @AppStorage("docked.merge.grid") private var savedGrid = ""
+    @AppStorage("docked.merge.score") private var savedScore = 0
+    @AppStorage("docked.merge.over") private var savedOver = false
 
     @State private var grid: [Int] = Array(repeating: 0, count: 16)
     @State private var score = 0
@@ -18,6 +22,7 @@ struct MergeView: View {
     @State private var moveTick = 0
     @State private var mergeTick = 0
     @State private var pulse: CGFloat = 1
+    @State private var restored = false
 
     private let n = 4
 
@@ -62,7 +67,24 @@ struct MergeView: View {
         )
         .sensoryFeedback(.impact(weight: .light), trigger: moveTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(weight: .medium), trigger: mergeTick) { _, _ in app.haptics }
-        .onAppear { if grid.allSatisfy({ $0 == 0 }) { newGame() } }
+        .onAppear {
+            guard !restored else { return }
+            restored = true
+            let parts = savedGrid.split(separator: ",").compactMap { Int($0) }
+            if parts.count == 16, parts.contains(where: { $0 != 0 }) {
+                grid = parts
+                score = savedScore
+                over = savedOver
+            } else {
+                newGame()
+            }
+        }
+    }
+
+    private func persist() {
+        savedGrid = grid.map(String.init).joined(separator: ",")
+        savedScore = score
+        savedOver = over
     }
 
     private var hintText: String { over ? "No moves — tap ↻" : "Swipe to merge" }
@@ -126,6 +148,7 @@ struct MergeView: View {
         score = 0
         over = false
         spawn(); spawn()
+        persist()
     }
 
     private func spawn() {
@@ -183,6 +206,7 @@ struct MergeView: View {
             best = max(best, score)
             if !anyMoveLeft() { over = true }
             if didMerge { pop() }
+            persist()
         }
     }
 

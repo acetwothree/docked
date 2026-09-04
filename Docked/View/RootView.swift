@@ -84,6 +84,8 @@ struct RootView: View {
                         current: app.module,
                         favorites: app.favorites,
                         hasPlus: store.entitled,
+                        chips: app.coins,
+                        chipRefillAt: app.chipRefillAt,
                         themeTint: app.tvTheme.palette.mid,
                         onPick: { picked in
                             if picked.isPlus && !store.entitled {
@@ -154,7 +156,10 @@ struct RootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { doodle.saveNow() }
-            if phase == .active { Task { await store.refreshEntitlements() } }
+            if phase == .active {
+                Task { await store.refreshEntitlements() }
+                app.checkChipRefill()
+            }
         }
     }
 
@@ -259,6 +264,7 @@ struct RootView: View {
         case .merge:     MergeView()
         case .drop:      MergeDropView()
         case .marble:    MarbleView()
+        case .brawl:     BrawlView()
         case .pop:       PopView()
         case .click:     ClickPenView()
         case .scratch:   ScratchGameView()

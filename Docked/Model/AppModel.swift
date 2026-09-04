@@ -72,9 +72,15 @@ final class AppModel {
     var popClearCount: Int { didSet { store(popClearCount, K.popClears) } }
     var tttGames: Int { didSet { store(tttGames, K.tttGames) } }
 
-    /// Play-money chips for the Gambling section. Seeded once; you can never
-    /// end up stuck at zero (see `ensureChips`).
+    /// Play-money chips for the Gambling section. Seeded once; if you hit zero
+    /// a short timer (running only while the app is open) tops you back up.
     var coins: Int { didSet { store(coins, K.coins) } }
+    /// When the next free-chips grant fires (nil = balance isn't empty).
+    var chipRefillAt: Date? = nil
+    @ObservationIgnored private var chipTimer: Timer?
+
+    static let chipRefillDelay: TimeInterval = 30
+    static let chipRefillAmount = 50
 
     /// Lifetime tally for the Clicker fidget. Never reset — not even by
     /// "Clear all app data".
@@ -136,20 +142,41 @@ final class AppModel {
     func placeBet(_ amount: Int) -> Bool {
         guard amount > 0, coins >= amount else { return false }
         coins -= amount
+        checkChipRefill()
         return true
     }
 
     func awardChips(_ amount: Int) {
         guard amount > 0 else { return }
         coins += amount
+        checkChipRefill()
     }
 
-    /// Guarantees you can always keep playing: if the balance falls below what
-    /// a single minimum bet needs, quietly top it back up.
-    func ensureChips(min minimum: Int) {
-        if coins < minimum {
-            coins = Swift.max(minimum * 10, 100)
+    /// Call on a gambling view's appear / on foreground. Starts the refill
+    /// timer if you're broke, or grants immediately if it already elapsed.
+    func checkChipRefill() {
+        if coins > 0 {
+            chipTimer?.invalidate(); chipTimer = nil
+            chipRefillAt = nil
+            return
         }
+        // broke
+        if let at = chipRefillAt {
+            if Date() >= at { grantRefill() }
+            return
+        }
+        let deadline = Date().addingTimeInterval(AppModel.chipRefillDelay)
+        chipRefillAt = deadline
+        chipTimer = Timer.scheduledTimer(withTimeInterval: AppModel.chipRefillDelay,
+                                         repeats: false) { [weak self] _ in
+            self?.grantRefill()
+        }
+    }
+
+    private func grantRefill() {
+        chipTimer?.invalidate(); chipTimer = nil
+        chipRefillAt = nil
+        coins = max(coins, AppModel.chipRefillAmount)
     }
 
     func toggleFavorite(_ mod: ActivityModule) {

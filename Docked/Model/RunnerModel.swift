@@ -2,11 +2,12 @@
 //  RunnerModel.swift
 //  Docked
 //
-//  A minimalist endless runner (think the offline dinosaur game): a block
-//  runs on the spot, obstacles scroll in from the right, tap to jump.
+//  A lane runner (Subway-Surfers-style): the player is pinned near the bottom
+//  in one of three lanes, obstacles scroll down from the top. Swipe left/right
+//  to change lane, swipe up (or tap) to hop over the short ones.
 //
-//  This type is pure simulation — no SwiftUI. `step(dt:arenaWidth:)` is
-//  called from the view's 60 Hz ticker; all the tuning knobs live up top.
+//  Pure simulation — no SwiftUI. `step(dt:arenaHeight:)` is called from the
+//  view's 60 Hz ticker.
 //
 
 import SwiftUI
@@ -14,128 +15,106 @@ import SwiftUI
 @Observable
 final class RunnerModel {
 
-    enum Phase: Equatable {
-        case ready      // waiting for the first tap
-        case running
-        case paused     // left the tab / backgrounded mid-run
-        case gameOver
-    }
-
-    // MARK: - Tuning (points & seconds)
-
-    private let gravity: CGFloat = 3200
-    private let jumpImpulse: CGFloat = 980
-    private let baseSpeed: CGFloat = 340
-    private let maxSpeed: CGFloat = 760
-
-    let groundHeight: CGFloat = 26      // ground strip height, from the bottom
-    let playerSize: CGFloat = 32
-    let playerX: CGFloat = 54           // player is pinned at this x
-
-    // MARK: - State (read-only to the outside)
-
-    private(set) var phase: Phase = .ready
-    private(set) var playerBottom: CGFloat = 0     // height of the player above the ground
-    private(set) var velocityY: CGFloat = 0        // positive = moving up
-    private(set) var obstacles: [Obstacle] = []
-    private(set) var score: Double = 0
-    private(set) var speed: CGFloat = 340
-    private(set) var groundScroll: CGFloat = 0     // 0..<24, drives the moving ground ticks
-
-    private var spawnCountdown: CGFloat = 1.2
-
-    var scoreValue: Int { Int(score) }
+    enum Phase: Equatable { case ready, running, paused, gameOver }
+    enum Kind { case block, low }
 
     struct Obstacle: Identifiable {
         let id = UUID()
-        var x: CGFloat
-        var width: CGFloat
-        var height: CGFloat
+        var lane: Int
+        var y: CGFloat
+        var kind: Kind
     }
 
-    // MARK: - Intent
+    let lanes = 3
 
-    /// Single input for the whole game: start / jump / resume / retry.
-    func tap() {
-        switch phase {
-        case .ready, .gameOver:
-            resetWorld()
-            phase = .running
-        case .paused:
-            phase = .running
-        case .running:
-            if playerBottom <= 0.5 {      // only jump when grounded
-                velocityY = jumpImpulse
-            }
+    private(set) var phase: Phase = .ready
+    private(set) var lane = 1
+    /// 0 = grounded, up to 1 at the top of a hop.
+    private(set) var hop: CGFloat = 0
+    private(set) var obstacles: [Obstacle] = []
+    private(set) var score: Double = 0
+    private(set) var speed: CGFloat = 300
+
+    private var hopTime: CGFloat = 0
+    private var spawnCountdown: CGFloat = 0.9
+
+    private let hopDuration: CGFloat = 0.6
+    private let baseSpeed: CGFloat = 300
+    private let maxSpeed: CGFloat = 660
+
+    var scoreValue: Int { Int(score) }
+
+    // MARK: intent
+
+    func moveLeft() {
+        if phase == .running { lane = max(0, lane - 1) } else { tap() }
+    }
+    func moveRight() {
+        if phase == .running { lane = min(lanes - 1, lane + 1) } else { tap() }
+    }
+
+    func jump() {
+        if phase == .running {
+            if hopTime <= 0 { hopTime = hopDuration }
+        } else {
+            tap()
         }
     }
 
-    /// Called when the game scrolls out of view or the app backgrounds.
-    func pauseIfRunning() {
-        if phase == .running { phase = .paused }
+    /// Tap = start / resume / retry / hop.
+    func tap() {
+        switch phase {
+        case .ready, .gameOver: reset(); phase = .running
+        case .paused: phase = .running
+        case .running: if hopTime <= 0 { hopTime = hopDuration }
+        }
     }
 
-    private func resetWorld() {
-        playerBottom = 0
-        velocityY = 0
+    func pauseIfRunning() { if phase == .running { phase = .paused } }
+
+    private func reset() {
+        lane = 1
+        hop = 0
+        hopTime = 0
         obstacles.removeAll()
         score = 0
         speed = baseSpeed
-        spawnCountdown = 1.2
-        groundScroll = 0
+        spawnCountdown = 0.9
     }
 
-    // MARK: - Simulation
+    // MARK: simulation
 
-    /// Advance the world by `dt` seconds. `arenaWidth` is the current
-    /// play-area width so obstacles enter just off the right edge regardless
-    /// of the active layout.
-    func step(dt: CGFloat, arenaWidth: CGFloat) {
+    func step(dt rawDt: CGFloat, arenaHeight: CGFloat) {
         guard phase == .running else { return }
-        let dt = min(dt, 1.0 / 30.0)   // clamp so a dropped frame can't teleport things
+        let dt = min(rawDt, 1.0 / 30.0)
 
-        // Difficulty ramps with distance.
-        speed = min(maxSpeed, baseSpeed + CGFloat(score) * 1.6)
+        speed = min(maxSpeed, baseSpeed + CGFloat(score) * 1.3)
+        score += Double(dt) * 12
 
-        // Player physics (semi-implicit Euler).
-        velocityY -= gravity * dt
-        playerBottom += velocityY * dt
-        if playerBottom <= 0 {
-            playerBottom = 0
-            velocityY = 0
+        if hopTime > 0 {
+            hopTime -= dt
+            let t = max(0, 1 - hopTime / hopDuration)   // 0 → 1 over the hop
+            hop = sin(t * .pi)                           // up then back down
+            if hopTime <= 0 { hop = 0; hopTime = 0 }
         }
 
-        // Scrolling ground ticks.
-        groundScroll = (groundScroll + speed * dt).truncatingRemainder(dividingBy: 24)
+        for i in obstacles.indices { obstacles[i].y += speed * dt }
+        obstacles.removeAll { $0.y > arenaHeight + 80 }
 
-        // Move & cull obstacles.
-        for i in obstacles.indices {
-            obstacles[i].x -= speed * dt
-        }
-        obstacles.removeAll { $0.x + $0.width < -4 }
-
-        // Spawn on a shrinking cadence.
         spawnCountdown -= dt
         if spawnCountdown <= 0 {
-            let height = CGFloat.random(in: 24...50)
-            let width = CGFloat.random(in: 14...24)
-            let spawnX = max(arenaWidth, 260) + 24
-            obstacles.append(Obstacle(x: spawnX, width: width, height: height))
-            let gap = CGFloat.random(in: 0.95...1.7) * (baseSpeed / speed)
-            spawnCountdown = max(0.7, gap)
+            let l = Int.random(in: 0..<lanes)
+            let kind: Kind = Bool.random() ? .low : .block
+            obstacles.append(Obstacle(lane: l, y: -70, kind: kind))
+            spawnCountdown = max(0.5, CGFloat.random(in: 0.75...1.45) * (baseSpeed / speed))
         }
 
-        // Score by distance.
-        score += Double(dt) * 14
-
-        // Collision: axis-aligned boxes, player fixed at playerX.
-        let player = CGRect(x: playerX, y: playerBottom, width: playerSize, height: playerSize)
-        for obstacle in obstacles {
-            let box = CGRect(x: obstacle.x, y: 0, width: obstacle.width, height: obstacle.height)
-            if player.intersects(box) {
-                phase = .gameOver
-                return
-            }
+        let playerY = arenaHeight - 88
+        for o in obstacles where o.lane == lane {
+            guard abs(o.y - playerY) < 32 else { continue }
+            if o.kind == .low && hop > 0.35 { continue }   // hopped over it
+            phase = .gameOver
+            return
         }
     }
 }
