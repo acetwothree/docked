@@ -15,6 +15,10 @@ struct TVKnob: View {
     /// false dims the knob and disables its tap — used for the back knob
     /// when there's nowhere to go back to (already on the game grid).
     var enabled: Bool = true
+    /// A brighter face + accent-coloured icon and rim — used for the back
+    /// knob while it's live, so it visibly reads as "press this" rather than
+    /// looking like an inert twin of the other two engraved dials.
+    var highlight: Bool = false
     var action: () -> Void
 
     @State private var pressed = false
@@ -45,25 +49,34 @@ struct TVKnob: View {
                     }
                     ctx.stroke(ticks, with: .color(palette.key.opacity(0.35)), lineWidth: 1)
 
-                    // dial face — raised: light from top-left
+                    // dial face — raised: light from top-left; a brighter,
+                    // glossier gradient when highlighted
                     ctx.fill(Path(ellipseIn: face.insetBy(dx: 3, dy: 3)),
                              with: .radialGradient(
-                                Gradient(colors: [palette.hi, palette.mid, palette.deep]),
+                                Gradient(colors: highlight
+                                         ? [.white.opacity(0.95), palette.hi, palette.mid]
+                                         : [palette.hi, palette.mid, palette.deep]),
                                 center: CGPoint(x: c.x - r * 0.28, y: c.y - r * 0.28),
                                 startRadius: 0, endRadius: r * 1.4))
 
-                    // bezel + inner rim
+                    // bezel + inner rim — an accent glow ring when highlighted
                     ctx.stroke(Path(ellipseIn: face.insetBy(dx: 1, dy: 1)),
                                with: .color(palette.key.opacity(0.7)), lineWidth: 1.5)
                     ctx.stroke(Path(ellipseIn: face.insetBy(dx: 4.5, dy: 4.5)),
                                with: .color(palette.hi.opacity(0.4)), lineWidth: 1)
+                    if highlight {
+                        ctx.stroke(Path(ellipseIn: face.insetBy(dx: -1.5, dy: -1.5)),
+                                   with: .color(Theme.accent.opacity(0.85)), lineWidth: 2)
+                    }
                 }
 
-                // engraved icon: dark cut with a hairline light edge below it
+                // engraved icon: dark cut with a hairline light edge below it —
+                // or, highlighted, a solid accent-coloured icon that pops
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(palette.key.opacity(0.62))
-                    .shadow(color: palette.hi.opacity(0.55), radius: 0, x: 0.7, y: 0.9)
+                    .foregroundStyle(highlight ? Theme.accent : palette.key.opacity(0.62))
+                    .shadow(color: highlight ? .black.opacity(0.35) : palette.hi.opacity(0.55),
+                            radius: highlight ? 1 : 0, x: highlight ? 0 : 0.7, y: highlight ? 0.6 : 0.9)
             }
             .frame(width: d, height: d)
             .scaleEffect(pressed ? 0.93 : 1)

@@ -25,6 +25,9 @@ struct SpotView: View {
     @State private var timeLeft: Double = 20
     @State private var running = false
     @State private var wrongIdx: Int? = nil
+    /// Index of the creature just correctly picked — a brief pulse + ring
+    /// plays on it before the crowd refreshes for the next round.
+    @State private var celebrateIdx: Int? = nil
     @State private var hitTick = 0
     @State private var missTick = 0
     @State private var overTick = 0
@@ -63,6 +66,15 @@ struct SpotView: View {
                         creatureView(pair.element, side: max(24, side))
                             .frame(maxWidth: .infinity)
                             .opacity(wrongIdx == pair.offset ? 0.3 : 1)
+                            .scaleEffect(celebrateIdx == pair.offset ? 1.25 : 1)
+                            .overlay {
+                                if celebrateIdx == pair.offset {
+                                    Circle().stroke(Color.green, lineWidth: 3)
+                                        .scaleEffect(1.35)
+                                        .transition(.scale.combined(with: .opacity))
+                                }
+                            }
+                            .animation(.spring(response: 0.26, dampingFraction: 0.5), value: celebrateIdx)
                             .onTapGesture {
                                 if running { pick(pair.offset) } else { start() }
                             }
@@ -155,10 +167,17 @@ struct SpotView: View {
         guard running else { return }
         if i == answer {
             score += round * 10
-            round += 1
-            timeLeft = min(timeLeft + 2.5, 22)
             hitTick += 1
-            deal()
+            celebrateIdx = i
+            let nextRound = round + 1
+            let nextTime = min(timeLeft + 2.5, 22)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+                guard running else { return }
+                round = nextRound
+                timeLeft = nextTime
+                deal()
+                celebrateIdx = nil
+            }
         } else {
             timeLeft -= 4
             missTick += 1

@@ -255,17 +255,15 @@ enum ColorSheets {
         Self.e(0.56, 0.44, 0.28, 0.26),     // bottom-right wing
     ]
 
-    // A friendly robot — 10 regions.
+    // A friendly robot — 8 regions, no antenna, centred on the canvas.
     static let robot: [ColorRegion] = [
         Self.rect(0, 0, 1, 0.6),            // sky
         Self.rect(0, 0.58, 1, 0.42),        // ground
-        Self.e(0.45, 0.0, 0.10, 0.10),      // antenna ball
-        Self.rect(0.485, 0.08, 0.03, 0.08), // antenna
-        Self.rect(0.30, 0.16, 0.40, 0.26),  // head
-        Self.e(0.38, 0.24, 0.09, 0.09),     // left eye
-        Self.e(0.53, 0.24, 0.09, 0.09),     // right eye
-        Self.rect(0.26, 0.44, 0.48, 0.32),  // body
-        Self.rect(0.10, 0.46, 0.14, 0.24),  // left arm
-        Self.rect(0.76, 0.46, 0.14, 0.24),  // right arm
+        Self.rect(0.30, 0.20, 0.40, 0.26),  // head
+        Self.e(0.38, 0.28, 0.09, 0.09),     // left eye
+        Self.e(0.53, 0.28, 0.09, 0.09),     // right eye
+        Self.rect(0.26, 0.48, 0.48, 0.32),  // body
+        Self.rect(0.10, 0.50, 0.14, 0.24),  // left arm
+        Self.rect(0.76, 0.50, 0.14, 0.24),  // right arm
     ]
 }

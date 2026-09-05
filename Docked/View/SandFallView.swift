@@ -2,11 +2,12 @@
 //  SandFallView.swift
 //  Docked
 //
-//  "Crumble Drop" — coloured tetromino pieces fall smoothly, then crumble
-//  into loose sand that trickles into gaps. A colour clears once a connected
-//  patch of it spans every column from the left wall to the right wall.
-//  Pieces don't rotate — drag left/right to slide them (they follow your
-//  finger 1:1), and either tap or swipe down to drop instantly.
+//  "Crumble Drop" — coloured tetromino pieces hover in place until you act;
+//  drag left/right to slide one over (it follows your finger 1:1), then tap
+//  (or swipe down) to drop it — nothing falls on its own. On landing it
+//  crumbles into loose sand that trickles into gaps. A colour clears once a
+//  connected patch of it spans every column from the left wall to the right
+//  wall. Pieces don't rotate.
 //
 //  Settled grains keep a stable identity (`Grain.id`) across the model's
 //  settle passes, so `ForEach(model.grains)` animates each one sliding to its
@@ -15,7 +16,6 @@
 //
 
 import SwiftUI
-import Combine
 
 struct SandFallView: View {
     @Environment(AppModel.self) private var app
@@ -24,12 +24,6 @@ struct SandFallView: View {
     /// Net columns already applied for the drag in progress, so continued
     /// finger movement only applies the DELTA each time (free 1:1 tracking).
     @State private var dragAppliedCols = 0
-
-    /// Ticks fast with an animation exactly as long as the gap between ticks,
-    /// so one linear step's motion ends right as the next begins — that's
-    /// what reads as a smooth continuous fall instead of a jerky hop.
-    private static let fallInterval = 0.15
-    private let fallTimer = Timer.publish(every: fallInterval, on: .main, in: .common).autoconnect()
 
     init(highScore: Int) {
         _model = State(initialValue: SandFallModel(best: highScore))
@@ -55,17 +49,13 @@ struct SandFallView: View {
                 board(w: geo.size.width, h: geo.size.height)
             }
 
-            Text(model.phase == .over ? "Sand piled up — resetting…" : "Drag left/right to slide · tap to drop")
+            Text(model.phase == .over ? "Sand piled up — resetting…" : "Drag to slide · tap to drop")
                 .font(.system(size: 11, weight: .heavy))
                 .foregroundStyle(model.phase == .over ? Color.orange : Color.secondary)
                 .lineLimit(1).minimumScaleFactor(0.7)
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onReceive(fallTimer) { _ in
-            guard model.phase == .play else { return }
-            withAnimation(.linear(duration: Self.fallInterval)) { _ = model.stepDown() }
-        }
         .onChange(of: model.lockTick) { _, _ in settleLoop() }
         .onChange(of: model.overTick) { _, _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { model.resetRun() }
@@ -172,11 +162,12 @@ struct SandFallView: View {
             }
     }
 
+    // A flat fill instead of a gradient+stroke — with up to ~120 of these
+    // redrawing on every settle step, cutting each one down to a single
+    // layer is what actually moves the needle on lag.
     private func grainView(_ color: Color, cell: CGFloat) -> some View {
-        let corner = max(2, cell * 0.18)
-        return RoundedRectangle(cornerRadius: corner, style: .continuous)
-            .fill(LinearGradient(colors: [color, color.opacity(0.72)], startPoint: .top, endPoint: .bottom))
-            .overlay(RoundedRectangle(cornerRadius: corner, style: .continuous).stroke(.white.opacity(0.18), lineWidth: 0.75))
+        RoundedRectangle(cornerRadius: max(2, cell * 0.18), style: .continuous)
+            .fill(color)
             .frame(width: max(1, cell - 1.5), height: max(1, cell - 1.5))
     }
 

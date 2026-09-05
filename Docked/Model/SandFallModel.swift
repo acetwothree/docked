@@ -122,9 +122,16 @@ final class SandFallModel {
 
     /// One tick of the fall — moves down if possible, else locks. Returns
     /// true while the piece is still falling.
+    ///
+    /// Guarding on `!activeCells.isEmpty` matters: with no active piece,
+    /// `canPlace([])` is vacuously true (the "for every cell" check has no
+    /// cells to fail on), so this would otherwise report "still falling"
+    /// forever and never lock — that's the infinite loop that hung the app
+    /// when `hardDrop()` was tapped between a piece landing and the next one
+    /// spawning.
     @discardableResult
     func stepDown() -> Bool {
-        guard phase == .play else { return false }
+        guard phase == .play, !activeCells.isEmpty else { return false }
         let moved = activeCells.map { (row: $0.row + 1, col: $0.col) }
         if canPlace(moved) {
             activeCells = moved
@@ -136,7 +143,7 @@ final class SandFallModel {
     }
 
     func hardDrop() {
-        guard phase == .play else { return }
+        guard phase == .play, !activeCells.isEmpty else { return }
         while stepDown() {}
     }
 
@@ -175,7 +182,10 @@ final class SandFallModel {
             let canLeft = leftCol >= 0 && !occ.contains((g.row + 1) * cols + leftCol)
             let canRight = rightCol < cols && !occ.contains((g.row + 1) * cols + rightCol)
             guard canLeft || canRight else { continue }
-            let goLeft = canLeft && (!canRight || Bool.random())
+            // Deterministic tie-break (was a coin flip) — same board, same
+            // spread, every time, so where a pile ends up reads as
+            // predictable instead of a new shuffle on every drop.
+            let goLeft = canLeft && (!canRight || (g.row + g.col).isMultiple(of: 2))
             occ.remove(g.row * cols + g.col)
             grains[i].col = goLeft ? leftCol : rightCol
             grains[i].row += 1

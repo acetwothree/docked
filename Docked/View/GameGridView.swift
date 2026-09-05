@@ -265,7 +265,7 @@ private struct GamePreview: View {
                 let angle = Double(t) * turns * 2 * .pi
                 let r = t * 0.38
                 let cg = CGPoint(x: (0.5 + r * CGFloat(cos(angle))) * s,
-                                 y: (0.5 + r * CGFloat(sin(angle))) * s)
+                                 y: (0.44 + r * CGFloat(sin(angle))) * s)
                 if i == 0 { p.move(to: cg) } else { p.addLine(to: cg) }
             }
         }
@@ -296,6 +296,7 @@ private struct GamePreview: View {
                 .font(.system(size: s * 0.24, weight: .bold))
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.4), radius: 2)
+                .offset(y: -s * 0.06)
         }
     }
 
@@ -367,17 +368,18 @@ private struct GamePreview: View {
     }
 
     private func brawl(_ s: CGFloat) -> some View {
-        ZStack {
+        let cy: CGFloat = 0.44
+        return ZStack {
             ForEach(0..<8, id: \.self) { i in
                 let a = Double(i) / 8 * 2 * .pi
                 Capsule().fill(Color(hex: "3ECF7A").opacity(0.5))
                     .frame(width: s * 0.06, height: s * 0.22)
                     .rotationEffect(.degrees(Double(i) / 8 * 360))
                     .position(x: s * 0.5 + CGFloat(sin(a)) * s * 0.36,
-                             y: s * 0.5 - CGFloat(cos(a)) * s * 0.36)
+                             y: s * cy - CGFloat(cos(a)) * s * 0.36)
             }
             PopBlock(Color(hex: "3ECF7A"), width: s * 0.3, height: s * 0.3)
-                .position(x: s * 0.5, y: s * 0.5)
+                .position(x: s * 0.5, y: s * cy)
         }
     }
 
@@ -385,14 +387,14 @@ private struct GamePreview: View {
     /// this is — a circle body with two eyes — with one picked out by colour
     /// and a ring, the way the real game asks you to spot it.
     private func spot(_ s: CGFloat) -> some View {
-        let dim: [(CGFloat, CGFloat)] = [(0.24, 0.28), (0.76, 0.28), (0.24, 0.76)]
+        let dim: [(CGFloat, CGFloat)] = [(0.24, 0.22), (0.76, 0.22), (0.24, 0.70)]
         return ZStack {
             ForEach(Array(dim.enumerated()), id: \.offset) { _, pt in
                 creature(Color(hex: "6B7280"), s: s * 0.3).position(x: pt.0 * s, y: pt.1 * s)
             }
-            creature(Color(hex: "3ECF7A"), s: s * 0.34).position(x: s * 0.76, y: s * 0.76)
+            creature(Color(hex: "3ECF7A"), s: s * 0.34).position(x: s * 0.76, y: s * 0.70)
             Circle().stroke(Color(hex: "3ECF7A"), lineWidth: s * 0.025).frame(width: s * 0.46)
-                .position(x: s * 0.76, y: s * 0.76)
+                .position(x: s * 0.76, y: s * 0.70)
         }
     }
 
@@ -436,29 +438,26 @@ private struct GamePreview: View {
         }
     }
 
-    /// A dark wooden tray holding pale sand with raked grooves — high
-    /// contrast so it actually reads as sand, not a flat purple pattern.
+    /// A zen garden tray — concentric raked rings, unmistakably centred by
+    /// construction (every ring shares the box's own centre point).
     private func sand(_ s: CGFloat) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color(hex: "4A3826"))
-                .frame(width: s * 0.94, height: s * 0.94)
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
+            Circle().fill(Color(hex: "4A3826")).frame(width: s * 0.86, height: s * 0.86)
+            Circle()
                 .fill(LinearGradient(colors: [Color(hex: "E8CFA0"), Color(hex: "D2AE72")],
                                      startPoint: .top, endPoint: .bottom))
-                .frame(width: s * 0.8, height: s * 0.8)
-            VStack(spacing: s * 0.12) {
-                ForEach(0..<4, id: \.self) { i in
-                    Path { p in
-                        p.move(to: CGPoint(x: 0, y: 0))
-                        p.addCurve(to: CGPoint(x: s * 0.64, y: 0),
-                                  control1: CGPoint(x: s * 0.21, y: i.isMultiple(of: 2) ? -s * 0.08 : s * 0.08),
-                                  control2: CGPoint(x: s * 0.43, y: i.isMultiple(of: 2) ? s * 0.08 : -s * 0.08))
-                    }
-                    .stroke(Color(hex: "9C7A46").opacity(0.8), style: StrokeStyle(lineWidth: s * 0.03, lineCap: .round))
-                    .frame(width: s * 0.64, height: s * 0.05)
-                }
+                .frame(width: s * 0.74, height: s * 0.74)
+            ForEach(1..<4, id: \.self) { i in
+                Circle()
+                    .stroke(Color(hex: "9C7A46").opacity(0.75), lineWidth: s * 0.022)
+                    .frame(width: s * 0.74 * CGFloat(i) / 4, height: s * 0.74 * CGFloat(i) / 4)
             }
+            // a little rake, resting across the pattern
+            Capsule().fill(Color(hex: "6B4A2E"))
+                .frame(width: s * 0.05, height: s * 0.42)
+                .rotationEffect(.degrees(-32))
+                .offset(x: s * 0.2, y: -s * 0.16)
+                .shadow(color: .black.opacity(0.3), radius: 1.5, y: 1)
         }
     }
 

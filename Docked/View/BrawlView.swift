@@ -22,13 +22,15 @@ struct BrawlView: View {
     /// Direction of the last swipe + when it happened, for the slash arc.
     @State private var slashDir: Int? = nil
     @State private var slashAt = Date()
+    /// 1 right when a life is lost, eased back to 0 — flashes the player red.
+    @State private var hitFlash: CGFloat = 0
 
     private let ticker = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                canvas(size: geo.size, tick: lastTick)
+                canvas(size: geo.size, tick: lastTick, hitFlash: hitFlash)
                 hud
                 overlay
             }
@@ -52,7 +54,15 @@ struct BrawlView: View {
                 lastTick = now
                 let livesBefore = game.lives
                 game.step(dt: dt)
-                if game.lives < livesBefore { hurtTick += 1 }
+                if game.lives < livesBefore {
+                    hurtTick += 1
+                    hitFlash = 1
+                }
+                // Decayed by hand, in step with the same 60Hz tick that
+                // drives the rest of this Canvas — SwiftUI's implicit
+                // animation system doesn't interpolate a value read straight
+                // inside a Canvas closure, so this is what actually fades it.
+                if hitFlash > 0 { hitFlash = max(0, hitFlash - dt / 0.4) }
             }
         }
         .onChange(of: game.phase) { _, p in
@@ -61,9 +71,10 @@ struct BrawlView: View {
         .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: swipeTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: hitTick) { _, _ in app.haptics }
         .sensoryFeedback(.error, trigger: hurtTick) { _, _ in app.haptics }
+        .sensoryFeedback(.success, trigger: game.blastTick) { _, _ in app.haptics }
     }
 
-    private func canvas(size: CGSize, tick: Date) -> some View {
+    private func canvas(size: CGSize, tick: Date, hitFlash: CGFloat) -> some View {
         _ = tick
         return Canvas { ctx, cs in
             let c = CGPoint(x: cs.width / 2, y: cs.height / 2)
@@ -96,25 +107,43 @@ struct BrawlView: View {
                 }
             }
 
-            // enemies — always the same look; no colour change near the ring
+            // enemies — plain ones always look the same; the rare powerup
+            // ones are deliberately a different colour, since standing out
+            // is the whole point of the signal.
             for e in game.enemies {
                 let d = dirs[e.dir]
                 let px = c.x + d.x * reach * e.dist
                 let py = c.y + d.y * reach * e.dist
                 let s: CGFloat = 26
                 let r = CGRect(x: px - s / 2, y: py - s / 2, width: s, height: s)
-                ctx.fill(Path(roundedRect: r, cornerRadius: 6, style: .continuous),
-                         with: .color(Theme.ink.opacity(0.8)))
+                let color: Color = {
+                    switch e.kind {
+                    case .normal: return Theme.ink.opacity(0.8)
+                    case .freeze: return Color(hex: "4AC7F0")
+                    case .blast: return Color(hex: "F2883C")
+                    }
+                }()
+                ctx.fill(Path(roundedRect: r, cornerRadius: 6, style: .continuous), with: .color(color))
+                if e.kind != .normal {
+                    ctx.stroke(Path(roundedRect: r, cornerRadius: 6, style: .continuous),
+                              with: .color(.white.opacity(0.7)), lineWidth: 1.5)
+                }
             }
 
-            // player — soft glow + a slow idle bob
+            // player — soft glow + a slow idle bob; flashes red on a hit (a
+            // plain red fill composited on top at `hitFlash` opacity, rather
+            // than trying to hand-blend RGB — much simpler and theme-safe)
             let bob = CGFloat(sin(Double(game.elapsed) * 2.2)) * 2
             let ps: CGFloat = 42
             let prect = CGRect(x: c.x - ps / 2, y: c.y - ps / 2 + bob, width: ps, height: ps)
             ctx.fill(Path(ellipseIn: prect.insetBy(dx: -9, dy: -9)),
-                     with: .color(Theme.accent.opacity(0.18)))
+                     with: .color((hitFlash > 0 ? Color.red : Theme.accent).opacity(0.18 + 0.3 * hitFlash)))
             ctx.fill(Path(roundedRect: prect, cornerRadius: 11, style: .continuous),
                      with: .color(Theme.accent))
+            if hitFlash > 0 {
+                ctx.fill(Path(roundedRect: prect, cornerRadius: 11, style: .continuous),
+                         with: .color(Color.red.opacity(hitFlash)))
+            }
         }
     }
 
@@ -162,7 +191,8 @@ struct BrawlView: View {
 @Observable
 final class BrawlModel {
     enum Phase: Equatable { case ready, running, over }
-    struct Enemy: Identifiable { let id = UUID(); var dir: Int; var dist: CGFloat }
+    enum EnemyKind: Equatable { case normal, freeze, blast }
+    struct Enemy: Identifiable { let id = UUID(); var dir: Int; var dist: CGFloat; var kind: EnemyKind = .normal }
 
     /// An enemy anywhere from the centre out to here is a valid target — a
     /// generous window, not a knife-edge at the ring.
@@ -173,15 +203,19 @@ final class BrawlModel {
     private(set) var score = 0
     private(set) var lives = 3
     private(set) var elapsed: CGFloat = 0
+    /// Bumps whenever a blast powerup clears the board — a haptic/visual cue.
+    private(set) var blastTick = 0
 
     private var spawnCountdown: CGFloat = 1.1
     private var speed: CGFloat = 0.12
+    /// While > 0, enemy speed is cut way down — a Freeze powerup's effect.
+    private(set) var freezeTimeLeft: CGFloat = 0
 
     func tap() {
         switch phase {
         case .ready, .over:
             enemies.removeAll(); score = 0; lives = 3
-            spawnCountdown = 0.22; speed = 0.30; elapsed = 0
+            spawnCountdown = 0.22; speed = 0.30; elapsed = 0; freezeTimeLeft = 0
             // Three enemies already on the board so it's a fight from the first tap.
             for d in Array(0..<4).shuffled().prefix(3) {
                 enemies.append(Enemy(dir: d, dist: CGFloat.random(in: 0.7...1.0)))
@@ -193,8 +227,10 @@ final class BrawlModel {
     }
 
     /// A little slack so an enemy whose edge is just touching the ring still
-    /// counts — roughly one enemy-radius past the ring line.
-    static let strikeSlack: CGFloat = 0.08
+    /// counts — roughly one enemy-radius past the ring line. Generous on
+    /// purpose: this is a "feels good" leniency on top of a reach that reads
+    /// (and is drawn) exactly the same either way.
+    static let strikeSlack: CGFloat = 0.15
 
     @discardableResult
     func strike(_ dir: Int) -> Bool {
@@ -203,8 +239,17 @@ final class BrawlModel {
             .filter { $0.element.dir == dir && $0.element.dist <= Self.strikeDist + Self.strikeSlack }
             .min(by: { $0.element.dist < $1.element.dist })
         guard let hit = inRange else { return false }
+        let kind = enemies[hit.offset].kind
         enemies.remove(at: hit.offset)
         score += 1
+        switch kind {
+        case .normal: break
+        case .freeze: freezeTimeLeft = 4
+        case .blast:
+            score += enemies.count
+            enemies.removeAll()
+            blastTick += 1
+        }
         return true
     }
 
@@ -212,7 +257,9 @@ final class BrawlModel {
         guard phase == .running else { return }
         let dt = min(rawDt, 1.0 / 30.0)
         elapsed += dt
-        speed = 0.30 + elapsed * 0.009
+        if freezeTimeLeft > 0 { freezeTimeLeft = max(0, freezeTimeLeft - dt) }
+        let baseSpeed = 0.30 + elapsed * 0.009
+        speed = freezeTimeLeft > 0 ? baseSpeed * 0.35 : baseSpeed
 
         for i in enemies.indices { enemies[i].dist -= speed * dt }
 
@@ -224,7 +271,11 @@ final class BrawlModel {
 
         spawnCountdown -= dt
         if spawnCountdown <= 0 {
-            enemies.append(Enemy(dir: Int.random(in: 0..<4), dist: 1))
+            // Rare powerup enemies — visually distinct on purpose, since
+            // that's the whole point of the signal.
+            let roll = Double.random(in: 0..<1)
+            let kind: EnemyKind = roll < 0.06 ? .freeze : (roll < 0.12 ? .blast : .normal)
+            enemies.append(Enemy(dir: Int.random(in: 0..<4), dist: 1, kind: kind))
             let base = max(0.22, 0.75 - elapsed * 0.03)
             spawnCountdown = CGFloat.random(in: base...(base + 0.4))
         }
