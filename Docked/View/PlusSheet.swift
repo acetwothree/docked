@@ -58,8 +58,6 @@ struct PlusSheet: View {
             .background(Theme.paper, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.hairline))
 
-            Spacer(minLength: 0)
-
             if store.entitled {
                 let activeLabel = store.hasPlus ? "Subscription active" : "Developer unlock active"
                 Label(activeLabel, systemImage: "checkmark.circle.fill")
@@ -99,12 +97,15 @@ struct PlusSheet: View {
             Button(store.entitled ? "Done" : "Maybe later") { dismiss() }
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.secondary)
+                .padding(.top, 4)
                 .padding(.bottom, 12)
         }
         .padding(.horizontal, 22)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
         .background(Theme.backdrop)
-        .presentationDetents([.medium, .large])
+        // Sized to fit the content instead of a generic .medium/.large slot —
+        // that used to leave a large empty gap below a fairly short sheet.
+        .presentationDetents([.height(store.entitled ? 340 : 480)])
         .alert(
             "Something went wrong",
             isPresented: Binding(

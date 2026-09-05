@@ -80,18 +80,28 @@ enum LayoutSolver {
         )
     }
 
-    // ---- Console knobs (order: Settings, Theme, Premium) ----
+    // ---- Console knobs ----
     static let knobDiameter: CGFloat = 34
 
-    /// Three knob centres, right-aligned in the given console rect (works in
-    /// whatever coordinate space the rect is expressed in).
-    static func knobCenters(inConsole c: CGRect) -> [CGPoint] {
+    struct KnobLayout {
+        var back: CGPoint      // alone, far left
+        var theme: CGPoint     // paired with settings, far right
+        var settings: CGPoint
+        var all: [CGPoint] { [back, theme, settings] }
+    }
+
+    /// Back sits alone on the left (it's the odd one out — it only does
+    /// anything once a game is open); Theme + Settings pair up on the right,
+    /// leaving the middle of the console free for the engraved label.
+    static func knobLayout(inConsole c: CGRect) -> KnobLayout {
         let d = knobDiameter
         let gap: CGFloat = 12
         let cy = c.midY
-        let x3 = c.maxX - 16 - d / 2
-        let x2 = x3 - d - gap
-        let x1 = x2 - d - gap
-        return [CGPoint(x: x1, y: cy), CGPoint(x: x2, y: cy), CGPoint(x: x3, y: cy)]
+        let backX = c.minX + 16 + d / 2
+        let settingsX = c.maxX - 16 - d / 2
+        let themeX = settingsX - d - gap
+        return KnobLayout(back: CGPoint(x: backX, y: cy),
+                          theme: CGPoint(x: themeX, y: cy),
+                          settings: CGPoint(x: settingsX, y: cy))
     }
 }

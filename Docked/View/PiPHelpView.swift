@@ -54,8 +54,6 @@ struct PiPHelpView: View {
         }
         .navigationTitle("Picture-in-Picture")
         .navigationBarTitleDisplayMode(.inline)
-        // Keep the first rows clear of a video parked at the top of the screen.
-        .safeAreaInset(edge: .top) { Color.clear.frame(height: 210) }
     }
 
     private func stepped(_ n: String, _ text: String) -> some View {

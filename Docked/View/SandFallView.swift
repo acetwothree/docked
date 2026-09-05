@@ -3,8 +3,10 @@
 //  Docked
 //
 //  "Sand Fall" — coloured tetromino pieces fall, then crumble into loose sand
-//  that trickles into gaps. Fill a row edge-to-edge with one colour and it
-//  clears. Piling up to the top ends the run.
+//  that trickles into gaps. A colour clears once a connected patch of it
+//  spans every column from the left wall to the right wall. Pieces don't
+//  rotate — just drag left/right to slide them (they follow your finger 1:1)
+//  and swipe down to drop.
 //
 //  Settled grains keep a stable identity (`Grain.id`) across the model's
 //  settle passes, so `ForEach(model.grains)` animates each one sliding to its
@@ -18,6 +20,10 @@ import Combine
 struct SandFallView: View {
     @Environment(AppModel.self) private var app
     @State private var model: SandFallModel
+
+    /// Net columns already applied for the drag in progress, so continued
+    /// finger movement only applies the DELTA each time (free 1:1 tracking).
+    @State private var dragAppliedCols = 0
 
     private let fallTimer = Timer.publish(every: 0.55, on: .main, in: .common).autoconnect()
 
@@ -45,29 +51,13 @@ struct SandFallView: View {
                 board(w: geo.size.width, h: geo.size.height)
             }
 
-            Text(model.phase == .over ? "Sand piled up — resetting…" : "Drag to move · tap to rotate · swipe down to drop")
+            Text(model.phase == .over ? "Sand piled up — resetting…" : "Drag left/right to slide · swipe down to drop")
                 .font(.system(size: 11, weight: .heavy))
                 .foregroundStyle(model.phase == .over ? Color.orange : Color.secondary)
                 .lineLimit(1).minimumScaleFactor(0.7)
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .contentShape(Rectangle())
-        .onTapGesture { withAnimation(.easeOut(duration: 0.12)) { model.rotateActive() } }
-        .gesture(
-            DragGesture(minimumDistance: 10)
-                .onEnded { v in
-                    let dx = v.translation.width, dy = v.translation.height
-                    if dy > 50, abs(dy) > abs(dx) {
-                        withAnimation(.easeIn(duration: 0.1)) { model.hardDrop() }
-                    } else if abs(dx) > 22 {
-                        let steps = max(1, min(3, Int(abs(dx) / 32)))
-                        for _ in 0..<steps {
-                            withAnimation(.easeOut(duration: 0.1)) { model.moveActive(dCol: dx > 0 ? 1 : -1) }
-                        }
-                    }
-                }
-        )
         .onReceive(fallTimer) { _ in
             guard model.phase == .play else { return }
             withAnimation(.linear(duration: 0.18)) { _ = model.stepDown() }
@@ -95,12 +85,12 @@ struct SandFallView: View {
     }
 
     private func checkClears() {
-        let full = model.fullMonoRows()
-        guard !full.isEmpty else {
+        let cells = model.spanningClearCells()
+        guard !cells.isEmpty else {
             model.afterLockShouldSpawnNext()
             return
         }
-        withAnimation(.easeOut(duration: 0.15)) { model.beginClearing(full) }
+        withAnimation(.easeOut(duration: 0.15)) { model.beginClearing(cells) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
             withAnimation(.easeInOut(duration: 0.12)) { model.finishClearing() }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { settleLoop() }
@@ -124,7 +114,13 @@ struct SandFallView: View {
 
             ForEach(model.grains) { g in
                 grainView(g.color, cell: cell)
-                    .opacity(model.clearingRows.contains(g.row) ? 0.3 : 1)
+                    .overlay {
+                        if model.clearingCells.contains(g.row * model.cols + g.col) {
+                            RoundedRectangle(cornerRadius: max(2, cell * 0.18), style: .continuous)
+                                .fill(.white.opacity(0.75))
+                                .blendMode(.plusLighter)
+                        }
+                    }
                     .position(x: ox + CGFloat(g.col) * cell + cell / 2, y: oy + CGFloat(g.row) * cell + cell / 2)
             }
 
@@ -134,18 +130,34 @@ struct SandFallView: View {
                         .position(x: ox + CGFloat(c.col) * cell + cell / 2, y: oy + CGFloat(c.row) * cell + cell / 2)
                 }
             }
-
-            if !model.clearingRows.isEmpty {
-                ForEach(Array(model.clearingRows), id: \.self) { r in
-                    Rectangle()
-                        .fill(.white.opacity(0.65))
-                        .blendMode(.plusLighter)
-                        .frame(width: boardW, height: cell)
-                        .position(x: ox + boardW / 2, y: oy + CGFloat(r) * cell + cell / 2)
-                }
-            }
         }
         .frame(width: w, height: h)
+        .contentShape(Rectangle())
+        .gesture(dragGesture(cell: cell))
+    }
+
+    /// Free 1:1 horizontal dragging (not step swipes) plus a downward swipe
+    /// to hard-drop.
+    private func dragGesture(cell: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 4)
+            .onChanged { v in
+                guard cell > 0 else { return }
+                let wanted = Int((v.translation.width / cell).rounded())
+                if wanted != dragAppliedCols {
+                    let step = wanted > dragAppliedCols ? 1 : -1
+                    for _ in 0..<abs(wanted - dragAppliedCols) {
+                        withAnimation(.easeOut(duration: 0.08)) { model.moveActive(dCol: step) }
+                    }
+                    dragAppliedCols = wanted
+                }
+            }
+            .onEnded { v in
+                let dx = v.translation.width, dy = v.translation.height
+                if dy > 60, abs(dy) > abs(dx) * 1.2 {
+                    withAnimation(.easeIn(duration: 0.1)) { model.hardDrop() }
+                }
+                dragAppliedCols = 0
+            }
     }
 
     private func grainView(_ color: Color, cell: CGFloat) -> some View {

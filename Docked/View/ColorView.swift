@@ -134,10 +134,22 @@ private struct ColorTri: Shape {
     }
 }
 
+/// Apex at the bottom instead of the top — an ice-cream cone, mostly.
+private struct ColorTriDown: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: r.midX, y: r.maxY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.minX, y: r.minY))
+        p.closeSubpath()
+        return p
+    }
+}
+
 enum ColorSheets {
     // A handful of BIG, mostly non-overlapping regions per sheet — easy to hit
     // with a fingertip.
-    static let all: [[ColorRegion]] = [house, flower, sailboat]
+    static let all: [[ColorRegion]] = [house, flower, sailboat, cat, car, rocket, icecream, butterfly, robot]
 
     private static func e(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> ColorRegion {
         ColorRegion(shape: AnyShape(Ellipse()), rect: CGRect(x: x, y: y, width: w, height: h))
@@ -147,6 +159,9 @@ enum ColorSheets {
     }
     private static func tri(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> ColorRegion {
         ColorRegion(shape: AnyShape(ColorTri()), rect: CGRect(x: x, y: y, width: w, height: h))
+    }
+    private static func triDown(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> ColorRegion {
+        ColorRegion(shape: AnyShape(ColorTriDown()), rect: CGRect(x: x, y: y, width: w, height: h))
     }
 
     // A house on a sunny day — 7 regions.
@@ -179,14 +194,78 @@ enum ColorSheets {
         return r
     }()
 
-    // A sailboat at sunset — 7 regions.
+    // A sailboat on calm water — 5 regions, contiguous sky/sea (no seams).
     static let sailboat: [ColorRegion] = [
-        Self.rect(0, 0, 1, 0.34),           // upper sky
-        Self.rect(0, 0.32, 1, 0.25),        // lower sky
-        Self.e(0.08, 0.07, 0.22, 0.22),     // sun
-        Self.rect(0, 0.55, 1, 0.45),        // sea
-        Self.rect(0.49, 0.48, 0.03, 0.22),  // mast
-        Self.tri(0.50, 0.48, 0.19, 0.22),   // sail
-        Self.rect(0.34, 0.68, 0.34, 0.07),  // hull
+        Self.rect(0, 0, 1, 0.56),           // sky
+        Self.e(0.08, 0.06, 0.22, 0.22),     // sun
+        Self.rect(0, 0.56, 1, 0.44),        // sea
+        Self.rect(0.30, 0.56, 0.40, 0.10),  // hull, sitting on the waterline
+        Self.tri(0.46, 0.28, 0.22, 0.30),   // sail
+    ]
+
+    // A cat face — 8 regions.
+    static let cat: [ColorRegion] = [
+        Self.rect(0, 0, 1, 0.6),            // sky
+        Self.rect(0, 0.58, 1, 0.42),        // ground
+        Self.e(0.28, 0.22, 0.44, 0.42),     // head
+        Self.tri(0.26, 0.06, 0.18, 0.22),   // left ear
+        Self.tri(0.56, 0.06, 0.18, 0.22),   // right ear
+        Self.e(0.38, 0.42, 0.10, 0.10),     // left eye
+        Self.e(0.54, 0.42, 0.10, 0.10),     // right eye
+        Self.tri(0.46, 0.52, 0.08, 0.07),   // nose
+    ]
+
+    // A little car — 6 regions.
+    static let car: [ColorRegion] = [
+        Self.rect(0, 0, 1, 0.55),           // sky
+        Self.rect(0, 0.53, 1, 0.47),        // road
+        Self.rect(0.10, 0.42, 0.80, 0.24),  // body
+        Self.rect(0.30, 0.26, 0.40, 0.18),  // cabin
+        Self.e(0.18, 0.60, 0.20, 0.20),     // left wheel
+        Self.e(0.62, 0.60, 0.20, 0.20),     // right wheel
+    ]
+
+    // A rocket blasting off — 7 regions.
+    static let rocket: [ColorRegion] = [
+        Self.rect(0, 0, 1, 0.7),            // sky
+        Self.rect(0, 0.68, 1, 0.32),        // ground
+        Self.rect(0.36, 0.18, 0.28, 0.48),  // body
+        Self.tri(0.32, 0.02, 0.36, 0.18),   // nose cone
+        Self.tri(0.16, 0.52, 0.22, 0.22),   // left fin
+        Self.tri(0.62, 0.52, 0.22, 0.22),   // right fin
+        Self.e(0.40, 0.30, 0.20, 0.20),     // window
+    ]
+
+    // An ice-cream cone — 5 regions.
+    static let icecream: [ColorRegion] = [
+        Self.rect(0, 0, 1, 1),              // background
+        Self.triDown(0.36, 0.55, 0.28, 0.38), // cone
+        Self.e(0.28, 0.32, 0.44, 0.30),     // bottom scoop
+        Self.e(0.32, 0.12, 0.36, 0.26),     // top scoop
+        Self.e(0.45, 0.05, 0.10, 0.10),     // cherry
+    ]
+
+    // A butterfly — 6 regions.
+    static let butterfly: [ColorRegion] = [
+        Self.rect(0, 0, 1, 1),              // background
+        Self.rect(0.47, 0.22, 0.06, 0.56),  // body
+        Self.e(0.10, 0.14, 0.36, 0.32),     // top-left wing
+        Self.e(0.54, 0.14, 0.36, 0.32),     // top-right wing
+        Self.e(0.16, 0.44, 0.28, 0.26),     // bottom-left wing
+        Self.e(0.56, 0.44, 0.28, 0.26),     // bottom-right wing
+    ]
+
+    // A friendly robot — 10 regions.
+    static let robot: [ColorRegion] = [
+        Self.rect(0, 0, 1, 0.6),            // sky
+        Self.rect(0, 0.58, 1, 0.42),        // ground
+        Self.e(0.45, 0.0, 0.10, 0.10),      // antenna ball
+        Self.rect(0.485, 0.08, 0.03, 0.08), // antenna
+        Self.rect(0.30, 0.16, 0.40, 0.26),  // head
+        Self.e(0.38, 0.24, 0.09, 0.09),     // left eye
+        Self.e(0.53, 0.24, 0.09, 0.09),     // right eye
+        Self.rect(0.26, 0.44, 0.48, 0.32),  // body
+        Self.rect(0.10, 0.46, 0.14, 0.24),  // left arm
+        Self.rect(0.76, 0.46, 0.14, 0.24),  // right arm
     ]
 }

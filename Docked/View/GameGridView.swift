@@ -9,12 +9,15 @@
 //
 
 import SwiftUI
+import StoreKit
 
 struct GameGridView: View {
     var hasPlus: Bool
     var favorites: [ActivityModule]
     var onPick: (ActivityModule) -> Void
     var onToggleFav: (ActivityModule) -> Void
+
+    @Environment(\.requestReview) private var requestReview
 
     private let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -32,9 +35,33 @@ struct GameGridView: View {
                 }
             }
             .padding(.horizontal, 2)
-            .padding(.bottom, 18)
+
+            moreCard
+                .padding(.horizontal, 2)
+                .padding(.top, 4)
+                .padding(.bottom, 18)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private var moreCard: some View {
+        VStack(spacing: 10) {
+            Text("More activities coming soon")
+                .font(.system(size: 13, weight: .heavy))
+                .foregroundStyle(.secondary)
+            Button { requestReview() } label: {
+                Label("Enjoying Docked? Leave a review", systemImage: "star.fill")
+                    .font(.system(size: 13, weight: .heavy))
+                    .padding(.horizontal, 16).padding(.vertical, 9)
+                    .background(Theme.accent, in: Capsule())
+                    .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(Theme.paper, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Theme.hairline))
     }
 }
 
@@ -106,20 +133,26 @@ private struct GameCard: View {
 }
 
 // MARK: - Shared glossy pieces
+//
+// `shadow` defaults to true for a single hero instance; pass false when many
+// copies tile a grid (Color Blocks cells, bubble wrap, the sand pile) — each
+// `.shadow()` is its own offscreen render pass, and dozens of them stacked up
+// is what made the grid (and the TV stretch, which resizes this whole screen)
+// feel laggy.
 
-/// A gradient-filled, top-lit block — used everywhere a preview needs a
-/// "physical" square or tile instead of a flat colour swatch.
 private struct PopBlock: View {
     let colors: [Color]
     var width: CGFloat
     var height: CGFloat
     var corner: CGFloat = 6
+    var shadow: Bool = true
 
-    init(_ color: Color, width: CGFloat, height: CGFloat, corner: CGFloat = 6) {
+    init(_ color: Color, width: CGFloat, height: CGFloat, corner: CGFloat = 6, shadow: Bool = true) {
         self.colors = [color.opacity(1), color.opacity(0.72)]
         self.width = width
         self.height = height
         self.corner = corner
+        self.shadow = shadow
     }
 
     var body: some View {
@@ -132,7 +165,7 @@ private struct PopBlock: View {
             }
             .overlay(RoundedRectangle(cornerRadius: corner, style: .continuous).stroke(.white.opacity(0.14), lineWidth: 0.75))
             .frame(width: width, height: height)
-            .shadow(color: .black.opacity(0.35), radius: 2, y: 1.5)
+            .shadow(color: .black.opacity(shadow ? 0.35 : 0), radius: shadow ? 2 : 0, y: shadow ? 1.5 : 0)
     }
 }
 
@@ -159,6 +192,7 @@ private struct PopCapsule: View {
 private struct PopSphere: View {
     let color: Color
     var size: CGFloat
+    var shadow: Bool = true
     var body: some View {
         Circle()
             .fill(RadialGradient(colors: [color.opacity(0.92), color],
@@ -169,12 +203,15 @@ private struct PopSphere: View {
             )
             .overlay(Circle().stroke(.black.opacity(0.12), lineWidth: 1))
             .frame(width: size, height: size)
-            .shadow(color: .black.opacity(0.35), radius: 2, y: 1.5)
+            .shadow(color: .black.opacity(shadow ? 0.35 : 0), radius: shadow ? 2 : 0, y: shadow ? 1.5 : 0)
     }
 }
 
 /// A small illustration hinting at each game's play, drawn with plain shapes
-/// so it costs nothing to ship (no image assets).
+/// so it costs nothing to ship (no image assets). Flattened with
+/// `.drawingGroup()` — one rasterized layer per card instead of a dozen+
+/// separately-composited gradient/shadow shapes — so the grid scrolls and the
+/// TV stretch resizes smoothly even with many cards on screen.
 private struct GamePreview: View {
     let mod: ActivityModule
 
@@ -183,6 +220,8 @@ private struct GamePreview: View {
             let s = min(geo.size.width, geo.size.height)
             content(s)
                 .frame(width: geo.size.width, height: geo.size.height)
+                .compositingGroup()
+                .drawingGroup()
         }
     }
 
@@ -207,7 +246,7 @@ private struct GamePreview: View {
 
     private func doodle(_ s: CGFloat) -> some View {
         Path { p in
-            let pts: [(CGFloat, CGFloat)] = [(0.08, 0.75), (0.28, 0.25), (0.42, 0.7), (0.58, 0.2), (0.74, 0.68), (0.92, 0.35)]
+            let pts: [(CGFloat, CGFloat)] = [(0.2, 0.68), (0.35, 0.32), (0.46, 0.62), (0.57, 0.28), (0.68, 0.6), (0.8, 0.38)]
             for (i, pt) in pts.enumerated() {
                 let cg = CGPoint(x: pt.0 * s, y: pt.1 * s)
                 if i == 0 { p.move(to: cg) } else { p.addLine(to: cg) }
@@ -219,41 +258,49 @@ private struct GamePreview: View {
 
     private func notes(_ s: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: s * 0.1) {
-            ForEach(Array([0.9, 0.65, 0.8, 0.45].enumerated()), id: \.offset) { _, w in
+            ForEach(Array([0.62, 0.48, 0.56].enumerated()), id: \.offset) { _, w in
                 Capsule().fill(Color.white.opacity(0.28)).frame(width: s * w, height: s * 0.07)
             }
         }
-        .frame(width: s, height: s, alignment: .topLeading)
         .overlay(alignment: .bottomTrailing) {
             Image(systemName: "pencil").font(.system(size: s * 0.24, weight: .bold))
                 .foregroundStyle(Color(hex: "4A9CFF"))
                 .shadow(color: Color(hex: "4A9CFF").opacity(0.6), radius: 4)
+                .offset(x: s * 0.22, y: s * 0.22)
         }
     }
 
     private func color(_ s: CGFloat) -> some View {
         ZStack {
-            PopSphere(color: Color(hex: "E0473E"), size: s * 0.5).offset(x: -s * 0.18, y: -s * 0.08)
-            PopSphere(color: Color(hex: "F2B90C"), size: s * 0.5).offset(x: s * 0.18, y: -s * 0.05)
-            PopSphere(color: Color(hex: "3ECF7A"), size: s * 0.5).offset(x: 0, y: s * 0.22)
+            PopSphere(color: Color(hex: "E0473E"), size: s * 0.48).offset(x: -s * 0.17, y: -s * 0.08)
+            PopSphere(color: Color(hex: "F2B90C"), size: s * 0.48).offset(x: s * 0.17, y: -s * 0.08)
+            PopSphere(color: Color(hex: "3ECF7A"), size: s * 0.48).offset(x: 0, y: s * 0.16)
             Image(systemName: "paintbrush.pointed.fill")
-                .font(.system(size: s * 0.26, weight: .bold))
+                .font(.system(size: s * 0.24, weight: .bold))
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.4), radius: 2)
         }
     }
 
+    /// Real tetromino-shaped groups tiling part of the grid, like an
+    /// in-progress board — not scattered single squares.
     private func blocks(_ s: CGFloat) -> some View {
         let n = 4
         let cell = s / CGFloat(n) - 3
-        let filled: [Int: Color] = [2: Color(hex: "3EA1E0"), 5: Color(hex: "3EA1E0"), 6: Color(hex: "F25CA2"),
-                                    9: Color(hex: "F25CA2"), 10: Color(hex: "F2B90C")]
+        let square = Color(hex: "3EA1E0")
+        let lShape = Color(hex: "F25CA2")
+        let line = Color(hex: "F2B90C")
+        let filled: [Int: Color] = [
+            0: square, 1: square, 4: square, 5: square,       // 2×2 block
+            2: lShape, 3: lShape, 7: lShape,                  // L piece
+            8: line, 9: line, 10: line,                       // I piece
+        ]
         return VStack(spacing: 3) {
             ForEach(0..<n, id: \.self) { r in
                 HStack(spacing: 3) {
                     ForEach(0..<n, id: \.self) { c in
                         if let color = filled[r * n + c] {
-                            PopBlock(color, width: cell, height: cell, corner: 4)
+                            PopBlock(color, width: cell, height: cell, corner: 4, shadow: false)
                         } else {
                             RoundedRectangle(cornerRadius: 4, style: .continuous)
                                 .fill(Color.white.opacity(0.06))
@@ -266,84 +313,97 @@ private struct GamePreview: View {
     }
 
     private func merge(_ s: CGFloat) -> some View {
-        VStack(spacing: s * 0.06) {
-            numberTile("4", Color(hex: "8B5CF6"), s * 0.5, s * 0.4)
+        VStack(spacing: s * 0.05) {
+            numberTile("2", Color(hex: "3ECF7A"), s * 0.3, s * 0.24)
             HStack(spacing: s * 0.05) {
-                numberTile("32", Color(hex: "3EA1E0"), s * 0.34, s * 0.28)
-                numberTile("2", Color(hex: "F25CA2"), s * 0.34, s * 0.28)
-                numberTile("8", Color(hex: "F2B90C"), s * 0.34, s * 0.28)
+                numberTile("4", Color(hex: "3EA1E0"), s * 0.3, s * 0.24)
+                numberTile("8", Color(hex: "8B5CF6"), s * 0.3, s * 0.24)
             }
+            numberTile("16", Color(hex: "F25CA2"), s * 0.42, s * 0.24)
         }
     }
 
     private func drop(_ s: CGFloat) -> some View {
-        HStack(alignment: .bottom, spacing: s * 0.08) {
-            VStack(spacing: s * 0.05) {
-                numberCircle("2", Color(hex: "3ECF7A"), s * 0.32)
-                numberCircle("4", Color(hex: "3EA1E0"), s * 0.32)
-            }
-            numberCircle("8", Color(hex: "F2883C"), s * 0.4)
+        HStack(alignment: .bottom, spacing: s * 0.06) {
+            numberCircle("2", Color(hex: "3ECF7A"), s * 0.3)
+            numberCircle("4", Color(hex: "3EA1E0"), s * 0.36)
+            numberCircle("8", Color(hex: "F2883C"), s * 0.3)
         }
     }
 
     private func maze(_ s: CGFloat) -> some View {
         ZStack {
             Path { p in
-                p.move(to: CGPoint(x: s * 0.16, y: s * 0.2))
-                p.addLine(to: CGPoint(x: s * 0.16, y: s * 0.55))
-                p.addLine(to: CGPoint(x: s * 0.56, y: s * 0.55))
-                p.addLine(to: CGPoint(x: s * 0.56, y: s * 0.2))
-                p.addLine(to: CGPoint(x: s * 0.86, y: s * 0.2))
-                p.addLine(to: CGPoint(x: s * 0.86, y: s * 0.82))
-                p.addLine(to: CGPoint(x: s * 0.36, y: s * 0.82))
+                p.move(to: CGPoint(x: s * 0.22, y: s * 0.25))
+                p.addLine(to: CGPoint(x: s * 0.22, y: s * 0.5))
+                p.addLine(to: CGPoint(x: s * 0.5, y: s * 0.5))
+                p.addLine(to: CGPoint(x: s * 0.5, y: s * 0.25))
+                p.addLine(to: CGPoint(x: s * 0.78, y: s * 0.25))
+                p.addLine(to: CGPoint(x: s * 0.78, y: s * 0.75))
+                p.addLine(to: CGPoint(x: s * 0.42, y: s * 0.75))
             }
             .stroke(Color(hex: "E0473E"), style: StrokeStyle(lineWidth: s * 0.13, lineCap: .round, lineJoin: .round))
             .shadow(color: Color(hex: "E0473E").opacity(0.5), radius: 3)
             PopSphere(color: Color(hex: "E8EBF2"), size: s * 0.2)
-                .position(x: s * 0.16, y: s * 0.2)
+                .position(x: s * 0.22, y: s * 0.25)
         }
     }
 
     private func brawl(_ s: CGFloat) -> some View {
         ZStack {
             ForEach(0..<8, id: \.self) { i in
+                let a = Double(i) / 8 * 2 * .pi
                 Capsule().fill(Color(hex: "3ECF7A").opacity(0.5))
-                    .frame(width: s * 0.06, height: s * 0.26)
-                    .offset(y: -s * 0.32)
+                    .frame(width: s * 0.06, height: s * 0.22)
                     .rotationEffect(.degrees(Double(i) / 8 * 360))
+                    .position(x: s * 0.5 + CGFloat(sin(a)) * s * 0.36,
+                             y: s * 0.5 - CGFloat(cos(a)) * s * 0.36)
             }
             PopBlock(Color(hex: "3ECF7A"), width: s * 0.3, height: s * 0.3)
+                .position(x: s * 0.5, y: s * 0.5)
         }
     }
 
+    /// Same simple "creature" silhouette repeated so it's obvious what game
+    /// this is — a circle body with two eyes — with one picked out by colour
+    /// and a ring, the way the real game asks you to spot it.
     private func spot(_ s: CGFloat) -> some View {
-        let dim: [(CGFloat, CGFloat)] = [(0.2, 0.25), (0.78, 0.22), (0.22, 0.78), (0.8, 0.72)]
+        let dim: [(CGFloat, CGFloat)] = [(0.24, 0.28), (0.76, 0.28), (0.24, 0.76)]
         return ZStack {
             ForEach(Array(dim.enumerated()), id: \.offset) { _, pt in
-                PopSphere(color: Color(hex: "6B7280"), size: s * 0.22).position(x: pt.0 * s, y: pt.1 * s)
+                creature(Color(hex: "6B7280"), s: s * 0.3).position(x: pt.0 * s, y: pt.1 * s)
             }
-            PopSphere(color: Color(hex: "3ECF7A"), size: s * 0.24)
-                .overlay {
-                    HStack(spacing: s * 0.05) {
-                        Circle().fill(.black.opacity(0.7)).frame(width: s * 0.03)
-                        Circle().fill(.black.opacity(0.7)).frame(width: s * 0.03)
-                    }
-                    .offset(y: -s * 0.02)
-                }
-                .position(x: s * 0.5, y: s * 0.5)
-            Circle().stroke(Color(hex: "3ECF7A"), lineWidth: s * 0.03).frame(width: s * 0.34)
-                .position(x: s * 0.5, y: s * 0.5)
+            creature(Color(hex: "3ECF7A"), s: s * 0.34).position(x: s * 0.76, y: s * 0.76)
+            Circle().stroke(Color(hex: "3ECF7A"), lineWidth: s * 0.025).frame(width: s * 0.46)
+                .position(x: s * 0.76, y: s * 0.76)
         }
     }
 
+    private func creature(_ color: Color, s: CGFloat) -> some View {
+        PopSphere(color: color, size: s, shadow: false)
+            .overlay {
+                HStack(spacing: s * 0.22) {
+                    Circle().fill(.black.opacity(0.75)).frame(width: s * 0.13)
+                    Circle().fill(.black.opacity(0.75)).frame(width: s * 0.13)
+                }
+                .offset(y: -s * 0.02)
+            }
+    }
+
+    /// A tight, uniform grid of small glossy bubbles — bubble wrap, not a
+    /// scattered polka-dot pattern.
     private func pop(_ s: CGFloat) -> some View {
-        let n = 4
-        let d = s / CGFloat(n) - 4
-        return VStack(spacing: 4) {
-            ForEach(0..<n, id: \.self) { r in
-                HStack(spacing: 4) {
-                    ForEach(0..<n, id: \.self) { c in
-                        PopSphere(color: Color(hex: "C77DFF").opacity((r + c).isMultiple(of: 3) ? 0.55 : 0.9), size: d)
+        let n = 5
+        let d = s / CGFloat(n) - 2.5
+        return VStack(spacing: 2.5) {
+            ForEach(0..<n, id: \.self) { _ in
+                HStack(spacing: 2.5) {
+                    ForEach(0..<n, id: \.self) { _ in
+                        Circle()
+                            .fill(RadialGradient(colors: [.white.opacity(0.5), Color(hex: "C77DFF").opacity(0.35)],
+                                                 center: UnitPoint(x: 0.35, y: 0.3), startRadius: 0, endRadius: d * 0.7))
+                            .overlay(Circle().stroke(.white.opacity(0.3), lineWidth: 0.75))
+                            .frame(width: d, height: d)
                     }
                 }
             }
@@ -359,44 +419,65 @@ private struct GamePreview: View {
         }
     }
 
+    /// A sandy tray with raked lines — warm tan, not purple.
     private func sand(_ s: CGFloat) -> some View {
-        VStack(spacing: s * 0.14) {
-            ForEach(0..<4, id: \.self) { i in
-                Path { p in
-                    p.move(to: CGPoint(x: 0, y: 0))
-                    p.addCurve(to: CGPoint(x: s * 0.9, y: 0),
-                              control1: CGPoint(x: s * 0.3, y: i.isMultiple(of: 2) ? -s * 0.1 : s * 0.1),
-                              control2: CGPoint(x: s * 0.6, y: i.isMultiple(of: 2) ? s * 0.1 : -s * 0.1))
+        ZStack {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color(hex: "8B6F47"))
+                .frame(width: s * 0.94, height: s * 0.94)
+            VStack(spacing: s * 0.13) {
+                ForEach(0..<4, id: \.self) { i in
+                    Path { p in
+                        p.move(to: CGPoint(x: 0, y: 0))
+                        p.addCurve(to: CGPoint(x: s * 0.72, y: 0),
+                                  control1: CGPoint(x: s * 0.24, y: i.isMultiple(of: 2) ? -s * 0.08 : s * 0.08),
+                                  control2: CGPoint(x: s * 0.48, y: i.isMultiple(of: 2) ? s * 0.08 : -s * 0.08))
+                    }
+                    .stroke(Color(hex: "E8CFA0"), style: StrokeStyle(lineWidth: s * 0.035, lineCap: .round))
+                    .frame(width: s * 0.72, height: s * 0.05)
                 }
-                .stroke(Color(hex: "C77DFF").opacity(0.6), style: StrokeStyle(lineWidth: s * 0.035, lineCap: .round))
-                .frame(width: s * 0.9, height: s * 0.06)
             }
         }
     }
 
+    /// A peg with rings actually stacked around it, big on the bottom —
+    /// the classic tower puzzle, not three free-floating bars.
     private func rings(_ s: CGFloat) -> some View {
-        VStack(spacing: s * 0.05) {
-            PopCapsule(color: Color(hex: "E0473E"), width: s * 0.78, height: s * 0.16)
-            PopCapsule(color: Color(hex: "F2B90C"), width: s * 0.56, height: s * 0.16)
-            PopCapsule(color: Color(hex: "3ECF7A"), width: s * 0.34, height: s * 0.16)
+        ZStack(alignment: .bottom) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(Color.white.opacity(0.25))
+                .frame(width: s * 0.05, height: s * 0.66)
+            VStack(spacing: s * 0.04) {
+                PopCapsule(color: Color(hex: "E0473E"), width: s * 0.7, height: s * 0.15)
+                PopCapsule(color: Color(hex: "F2B90C"), width: s * 0.5, height: s * 0.15)
+                PopCapsule(color: Color(hex: "3ECF7A"), width: s * 0.3, height: s * 0.15)
+            }
         }
     }
 
+    /// A falling piece above a mounded pile of colourful sand — not a flat row.
     private func sandfall(_ s: CGFloat) -> some View {
         VStack(spacing: s * 0.1) {
             HStack(spacing: 2) {
-                PopBlock(Color(hex: "F2B90C"), width: s * 0.16, height: s * 0.16, corner: 3)
-                PopBlock(Color(hex: "F2B90C"), width: s * 0.16, height: s * 0.16, corner: 3)
+                PopBlock(Color(hex: "3EA1E0"), width: s * 0.16, height: s * 0.16, corner: 3)
+                PopBlock(Color(hex: "3EA1E0"), width: s * 0.16, height: s * 0.16, corner: 3)
             }
-            .offset(x: -s * 0.15)
             Spacer(minLength: 0)
-            HStack(spacing: 2) {
-                ForEach(Array(sandColors.enumerated()), id: \.offset) { _, c in
-                    PopBlock(c, width: s * 0.14, height: s * 0.14, corner: 3)
-                }
+            VStack(spacing: 2) {
+                pileRow(count: 2, size: s * 0.13)
+                pileRow(count: 4, size: s * 0.13)
+                pileRow(count: 6, size: s * 0.13)
             }
         }
         .frame(width: s, height: s)
+    }
+
+    private func pileRow(count: Int, size: CGFloat) -> some View {
+        HStack(spacing: 2) {
+            ForEach(0..<count, id: \.self) { i in
+                PopBlock(sandColors[i % sandColors.count], width: size, height: size, corner: 2, shadow: false)
+            }
+        }
     }
 
     private var sandColors: [Color] {

@@ -26,11 +26,12 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-// Declaration order is also the order the home grid shows them in — premium
-// activities are interleaved with free ones on purpose rather than grouped,
-// so Plus doesn't read as "everything past this point costs money".
+// Declaration order is also the order the home grid shows them in: doodle,
+// Color Blocks, Color, Maze Paint, Number Merge and Pop lead (the most-used
+// free activities), then the rest of the free set, then every Plus activity
+// last.
 enum ActivityModule: String, CaseIterable, Identifiable {
-    case doodle, notes, merge, color, zen, brawl, drop, marble, spot, pop, click, ksand, rings, sandfall
+    case doodle, zen, color, marble, drop, pop, notes, click, rings, sandfall, merge, brawl, spot, ksand
     var id: String { rawValue }
 
     var category: ActivityCategory {
@@ -47,8 +48,8 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .notes: "Notes"
         case .color: "Color"
         case .zen: "Color Blocks"
-        case .merge: "Number Merge"
-        case .drop: "Merge"
+        case .merge: "2048"
+        case .drop: "Number Merge"
         case .marble: "Maze Paint"
         case .brawl: "Brawl"
         case .spot: "Spot"
@@ -96,8 +97,8 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .notes: "A quick scratch notepad."
         case .color: "Tap-to-fill colouring scenes."
         case .zen: "A block-drop line-clear puzzle."
-        case .merge: "Slide-to-merge number tiles (2048)."
-        case .drop: "Drop blocks into columns; equal ones merge."
+        case .merge: "Swipe to slide and merge matching number tiles."
+        case .drop: "Drop numbered pieces into columns; equal ones merge."
         case .marble: "Slide a marble to paint every tile of the maze."
         case .brawl: "Swipe to fend off enemies from all four sides."
         case .spot: "Find the one creature that matches, against the clock."

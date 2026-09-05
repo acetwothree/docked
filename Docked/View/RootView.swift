@@ -147,11 +147,11 @@ struct RootView: View {
     }
 
     /// The whole bottom bar of the TV cabinet is the screen-fit control: press
-    /// and drag anywhere along it — the wood strip, the speaker grille, between
-    /// and around the knobs — up or down to stretch the screen so the border
-    /// wraps whatever video is playing. The knob buttons are drawn on top and
-    /// still take taps; a drag that starts off a knob grabs the bar.
-    /// Onboarding + Settings ▸ How to use explain it.
+    /// and drag anywhere along it — the wood strip, between and around the
+    /// knobs — up or down to stretch the screen so the border wraps whatever
+    /// video is playing. The knob buttons are drawn on top and still take
+    /// taps; a drag that starts off a knob grabs the bar. Onboarding +
+    /// Settings ▸ How to use explain it.
     private func stretchHandle(_ s: SolvedLayout) -> some View {
         // A little taller than the console so the very bottom edge is grabbable.
         let zoneH = s.console.height + 14
@@ -185,39 +185,36 @@ struct RootView: View {
         .accessibilityLabel("Drag to stretch the TV screen to fit your video")
     }
 
-    /// The three console knobs, positioned over the wells drawn by VideoFrameView.
+    /// The three console knobs, positioned over the wells drawn by VideoFrameView:
+    /// Back alone on the left, Theme + Settings paired on the right.
     @ViewBuilder
     private func consoleKnobs(_ s: SolvedLayout) -> some View {
-        let centers = LayoutSolver.knobCenters(inConsole: s.console)
+        let knobs = LayoutSolver.knobLayout(inConsole: s.console)
         let pal = app.tvTheme.palette
         ZStack {
-            if centers.count == 3 {
-                // Left → right: Back, Theme, Settings (settings is the
-                // right-most, easiest-reach knob). Back only does anything once
-                // a game is open — Docked Plus lives in Settings and on locked
-                // game cards instead of its own knob now.
-                TVKnob(icon: "chevron.left", palette: pal, enabled: openModule != nil) {
-                    endEditing()
-                    withAnimation(.snappy(duration: 0.22)) { openModule = nil }
-                }
-                .position(centers[0])
-
-                TVKnob(icon: "paintpalette.fill", palette: pal) {
-                    if store.entitled {
-                        withAnimation(.easeInOut(duration: 0.25)) { app.tvTheme = app.tvTheme.next }
-                    } else {
-                        endEditing()
-                        plusContext = "This knob switches the TV between colour themes."
-                        showPlus = true
-                    }
-                }
-                .position(centers[1])
-
-                TVKnob(icon: "gearshape.fill", palette: pal) {
-                    endEditing(); showSettings = true
-                }
-                .position(centers[2])
+            // Back only does anything once a game is open — Docked Plus lives
+            // in Settings and on locked game cards instead of its own knob now.
+            TVKnob(icon: "chevron.left", palette: pal, enabled: openModule != nil) {
+                endEditing()
+                withAnimation(.snappy(duration: 0.22)) { openModule = nil }
             }
+            .position(knobs.back)
+
+            TVKnob(icon: "paintpalette.fill", palette: pal) {
+                if store.entitled {
+                    withAnimation(.easeInOut(duration: 0.25)) { app.tvTheme = app.tvTheme.next }
+                } else {
+                    endEditing()
+                    plusContext = "This knob switches the TV between colour themes."
+                    showPlus = true
+                }
+            }
+            .position(knobs.theme)
+
+            TVKnob(icon: "gearshape.fill", palette: pal) {
+                endEditing(); showSettings = true
+            }
+            .position(knobs.settings)
         }
         .allowsHitTesting(true)
     }

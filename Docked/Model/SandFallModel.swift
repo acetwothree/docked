@@ -4,9 +4,11 @@
 //
 //  "Sand Fall" — coloured tetromino-shaped clusters fall down a grid; on
 //  landing they crumble into loose grains of sand that trickle and settle
-//  (straight down, or diagonally if blocked) instead of staying rigid.
-//  A row clears when it's completely full AND every grain in it is the same
-//  colour. Lose when a new piece can't spawn.
+//  (straight down, or diagonally if blocked) instead of staying rigid. A
+//  colour clears once it forms one connected path of touching grains that
+//  spans every column from the left wall to the right wall — the path doesn't
+//  have to be a straight row, it can zigzag up and down. Lose when a new
+//  piece can't spawn.
 //
 //  Each grain keeps a stable identity (`Grain.id`) across settle passes so
 //  the view can animate it sliding to its new cell, rather than cells just
@@ -37,8 +39,8 @@ final class SandFallModel {
     private(set) var score = 0
     private(set) var best: Int
     private(set) var phase: Phase = .play
-    /// Rows currently flashing before they're removed.
-    private(set) var clearingRows: Set<Int> = []
+    /// Cell indices (row*cols+col) currently flashing before they're removed.
+    private(set) var clearingCells: Set<Int> = []
 
     private(set) var lockTick = 0
     private(set) var clearTick = 0
@@ -100,21 +102,12 @@ final class SandFallModel {
         return true
     }
 
-    // MARK: player input
+    // MARK: player input — move only; these pieces don't rotate.
 
     func moveActive(dCol: Int) {
         guard phase == .play else { return }
         let moved = activeCells.map { (row: $0.row, col: $0.col + dCol) }
         if canPlace(moved) { activeCells = moved }
-    }
-
-    func rotateActive() {
-        guard phase == .play, let pivot = activeCells.first else { return }
-        let rotated = activeCells.map { c -> (row: Int, col: Int) in
-            let dr = c.row - pivot.row, dc = c.col - pivot.col
-            return (row: pivot.row + dc, col: pivot.col - dr)
-        }
-        if canPlace(rotated) { activeCells = rotated }
     }
 
     /// One tick of the fall — moves down if possible, else locks. Returns
@@ -182,32 +175,61 @@ final class SandFallModel {
         return moved
     }
 
-    /// Rows that are completely full AND a single colour throughout.
-    func fullMonoRows() -> [Int] {
-        var full: [Int] = []
+    /// Every cell belonging to a same-colour, 8-connected group that touches
+    /// both the left wall (column 0) and the right wall (last column) — the
+    /// path doesn't have to run at one height, it can zigzag through any
+    /// touching same-colour grains as long as it connects the two walls.
+    func spanningClearCells() -> Set<Int> {
+        var colorAt: [Int: Color] = [:]
+        for g in grains { colorAt[g.row * cols + g.col] = g.color }
+        guard !colorAt.isEmpty else { return [] }
+
+        var visited = Set<Int>()
+        var toClear = Set<Int>()
+        let dirs = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+
         for r in 0..<rows {
-            let rowGrains = grains.filter { $0.row == r }
-            guard rowGrains.count == cols, let first = rowGrains.first?.color else { continue }
-            if rowGrains.allSatisfy({ $0.color == first }) { full.append(r) }
+            let start = r * cols
+            guard let color = colorAt[start], !visited.contains(start) else { continue }
+            var comp: Set<Int> = []
+            var touchesRight = false
+            var queue = [start]
+            visited.insert(start)
+            var qi = 0
+            while qi < queue.count {
+                let cur = queue[qi]; qi += 1
+                comp.insert(cur)
+                let cr = cur / cols, cc = cur % cols
+                if cc == cols - 1 { touchesRight = true }
+                for (dr, dc) in dirs {
+                    let nr = cr + dr, nc = cc + dc
+                    guard nr >= 0, nr < rows, nc >= 0, nc < cols else { continue }
+                    let ni = nr * cols + nc
+                    guard !visited.contains(ni), colorAt[ni] == color else { continue }
+                    visited.insert(ni)
+                    queue.append(ni)
+                }
+            }
+            if touchesRight { toClear.formUnion(comp) }
         }
-        return full
+        return toClear
     }
 
-    /// Marks rows as clearing (for the flash), actually removed a beat later
+    /// Marks cells as clearing (for the flash), actually removed a beat later
     /// by `finishClearing`.
-    func beginClearing(_ rowsToClear: [Int]) {
-        guard !rowsToClear.isEmpty else { return }
-        clearingRows = Set(rowsToClear)
+    func beginClearing(_ cells: Set<Int>) {
+        guard !cells.isEmpty else { return }
+        clearingCells = cells
         clearTick += 1
     }
 
     func finishClearing() {
-        guard !clearingRows.isEmpty else { return }
-        let n = clearingRows.count
-        grains.removeAll { clearingRows.contains($0.row) }
-        score += n * 100 + (n - 1) * 40
+        guard !clearingCells.isEmpty else { return }
+        let n = clearingCells.count
+        grains.removeAll { clearingCells.contains($0.row * cols + $0.col) }
+        score += n * 12
         best = max(best, score)
-        clearingRows = []
+        clearingCells = []
     }
 
     func afterLockShouldSpawnNext() {
@@ -220,7 +242,7 @@ final class SandFallModel {
         activeCells = []
         score = 0
         phase = .play
-        clearingRows = []
+        clearingCells = []
         spawn()
     }
 }

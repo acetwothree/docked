@@ -194,10 +194,10 @@ final class BrawlModel {
         switch phase {
         case .ready, .over:
             enemies.removeAll(); score = 0; lives = 3
-            spawnCountdown = 0.35; speed = 0.24; elapsed = 0
-            // Two enemies already on the board so it's a fight from the first tap.
-            for d in Array(0..<4).shuffled().prefix(2) {
-                enemies.append(Enemy(dir: d, dist: CGFloat.random(in: 0.8...1.0)))
+            spawnCountdown = 0.22; speed = 0.30; elapsed = 0
+            // Three enemies already on the board so it's a fight from the first tap.
+            for d in Array(0..<4).shuffled().prefix(3) {
+                enemies.append(Enemy(dir: d, dist: CGFloat.random(in: 0.7...1.0)))
             }
             phase = .running
         case .running:
@@ -225,7 +225,7 @@ final class BrawlModel {
         guard phase == .running else { return }
         let dt = min(rawDt, 1.0 / 30.0)
         elapsed += dt
-        speed = 0.24 + elapsed * 0.007
+        speed = 0.30 + elapsed * 0.009
 
         for i in enemies.indices { enemies[i].dist -= speed * dt }
 
@@ -238,8 +238,8 @@ final class BrawlModel {
         spawnCountdown -= dt
         if spawnCountdown <= 0 {
             enemies.append(Enemy(dir: Int.random(in: 0..<4), dist: 1))
-            let base = max(0.32, 1.0 - elapsed * 0.025)
-            spawnCountdown = CGFloat.random(in: base...(base + 0.5))
+            let base = max(0.22, 0.75 - elapsed * 0.03)
+            spawnCountdown = CGFloat.random(in: base...(base + 0.4))
         }
     }
 }

@@ -2,9 +2,10 @@
 //  MergeDropView.swift
 //  Docked
 //
-//  "Merge" — a tiny column dropper. Drag across the board to aim, release over
-//  a column to drop the next block; equal blocks stacked on each other merge
-//  into the next tier and everything falls. Best score persists.
+//  "Number Merge" — a tiny column dropper. Drag across the board to aim,
+//  release over a column to drop the next block; equal blocks stacked on
+//  each other merge into the next tier and everything falls. Best score
+//  persists.
 //
 
 import SwiftUI
@@ -19,9 +20,9 @@ struct MergeDropView: View {
     @AppStorage("docked.drop.over") private var savedOver = false
 
     private let cols = 5
-    private let rows = 8
+    private let rows = 5
 
-    @State private var grid: [Int] = Array(repeating: 0, count: 40)
+    @State private var grid: [Int] = Array(repeating: 0, count: 25)
     @State private var next = 1
     @State private var score = 0
     @State private var over = false
@@ -46,19 +47,20 @@ struct MergeDropView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            HStack {
+            HStack(spacing: 0) {
                 Text("SCORE \(score)").font(.system(size: 12, weight: .heavy)).monospacedDigit()
                     .foregroundStyle(.secondary)
-                Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Text("BEST \(max(best, score))").font(.system(size: 12, weight: .heavy)).monospacedDigit()
                     .foregroundStyle(.secondary)
-                Spacer()
+                    .frame(maxWidth: .infinity, alignment: .center)
                 Button { newGame() } label: {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.secondary).frame(width: 34, height: 30)
                 }
                 .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
             HStack(spacing: 6) {
@@ -89,7 +91,7 @@ struct MergeDropView: View {
                             .position(x: CGFloat(hc) * cw + cw / 2, y: ch / 2)
                     }
 
-                    ForEach(Array(0..<40), id: \.self) { i in
+                    ForEach(Array(0..<(cols * rows)), id: \.self) { i in
                         cellView(i, cw: cw, ch: ch)
                     }
 
@@ -130,7 +132,7 @@ struct MergeDropView: View {
             guard !restored else { return }
             restored = true
             let parts = savedGrid.split(separator: ",").compactMap { Int($0) }
-            if parts.count == 40, parts.contains(where: { $0 != 0 }) {
+            if parts.count == cols * rows, parts.contains(where: { $0 != 0 }) {
                 grid = parts
                 score = savedScore
                 next = savedNext
@@ -188,7 +190,7 @@ struct MergeDropView: View {
     private func clampCol(_ x: Int) -> Int { min(max(x, 0), cols - 1) }
 
     private func newGame() {
-        grid = Array(repeating: 0, count: 40)
+        grid = Array(repeating: 0, count: cols * rows)
         score = 0
         over = false
         falling = nil

@@ -4,10 +4,10 @@
 //
 //  The whole TV set, drawn as one wood cabinet: the screen opening near the
 //  top (the app background shows through, so unfilled PiP area reads as
-//  letterbox bars) and a console strip along the bottom with a speaker
-//  grille, an engraved label (the open game's name, or the app's own name)
-//  centered between the grille and three recessed knob wells. RootView drops
-//  the real knob buttons onto the wells.
+//  letterbox bars) and a console strip along the bottom with the Back knob
+//  alone on the left, Theme + Settings paired on the right, and an engraved
+//  label (the open game's name, or the app's own name) centered in the gap
+//  between them. RootView drops the real knob buttons onto the wells.
 //
 
 import SwiftUI
@@ -94,20 +94,9 @@ struct VideoFrameView: View {
         ctx.fill(Path(CGRect(x: 6, y: ridgeY + 1.5, width: w - 12, height: 1)),
                  with: .color(palette.hi.opacity(0.3)))
 
-        // --- speaker grille (left of the console) ---
-        let grilleTop = consoleRect.minY + 10
-        let grilleBottom = consoleRect.maxY - 10
-        var gx = consoleRect.minX + 14
-        for _ in 0..<8 {
-            ctx.fill(Path(roundedRect: CGRect(x: gx, y: grilleTop, width: 3, height: grilleBottom - grilleTop),
-                                       cornerRadius: 1.5),
-                     with: .color(palette.key.opacity(0.32)))
-            gx += 6
-        }
-
         // --- knob wells ---
-        let knobCenters = LayoutSolver.knobCenters(inConsole: consoleRect)
-        for c in knobCenters {
+        let knobs = LayoutSolver.knobLayout(inConsole: consoleRect)
+        for c in knobs.all {
             let d = LayoutSolver.knobDiameter + 8
             ctx.fill(Path(ellipseIn: CGRect(x: c.x - d/2, y: c.y - d/2, width: d, height: d)),
                      with: .color(palette.deep.opacity(0.5)))
@@ -115,11 +104,10 @@ struct VideoFrameView: View {
                        with: .color(palette.key.opacity(0.4)), lineWidth: 1)
         }
 
-        // --- engraved console text — centered in the gap between the
-        // grille and the knob wells (either the open game's name, or the
-        // app's own name when nothing's open) ---
-        let knobsStart = (knobCenters.first?.x ?? consoleRect.maxX - 16) - (LayoutSolver.knobDiameter + 8) / 2 - 8
-        let cx = (gx + knobsStart) / 2
+        // --- engraved console text — centered in the gap between the Back
+        // knob and the Theme/Settings pair (either the open game's name, or
+        // the app's own name when nothing's open) ---
+        let cx = (knobs.back.x + knobs.theme.x) / 2
         let cy = consoleRect.midY
         let font = Font.system(size: 10, weight: .black, design: .rounded)
         // A light halo in every direction first (carries it on the dark

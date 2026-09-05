@@ -2,12 +2,11 @@
 //  MergeView.swift
 //  Docked
 //
-//  "Number Merge" — a tiny 2048. Swipe to slide the tiles; equal ones merge
-//  and add up. Each tile keeps its identity across a move (`Tile.id`), so it
-//  visibly SLIDES to its new cell rather than just changing a number at a
-//  fixed spot — that's what makes the merge direction legible. A brief
-//  direction glyph also flashes on every swipe so the input itself reads
-//  clearly. Best score persists.
+//  "2048" — swipe to slide the tiles; equal ones merge and add up. Each tile
+//  keeps its identity across a move (`Tile.id`), so it visibly SLIDES to its
+//  new cell rather than just changing a number at a fixed spot — that's what
+//  makes the merge direction legible. A small corner badge flashes the swipe
+//  direction too. Best score persists.
 //
 
 import SwiftUI
@@ -142,10 +141,16 @@ struct MergeView: View {
                 tileView(tile, cell: cell, gap: gap)
             }
             if let d = swipeDir {
+                // A small corner badge, not a shape blocking the board —
+                // just enough to confirm which way the swipe registered.
                 Image(systemName: iconFor(d))
-                    .font(.system(size: side * 0.26, weight: .black))
+                    .font(.system(size: 11, weight: .heavy))
                     .foregroundStyle(Theme.accent)
+                    .frame(width: 22, height: 22)
+                    .background(Theme.paper, in: Circle())
+                    .overlay(Circle().stroke(Theme.hairline, lineWidth: 1))
                     .opacity(swipeOpacity)
+                    .position(x: side - 18, y: 18)
                     .allowsHitTesting(false)
             }
         }
@@ -231,7 +236,7 @@ struct MergeView: View {
         swipeDir = dir
         swipeGeneration += 1
         let gen = swipeGeneration
-        withAnimation(.easeOut(duration: 0.05)) { swipeOpacity = 0.4 }
+        withAnimation(.easeOut(duration: 0.05)) { swipeOpacity = 0.85 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
             guard swipeGeneration == gen else { return }
             withAnimation(.easeOut(duration: 0.25)) { swipeOpacity = 0 }

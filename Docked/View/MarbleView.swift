@@ -4,11 +4,12 @@
 //
 //  "Maze Paint" — swipe and the marble slides until it hits a wall or the
 //  edge. Paint every open tile to clear the level. Levels are random mazes (a
-//  recursive-backtracker carve, regenerated until at least one full-clear
-//  order exists). If the player's own move order ever paints them into a
-//  corner the rest can't reach, `paintableBySliding` catches it right away
-//  and the level quietly reshuffles instead of leaving them stuck. Grid size
-//  grows with the level. Level persists.
+//  recursive-backtracker carve), regenerated at load time until a full-clear
+//  order is verified to exist — an unsolvable layout is never shown. If the
+//  player's own move order still paints them into a corner the rest can't
+//  reach, `paintableBySliding` catches it right away and the SAME maze
+//  restarts (never swapped for a different one) so they can try a better
+//  order. Grid size grows with the level. Level persists.
 //
 
 import SwiftUI
@@ -40,7 +41,7 @@ struct MarbleView: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack {
-                Button { load(level) } label: {
+                Button { restartLevel() } label: {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.secondary)
@@ -63,13 +64,16 @@ struct MarbleView: View {
             }
 
             GeometryReader { geo in
-                let side = min(geo.size.width, geo.size.height)
+                let side = min(geo.size.width, geo.size.height) * 0.86
                 board(side: side)
                     .frame(width: side, height: side)
+                    // A light top-down-but-tilted skew, closer to the
+                    // isometric-looking reference than a flat plan view.
+                    .rotation3DEffect(.degrees(26), axis: (x: 1, y: 0, z: 0), perspective: 0.3)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
-            Text(cleared ? "Cleared!" : stuck ? "No path left — reshuffling…" : "Swipe to roll · paint every tile")
+            Text(cleared ? "Cleared!" : stuck ? "No path left — restarting…" : "Swipe to roll · paint every tile")
                 .font(.system(size: 12, weight: .heavy))
                 .foregroundStyle(cleared ? Color.green : stuck ? Color.orange : Color.secondary)
         }
@@ -208,12 +212,21 @@ struct MarbleView: View {
         } else if !Self.paintableBySliding(mw: cols, mh: rows, isOpen: { !walls.contains($0) },
                                           start: pos, covered: visited) {
             // However this position was reached, the rest of the board can no
-            // longer all be painted from here — reshuffle rather than leave
-            // the player stuck for good.
+            // longer all be painted from here. The maze itself is always
+            // generated with a full solution, so just restart THIS layout —
+            // never swap in a different maze — and try a better order.
             stuck = true
-            let lvl = level
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { load(lvl) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { restartLevel() }
         }
+    }
+
+    /// Resets the marble to the start of the SAME maze — no new layout is
+    /// generated. Used by both the reset button and the stuck-recovery timer.
+    private func restartLevel() {
+        pos = 0
+        visited = [0]
+        cleared = false
+        stuck = false
     }
 
     // MARK: maze generation (recursive backtracker)
