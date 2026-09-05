@@ -109,7 +109,10 @@ private struct NotesEditorSheet: View {
                 .background(.ultraThinMaterial)
             }
         }
-        .onAppear { focused = true }
+        // Deferring one runloop tick (rather than setting it straight inside
+        // onAppear, before the view is in the window) is what lets the
+        // keyboard rise together with the sheet instead of a beat later.
+        .onAppear { DispatchQueue.main.async { focused = true } }
     }
 
     private var wordCount: Int {

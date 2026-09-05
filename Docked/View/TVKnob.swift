@@ -40,9 +40,9 @@ struct TVKnob: View {
                 // square bounds, which showed up as a hard yellow square.)
                 if highlight {
                     Circle()
-                        .fill(RadialGradient(colors: [Theme.accent.opacity(0.55), .clear],
-                                             center: .center, startRadius: d * 0.32, endRadius: d * 0.62))
-                        .frame(width: d * 1.55, height: d * 1.55)
+                        .fill(RadialGradient(colors: [Theme.accent.opacity(0.5), .clear],
+                                             center: .center, startRadius: d * 0.42, endRadius: d * 0.66))
+                        .frame(width: d * 1.16, height: d * 1.16)
                         .allowsHitTesting(false)
                 }
 
@@ -100,7 +100,11 @@ struct TVKnob: View {
             .opacity(enabled ? 1 : 0.4)
             .animation(.easeOut(duration: 0.12), value: pressed)
             .shadow(color: .black.opacity(0.3), radius: 2, y: 1.5)
-            .contentShape(Circle())
+            // A forgiving, rectangular tap target a bit larger than the dial —
+            // the small circular hit area made the back knob easy to miss,
+            // which read as it "not responding".
+            .frame(width: d + 16, height: d + 16)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

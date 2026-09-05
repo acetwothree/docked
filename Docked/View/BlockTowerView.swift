@@ -63,7 +63,7 @@ struct BlockTowerView: View {
                 if score > best { best = score }
                 over = true
                 overTick += 1
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
                     over = false
                     scene.reset()
                 }

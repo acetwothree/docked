@@ -203,16 +203,16 @@ enum ColorSheets {
         Self.tri(0.46, 0.28, 0.22, 0.30),   // sail
     ]
 
-    // A cat face — 8 regions.
+    // A cat face — 8 regions, symmetric about the vertical centre line.
     static let cat: [ColorRegion] = [
-        Self.rect(0, 0, 1, 0.6),            // sky
-        Self.rect(0, 0.58, 1, 0.42),        // ground
-        Self.e(0.28, 0.22, 0.44, 0.42),     // head
-        Self.tri(0.26, 0.06, 0.18, 0.22),   // left ear
-        Self.tri(0.56, 0.06, 0.18, 0.22),   // right ear
-        Self.e(0.38, 0.42, 0.10, 0.10),     // left eye
-        Self.e(0.54, 0.42, 0.10, 0.10),     // right eye
-        Self.tri(0.46, 0.52, 0.08, 0.07),   // nose
+        Self.rect(0, 0, 1, 0.58),           // sky
+        Self.rect(0, 0.56, 1, 0.44),        // ground
+        Self.e(0.27, 0.24, 0.46, 0.44),     // head        x[0.27..0.73] → mid 0.50
+        Self.tri(0.28, 0.07, 0.19, 0.22),   // left ear    x mid 0.375
+        Self.tri(0.53, 0.07, 0.19, 0.22),   // right ear   x mid 0.625
+        Self.e(0.36, 0.44, 0.10, 0.10),     // left eye    x mid 0.41
+        Self.e(0.54, 0.44, 0.10, 0.10),     // right eye   x mid 0.59
+        Self.triDown(0.46, 0.55, 0.08, 0.07), // nose      x mid 0.50
     ]
 
     // A little car — 6 regions.
@@ -245,14 +245,15 @@ enum ColorSheets {
         Self.e(0.45, 0.05, 0.10, 0.10),     // cherry
     ]
 
-    // A butterfly — 6 regions.
+    // A butterfly — 6 regions. Body on the centre line; each wing pair
+    // symmetric about it and touching the body at x 0.47 / 0.53.
     static let butterfly: [ColorRegion] = [
         Self.rect(0, 0, 1, 1),              // background
-        Self.rect(0.47, 0.22, 0.06, 0.56),  // body
-        Self.e(0.10, 0.14, 0.36, 0.32),     // top-left wing
-        Self.e(0.54, 0.14, 0.36, 0.32),     // top-right wing
-        Self.e(0.16, 0.44, 0.28, 0.26),     // bottom-left wing
-        Self.e(0.56, 0.44, 0.28, 0.26),     // bottom-right wing
+        Self.rect(0.47, 0.20, 0.06, 0.56),  // body        x mid 0.50
+        Self.e(0.12, 0.16, 0.35, 0.30),     // top-left wing     x[0.12..0.47]
+        Self.e(0.53, 0.16, 0.35, 0.30),     // top-right wing    x[0.53..0.88]
+        Self.e(0.18, 0.46, 0.29, 0.26),     // bottom-left wing  x[0.18..0.47]
+        Self.e(0.53, 0.46, 0.29, 0.26),     // bottom-right wing x[0.53..0.82]
     ]
 
     // A friendly robot — 8 regions, no antenna, centred on the canvas.

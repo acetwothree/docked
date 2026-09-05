@@ -5,11 +5,11 @@
 //  "Crumble Drop" — coloured tetromino pieces spawn just above a dashed
 //  starting line and immediately begin a slow, steady, continuous descent —
 //  no pauses between steps. Drag left/right to slide the falling piece over
-//  (it follows your finger 1:1); swipe down to speed it up into an instant
-//  hard drop. A little preview square above the line always shows the next
-//  piece. On landing it crumbles into loose sand that trickles into gaps. A
-//  colour clears once a connected patch of it spans every column from the
-//  left wall to the right wall. Pieces don't rotate.
+//  (it follows your finger 1:1); tap to rotate it a quarter-turn; swipe
+//  down to speed it up into an instant hard drop. A preview square above
+//  the line always shows the next piece. On landing it crumbles into loose
+//  sand that trickles into gaps. A colour clears once a connected patch of
+//  it spans every column from the left wall to the right wall.
 //
 //  Settled grains keep a stable identity (`Grain.id`) across the model's
 //  settle passes, so `ForEach(model.grains)` animates each one sliding to its
@@ -54,7 +54,7 @@ struct SandFallView: View {
                 board(w: geo.size.width, h: geo.size.height)
             }
 
-            Text(model.phase == .over ? "Sand piled up — resetting…" : "Drag to slide, swipe down to drop fast")
+            Text(model.phase == .over ? "Sand piled up — resetting…" : "Drag to slide · tap to rotate · swipe down to drop")
                 .font(.system(size: 11, weight: .heavy))
                 .foregroundStyle(model.phase == .over ? Color.orange : Color.secondary)
                 .lineLimit(1).minimumScaleFactor(0.7)
@@ -128,7 +128,9 @@ struct SandFallView: View {
         // band" — a dashed starting line, with new pieces entering from
         // above it and a tiny preview of the next one parked in the corner.
         let cellW = w / CGFloat(model.cols)
-        let cellH = h / (CGFloat(model.rows) + 1)
+        // ~2 rows' worth of height reserved at the top for the spawn band, so
+        // the dashed line sits a bit lower on the board (not right at the top).
+        let cellH = h / (CGFloat(model.rows) + 2)
         let bandH = h - CGFloat(model.rows) * cellH
         func y(_ row: Int) -> CGFloat { bandH + CGFloat(row) * cellH + cellH / 2 }
 
@@ -160,12 +162,21 @@ struct SandFallView: View {
                     .position(x: CGFloat(c.col) * cellW + cellW / 2, y: y(c.row))
             }
 
-            nextPreview(box: min(bandH, cellW * 1.6) * 0.72)
-                .position(x: w - min(bandH, cellW * 1.6) * 0.42 - 6, y: bandH * 0.5)
+            let previewBox = min(bandH * 0.8, cellW * 2.6)
+            nextPreview(box: previewBox)
+                .position(x: w - previewBox / 2 - 8, y: bandH * 0.5)
         }
         .frame(width: w, height: h)
         .contentShape(Rectangle())
-        .gesture(dragGesture(cellW: cellW))
+        // A drag (>=8pt) slides / swipe-drops; a plain tap that never becomes
+        // a drag falls through to rotate.
+        .gesture(dragGesture(cellW: cellW).exclusively(before: tapToRotateGesture))
+    }
+
+    private var tapToRotateGesture: some Gesture {
+        TapGesture().onEnded {
+            withAnimation(.easeOut(duration: 0.1)) { model.rotateActive() }
+        }
     }
 
     /// A tiny scaled-down rendering of `model.nextShape`, in its own colour —

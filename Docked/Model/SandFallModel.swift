@@ -135,12 +135,33 @@ final class SandFallModel {
         return true
     }
 
-    // MARK: player input — move only; these pieces don't rotate.
+    // MARK: player input — slide, and rotate (tap).
 
     func moveActive(dCol: Int) {
         guard phase == .play else { return }
         let moved = activeCells.map { (row: $0.row, col: $0.col + dCol) }
         if canPlace(moved) { activeCells = moved }
+    }
+
+    /// Quarter-turn clockwise about the piece's bounding-box, nudged back
+    /// inside the walls if the turn would poke it out. No-op if the rotated
+    /// shape can't fit where it is.
+    func rotateActive() {
+        guard phase == .play, !activeCells.isEmpty else { return }
+        let minR = activeCells.map(\.row).min()!
+        let minC = activeCells.map(\.col).min()!
+        let local = activeCells.map { (r: $0.row - minR, c: $0.col - minC) }
+        let maxR = local.map(\.r).max()!
+        // clockwise: (r, c) -> (c, maxR - r)
+        var cand = local.map { (row: $0.c + minR, col: (maxR - $0.r) + minC) }
+        // shove horizontally back into range if needed
+        if let lo = cand.map(\.col).min(), lo < 0 {
+            cand = cand.map { (row: $0.row, col: $0.col - lo) }
+        }
+        if let hi = cand.map(\.col).max(), hi > cols - 1 {
+            cand = cand.map { (row: $0.row, col: $0.col - (hi - (cols - 1)) ) }
+        }
+        if canPlace(cand) { activeCells = cand }
     }
 
     /// One tick of the fall — moves down if possible, else locks. Returns

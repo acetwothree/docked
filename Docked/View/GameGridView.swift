@@ -458,7 +458,10 @@ private struct GamePreview: View {
         // bounds, so a grid that already hugs the edges gets its top row
         // clipped the moment it's nudged upward to center.
         let gap: CGFloat = 2.5
-        let boardSide = s * 0.8
+        // Grid deliberately smaller than the s×s box (0.76s) so there's ~0.12s
+        // of margin on every side — enough headroom to nudge it up for
+        // centering without `.drawingGroup()` clipping the top row.
+        let boardSide = s * 0.76
         let d = (boardSide - CGFloat(n - 1) * gap) / CGFloat(n)
         return VStack(spacing: gap) {
             ForEach(0..<n, id: \.self) { _ in
@@ -473,7 +476,7 @@ private struct GamePreview: View {
                 }
             }
         }
-        .offset(y: -s * 0.03)
+        .offset(y: -s * 0.055)
     }
 
     private func click(_ s: CGFloat) -> some View {
