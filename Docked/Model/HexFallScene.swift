@@ -2,12 +2,20 @@
 //  HexFallScene.swift
 //  Docked
 //
-//  "Hex Fall" — a hexagon balances flat on top of a tower built from real
-//  tetromino pieces (packed tight, uniform 2-row height so they snap
-//  together without gaps). Tap a piece to remove it; SpriteKit's own
-//  rigid-body physics decides what tumbles — nothing is scripted. Once a
-//  tower is mostly cleared a fresh one grows back under the hexagon, so a
-//  run only ends when the hexagon itself goes over.
+//  "Hex Fall" — guide a flat-top hexagon down an endless tower of packed
+//  bricks by tapping bricks out from under it. Bricks are plain STATIC
+//  terrain (never fall, never move on their own) — only the hexagon is a
+//  real dynamic physics body, so it rolls naturally into whatever gap a tap
+//  opens up. A tap deletes its brick instantly, no animation, exactly like
+//  disintegrating a step out of a staircase.
+//
+//  Rows are either "stable" (one full-width bar — removing it drops the
+//  hexagon straight down) or "unstable" (several narrower pillars — removing
+//  one tips it over into a roll). A camera tracks the hexagon downward
+//  (never back up) and new rows keep generating below, so a run only ends
+//  when the hexagon rolls off the left/right edge of the tower or is lost
+//  below the generated floor. Every so often a solid, unbreakable checkpoint
+//  row appears — guaranteed a moment to settle before the next stretch.
 //
 
 import SpriteKit
@@ -20,13 +28,40 @@ final class HexFallScene: SKScene {
     private(set) var score = 0
     private(set) var isOver = false
 
+    /// Grid width, in units — every row's segment widths sum to exactly this.
+    private let cols = 6
+    private var cell: CGFloat = 20
+
     private var hexagon: SKShapeNode!
-    private var blockNodes: [SKNode] = []
+    private var bricks: [SKNode] = []
+    private var lowestRowY: CGFloat = 0
+    private var rowsSinceCheckpoint = 0
+    private var blocksDestroyed = 0
+    private var startY: CGFloat = 0
+    private var cam: SKCameraNode!
+
+    private static let palette: [SKColor] = [
+        SKColor(red: 0.88, green: 0.28, blue: 0.24, alpha: 1),
+        SKColor(red: 0.95, green: 0.54, blue: 0.24, alpha: 1),
+        SKColor(red: 0.24, green: 0.81, blue: 0.48, alpha: 1),
+        SKColor(red: 0.24, green: 0.63, blue: 0.88, alpha: 1),
+        SKColor(red: 0.55, green: 0.36, blue: 0.97, alpha: 1),
+    ]
+    private static let checkpointColor = SKColor(red: 0.95, green: 0.83, blue: 0.35, alpha: 1)
+
+    /// Unstable-row blueprints — segment widths (in units) summing to `cols`.
+    private static let unstableRows: [[Int]] = [
+        [2, 2, 2], [1, 2, 3], [3, 2, 1], [1, 1, 1, 1, 1, 1], [4, 2], [2, 4], [1, 4, 1],
+    ]
 
     override func didMove(to view: SKView) {
         backgroundColor = .clear
         scaleMode = .resizeFill
-        physicsWorld.gravity = CGVector(dx: 0, dy: -6.2)   // a bit slower/floatier than default
+        physicsWorld.gravity = CGVector(dx: 0, dy: -6.2)
+        let camera = SKCameraNode()
+        self.camera = camera
+        cam = camera
+        addChild(camera)
         buildEverything()
     }
 
@@ -40,122 +75,133 @@ final class HexFallScene: SKScene {
     func reset() { buildEverything() }
 
     private func buildEverything() {
-        removeAllChildren()
-        blockNodes = []
+        for b in bricks { b.removeFromParent() }
+        bricks = []
+        hexagon?.removeFromParent()
         score = 0
+        blocksDestroyed = 0
+        rowsSinceCheckpoint = 0
         isOver = false
         onScoreChange?(0)
         physicsWorld.speed = 1
         guard size.width > 10, size.height > 10 else { return }
 
-        let floor = SKNode()
-        floor.position = CGPoint(x: size.width / 2, y: 6)
-        floor.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: size.width * 2, height: 12))
-        floor.physicsBody?.isDynamic = false
-        addChild(floor)
+        cell = size.width / CGFloat(cols)
+        lowestRowY = cell * 1.5
 
-        let topY = buildTower(fromY: 14)
+        // Enough starting rows to fill the visible board plus a buffer.
+        let startRows = max(10, Int(size.height / cell) + 6)
+        for _ in 0..<startRows { addRow(forcedStable: bricks.isEmpty) }
+
+        let topY = lowestRowY + cell
         placeHexagon(atY: topY)
+        startY = topY
+        cam.position = CGPoint(x: size.width / 2, y: size.height / 2)
     }
 
-    /// Packs rows of real (2-row-tall, so every row snaps to the same
-    /// height) tetromino pieces left to right, filling as much of the
-    /// tower's width as each row allows, and returns the Y just above the
-    /// last row — where the hexagon sits.
-    @discardableResult
-    private func buildTower(fromY startY: CGFloat) -> CGFloat {
-        let towerWidth = size.width * 0.86          // fill most of the width
-        let cell = min(24, towerWidth / 6)
-        let leftX = size.width / 2 - towerWidth / 2
-        var y = startY
+    // MARK: row generation
 
-        for rowIndex in 0..<6 {
-            let color = TetrominoBuilder.palette[rowIndex % TetrominoBuilder.palette.count]
-            var x = leftX
-            while x < leftX + towerWidth - cell * 1.4 {
-                let shape = TetrominoShape.twoRow.randomElement()!
-                let w = CGFloat(shape.colSpan) * cell
-                if x + w > leftX + towerWidth + cell * 0.4 { break }
-                let node = TetrominoBuilder.makeNode(shape: shape, cell: cell, color: color)
-                node.position = CGPoint(x: x + w / 2, y: y + CGFloat(shape.rowSpan) * cell / 2)
-                node.name = "block"
-                node.zPosition = CGFloat(rowIndex)
-                addChild(node)
-                blockNodes.append(node)
-                x += w
-            }
-            y += CGFloat(2) * cell   // every row here is 2 cells tall
+    private func addRow(forcedStable: Bool = false) {
+        rowsSinceCheckpoint += 1
+        let isCheckpoint = rowsSinceCheckpoint >= 12
+        if isCheckpoint { rowsSinceCheckpoint = 0 }
+
+        let widths: [Int] = isCheckpoint || forcedStable || Double.random(in: 0..<1) < 0.2
+            ? [cols]
+            : Self.unstableRows.randomElement()!
+        let color = isCheckpoint ? Self.checkpointColor : Self.palette.randomElement()!
+
+        var x: CGFloat = 0
+        for w in widths {
+            let segW = CGFloat(w) * cell
+            let node = SKShapeNode(rectOf: CGSize(width: segW - 1, height: cell - 1), cornerRadius: 2)
+            node.fillColor = color
+            node.strokeColor = SKColor.white.withAlphaComponent(0.22)
+            node.lineWidth = 1
+            node.position = CGPoint(x: x + segW / 2, y: lowestRowY + cell / 2)
+            // The physics body covers the FULL cell width (no render gap) so
+            // the hexagon can't slip through a purely cosmetic seam.
+            node.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: segW, height: cell))
+            node.physicsBody?.isDynamic = false
+            node.physicsBody?.friction = 0.9
+            node.name = isCheckpoint ? "checkpoint" : "brick"
+            node.zPosition = 1
+            addChild(node)
+            bricks.append(node)
+            x += segW
         }
-        return y
+        lowestRowY += cell
     }
 
     private func placeHexagon(atY y: CGFloat) {
-        let hexRadius = min(size.width * 0.86 * 0.22, 32)
-        let hexPath = TetrominoBuilder.polygonPath(sides: 6, radius: hexRadius)
-        let hex = SKShapeNode(path: hexPath)
+        let radius = cell * 0.85
+        let path = TetrominoBuilder.polygonPath(sides: 6, radius: radius)
+        let hex = SKShapeNode(path: path)
         hex.fillColor = SKColor(red: 0.24, green: 0.63, blue: 0.88, alpha: 1)
         hex.strokeColor = .white
         hex.lineWidth = 1.5
-        // Flat-top, so it sits flush on the tower instead of balanced on a point.
-        hex.position = CGPoint(x: size.width / 2, y: y + hexRadius * 0.87)
+        hex.position = CGPoint(x: size.width / 2, y: y)
         hex.zPosition = 50
-        let body = SKPhysicsBody(polygonFrom: hexPath)
-        body.friction = 0.9
-        body.restitution = 0.02
-        body.density = 0.6
-        body.angularDamping = 0.5
-        body.linearDamping = 0.15
+        let body = SKPhysicsBody(polygonFrom: path)
+        body.friction = 0.7
+        body.restitution = 0.01
+        body.density = 0.7
+        body.angularDamping = 0.3
+        body.linearDamping = 0.1
         hex.physicsBody = body
         addChild(hex)
         hexagon = hex
     }
 
-    /// Removes the topmost block under the touch, if any. Real physics takes
-    /// over from there — nothing else is scripted.
+    // MARK: input — converts a tap to scene space accounting for the camera,
+    // then deletes whatever brick is under it, instantly, no animation.
+
+    func scenePoint(fromView p: CGPoint, viewSize: CGSize) -> CGPoint {
+        let camPos = cam?.position ?? CGPoint(x: size.width / 2, y: size.height / 2)
+        let dx = p.x - viewSize.width / 2
+        let dy = (viewSize.height - p.y) - viewSize.height / 2
+        return CGPoint(x: camPos.x + dx, y: camPos.y + dy)
+    }
+
     func handleTap(at point: CGPoint) {
         guard !isOver else { return }
-        let hit = nodes(at: point).first { $0.name == "block" }
-        guard let node = hit else { return }
-        node.physicsBody = nil
-        blockNodes.removeAll { $0 === node }
-        node.run(.sequence([.group([.fadeOut(withDuration: 0.18), .scale(to: 0.7, duration: 0.18)]),
-                            .removeFromParent()]))
-        score += 1
-        onScoreChange?(score)
+        guard let node = nodes(at: point).first(where: { $0.name == "brick" }) else { return }
+        node.removeFromParent()
+        bricks.removeAll { $0 === node }
+        blocksDestroyed += 1
         onTapHit?()
     }
 
     override func update(_ currentTime: TimeInterval) {
-        guard !isOver, hexagon != nil else { return }
-        // The hexagon fell off the tower (or off the visible board entirely).
-        if hexagon.position.y < 4 || hexagon.position.x < -60 || hexagon.position.x > size.width + 60 {
+        guard !isOver, hexagon != nil, cam != nil else { return }
+
+        // Camera smoothly follows the hexagon downward; `min` with the
+        // current position means it can only ever move down, never back up.
+        let desiredY = hexagon.position.y + size.height * 0.12
+        let smoothed = cam.position.y + (desiredY - cam.position.y) * 0.08
+        cam.position = CGPoint(x: size.width / 2, y: min(smoothed, cam.position.y))
+
+        // Keep material coming as the hexagon descends.
+        while lowestRowY > cam.position.y - size.height * 1.3 { addRow() }
+        // Cull rows well above the camera — off-screen and behind us.
+        let cullAbove = cam.position.y + size.height
+        for b in bricks where b.position.y > cullAbove { b.removeFromParent() }
+        bricks.removeAll { $0.parent == nil }
+
+        // Loss: rolled off either edge, or lost below the generated floor.
+        if hexagon.position.x < -cell * 2 || hexagon.position.x > size.width + cell * 2
+            || hexagon.position.y < lowestRowY - size.height {
             isOver = true
             physicsWorld.speed = 0
             onGameOver?()
             return
         }
-        // Clean up anything that toppled off-screen so it doesn't pile up as
-        // a dead physics body forever.
-        for node in blockNodes where node.position.y < -100 || node.parent == nil {
-            node.removeFromParent()
-        }
-        blockNodes.removeAll { $0.parent == nil }
 
-        // "Infinite" in the sense that a run only ends when the hexagon
-        // falls — once the current tower is mostly cleared, grow a fresh one
-        // underneath it rather than letting the game just end for lack of
-        // material.
-        if blockNodes.count <= 3, hexagon.parent != nil {
-            regrow()
+        let depthRows = max(0, Int((startY - hexagon.position.y) / cell))
+        let newScore = depthRows + blocksDestroyed
+        if newScore != score {
+            score = newScore
+            onScoreChange?(score)
         }
-    }
-
-    private func regrow() {
-        let oldHex = hexagon
-        for node in blockNodes { node.removeFromParent() }
-        blockNodes = []
-        let topY = buildTower(fromY: 14)
-        oldHex?.removeFromParent()
-        placeHexagon(atY: topY)
     }
 }

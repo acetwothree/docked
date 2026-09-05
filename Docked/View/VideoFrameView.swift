@@ -22,9 +22,6 @@ struct VideoFrameView: View {
     /// Engraved console text — the open game's name, or the app's own name
     /// when nothing's open (or when forced on for ad recordings).
     var consoleLabel: String = "DOCKED · FREE iOS APP"
-    /// Shows a small permanent "BACK" label under the left knob whenever a
-    /// game is open — always there, not a one-time callout.
-    var showBackLabel: Bool = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -124,14 +121,6 @@ struct VideoFrameView: View {
         }
         ctx.draw(Text(consoleLabel).font(font).foregroundColor(palette.deep.opacity(0.95)),
                  at: CGPoint(x: cx, y: cy), anchor: .center)
-
-        // --- permanent "BACK" label under the highlighted left knob ---
-        if showBackLabel {
-            let backFont = Font.system(size: 7, weight: .black, design: .rounded)
-            let by = knobs.back.y + LayoutSolver.knobDiameter / 2 + 10
-            ctx.draw(Text("BACK").font(backFont).foregroundColor(Theme.accent),
-                     at: CGPoint(x: knobs.back.x, y: by), anchor: .center)
-        }
 
         // cabinet keyline (no top-corner rivets — the video can drift over
         // the top corners, so there's nothing there to cover).

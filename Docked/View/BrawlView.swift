@@ -176,15 +176,21 @@ struct BrawlView: View {
         }
     }
 
+    /// Sits at the bottom, not the middle — so it reads as a hint rather than
+    /// a dialog blocking the arena from view before you've even started.
     private func prompt(_ t: String, _ s: String) -> some View {
-        VStack(spacing: 6) {
-            Text(t).font(.title3.bold())
-            Text(s).font(.footnote).foregroundStyle(.secondary)
+        VStack {
+            Spacer(minLength: 0)
+            VStack(spacing: 6) {
+                Text(t).font(.title3.bold())
+                Text(s).font(.footnote).foregroundStyle(.secondary)
+            }
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 22).padding(.vertical, 14)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .foregroundStyle(Theme.ink)
         }
-        .multilineTextAlignment(.center)
-        .padding(.horizontal, 22).padding(.vertical, 14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .foregroundStyle(Theme.ink)
+        .padding(.bottom, 12)
     }
 }
 

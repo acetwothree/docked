@@ -3,8 +3,8 @@
 //  Docked
 //
 //  SwiftUI shell around `HexFallScene` (SpriteKit does the actual physics).
-//  Tap a block to clear it — real rigid-body physics decides what tumbles.
-//  Keep the hexagon on the tower for as long as you can.
+//  Tap a brick to delete it and guide the hexagon down the endless tower —
+//  don't let it roll off either edge.
 //
 
 import SwiftUI
@@ -45,14 +45,15 @@ struct HexFallView: View {
                     .contentShape(Rectangle())
                     .gesture(
                         SpatialTapGesture().onEnded { v in
-                            // SwiftUI's tap location is top-left/Y-down; SpriteKit's
-                            // default scene space is bottom-left/Y-up.
-                            scene.handleTap(at: CGPoint(x: v.location.x, y: geo.size.height - v.location.y))
+                            // The scroll camera moves, so the SwiftUI tap
+                            // location needs the scene's own conversion, not
+                            // a fixed Y-flip against the scene's static size.
+                            scene.handleTap(at: scene.scenePoint(fromView: v.location, viewSize: geo.size))
                         }
                     )
             }
 
-            Text(over ? "Tower fell — resetting…" : "Tap a block to clear it")
+            Text(over ? "Off the edge — resetting…" : "Tap bricks to guide it down")
                 .font(.system(size: 12, weight: .heavy))
                 .foregroundStyle(over ? Color.orange : Color.secondary)
         }

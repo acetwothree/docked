@@ -283,8 +283,9 @@ private struct GamePreview: View {
             Image(systemName: "pencil").font(.system(size: s * 0.3, weight: .bold))
                 .foregroundStyle(Color(hex: "4A9CFF"))
                 .shadow(color: Color(hex: "4A9CFF").opacity(0.6), radius: 4)
-                .offset(x: s * 0.2, y: s * 0.26)
+                .offset(x: s * 0.2, y: s * 0.2)
         }
+        .offset(y: -s * 0.06)
     }
 
     private func color(_ s: CGFloat) -> some View {
@@ -330,14 +331,30 @@ private struct GamePreview: View {
         }
     }
 
+    /// An actual small grid, some cells filled — the sliding-tile board
+    /// itself, not just a few numbers floating in a pyramid.
     private func merge(_ s: CGFloat) -> some View {
-        VStack(spacing: s * 0.05) {
-            numberTile("2", Color(hex: "3ECF7A"), s * 0.38, s * 0.27)
-            HStack(spacing: s * 0.05) {
-                numberTile("4", Color(hex: "3EA1E0"), s * 0.38, s * 0.27)
-                numberTile("8", Color(hex: "8B5CF6"), s * 0.38, s * 0.27)
+        let n = 3
+        let gap: CGFloat = 4
+        let cell = (s * 0.9 - gap * CGFloat(n - 1)) / CGFloat(n)
+        let filled: [Int: (String, Color)] = [
+            0: ("2", Color(hex: "3ECF7A")), 4: ("8", Color(hex: "8B5CF6")),
+            5: ("4", Color(hex: "3EA1E0")), 7: ("16", Color(hex: "F25CA2")),
+        ]
+        return VStack(spacing: gap) {
+            ForEach(0..<n, id: \.self) { r in
+                HStack(spacing: gap) {
+                    ForEach(0..<n, id: \.self) { c in
+                        if let (text, color) = filled[r * n + c] {
+                            numberTile(text, color, cell, cell)
+                        } else {
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(Color.white.opacity(0.06))
+                                .frame(width: cell, height: cell)
+                        }
+                    }
+                }
             }
-            numberTile("16", Color(hex: "F25CA2"), s * 0.5, s * 0.27)
         }
     }
 
@@ -367,17 +384,31 @@ private struct GamePreview: View {
         }
     }
 
+    /// The actual arena mat + player block + a couple of enemies closing in
+    /// along the lanes, with a slash toward one of them — closer to an
+    /// actual moment of play than an abstract radiating burst.
     private func brawl(_ s: CGFloat) -> some View {
-        let cy: CGFloat = 0.44
+        let cy: CGFloat = 0.46
         return ZStack {
-            ForEach(0..<8, id: \.self) { i in
-                let a = Double(i) / 8 * 2 * .pi
-                Capsule().fill(Color(hex: "3ECF7A").opacity(0.5))
-                    .frame(width: s * 0.06, height: s * 0.22)
-                    .rotationEffect(.degrees(Double(i) / 8 * 360))
-                    .position(x: s * 0.5 + CGFloat(sin(a)) * s * 0.36,
-                             y: s * cy - CGFloat(cos(a)) * s * 0.36)
+            Circle().fill(Color(hex: "3ECF7A").opacity(0.08)).frame(width: s * 0.9, height: s * 0.9)
+                .position(x: s * 0.5, y: s * cy)
+            Circle().stroke(Color(hex: "3ECF7A").opacity(0.35), lineWidth: s * 0.02).frame(width: s * 0.9, height: s * 0.9)
+                .position(x: s * 0.5, y: s * cy)
+
+            PopBlock(Color(hex: "23262F"), width: s * 0.15, height: s * 0.15, corner: 3, shadow: false)
+                .position(x: s * 0.5, y: s * cy - s * 0.36)
+            PopBlock(Color(hex: "23262F"), width: s * 0.15, height: s * 0.15, corner: 3, shadow: false)
+                .position(x: s * 0.5 + s * 0.36, y: s * cy)
+
+            // slash wedge toward the top enemy
+            Path { p in
+                p.move(to: CGPoint(x: s * 0.5, y: s * cy))
+                p.addLine(to: CGPoint(x: s * 0.5 - s * 0.15, y: s * cy - s * 0.26))
+                p.addLine(to: CGPoint(x: s * 0.5 + s * 0.15, y: s * cy - s * 0.26))
+                p.closeSubpath()
             }
+            .fill(Color(hex: "3ECF7A").opacity(0.5))
+
             PopBlock(Color(hex: "3ECF7A"), width: s * 0.3, height: s * 0.3)
                 .position(x: s * 0.5, y: s * cy)
         }
@@ -387,14 +418,14 @@ private struct GamePreview: View {
     /// this is — a circle body with two eyes — with one picked out by colour
     /// and a ring, the way the real game asks you to spot it.
     private func spot(_ s: CGFloat) -> some View {
-        let dim: [(CGFloat, CGFloat)] = [(0.24, 0.22), (0.76, 0.22), (0.24, 0.70)]
+        let dim: [(CGFloat, CGFloat)] = [(0.19, 0.16), (0.71, 0.16), (0.19, 0.64)]
         return ZStack {
             ForEach(Array(dim.enumerated()), id: \.offset) { _, pt in
                 creature(Color(hex: "6B7280"), s: s * 0.3).position(x: pt.0 * s, y: pt.1 * s)
             }
-            creature(Color(hex: "3ECF7A"), s: s * 0.34).position(x: s * 0.76, y: s * 0.70)
+            creature(Color(hex: "3ECF7A"), s: s * 0.34).position(x: s * 0.71, y: s * 0.64)
             Circle().stroke(Color(hex: "3ECF7A"), lineWidth: s * 0.025).frame(width: s * 0.46)
-                .position(x: s * 0.76, y: s * 0.70)
+                .position(x: s * 0.71, y: s * 0.64)
         }
     }
 
@@ -427,6 +458,7 @@ private struct GamePreview: View {
                 }
             }
         }
+        .offset(y: -s * 0.05)
     }
 
     private func click(_ s: CGFloat) -> some View {
@@ -436,6 +468,7 @@ private struct GamePreview: View {
             Text("+1").font(.system(size: s * 0.2, weight: .black)).foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.3), radius: 1)
         }
+        .offset(y: -s * 0.05)
     }
 
     /// A zen garden tray — concentric raked rings, unmistakably centred by
@@ -474,6 +507,7 @@ private struct GamePreview: View {
                 PopCapsule(color: Color(hex: "3ECF7A"), width: s * 0.3, height: s * 0.15)
             }
         }
+        .offset(y: -s * 0.06)
     }
 
     /// A falling piece above a mounded pile of colourful sand — not a flat row.
@@ -501,33 +535,40 @@ private struct GamePreview: View {
         }
     }
 
-    /// A hexagon balanced on a slightly toppled little tower — tap-to-clear.
+    /// A hexagon resting flat on a neatly snapped, perfectly square tower of
+    /// bricks — one solid row (stable) over a row split into pillars
+    /// (unstable) — matching the real game's starting state.
     private func hexfall(_ s: CGFloat) -> some View {
         VStack(spacing: 1) {
             Polygon(sides: 6)
                 .fill(Color(hex: "3EA1E0"))
                 .overlay(Polygon(sides: 6).stroke(.white.opacity(0.3), lineWidth: 1.5))
-                .frame(width: s * 0.36, height: s * 0.32)
-                .rotationEffect(.degrees(6))
+                .frame(width: s * 0.34, height: s * 0.3)
                 .shadow(color: .black.opacity(0.3), radius: 2, y: 1.5)
-            PopBlock(Color(hex: "F2B90C"), width: s * 0.4, height: s * 0.14, corner: 3, shadow: false)
-                .rotationEffect(.degrees(6)).offset(x: s * 0.03)
-            PopBlock(Color(hex: "E0473E"), width: s * 0.4, height: s * 0.14, corner: 3, shadow: false)
-                .offset(x: -s * 0.05)
-            PopBlock(Color(hex: "8B5CF6"), width: s * 0.44, height: s * 0.14, corner: 3, shadow: false)
+            PopBlock(Color(hex: "F2B90C"), width: s * 0.62, height: s * 0.15, corner: 3, shadow: false)
+            HStack(spacing: 1) {
+                PopBlock(Color(hex: "E0473E"), width: s * 0.2, height: s * 0.15, corner: 3, shadow: false)
+                PopBlock(Color(hex: "26A65B"), width: s * 0.2, height: s * 0.15, corner: 3, shadow: false)
+                PopBlock(Color(hex: "8B5CF6"), width: s * 0.2, height: s * 0.15, corner: 3, shadow: false)
+            }
         }
     }
 
     /// A taller, straight stack — the "keep it balanced" stacking game.
+    /// A little stack of real, distinct tetromino silhouettes (O, T, I) — a
+    /// clearer "made of different shapes" cue than a pile of plain bars.
     private func blocktower(_ s: CGFloat) -> some View {
-        VStack(spacing: 2) {
-            PopBlock(Color(hex: "3ECF7A"), width: s * 0.26, height: s * 0.15, corner: 3, shadow: false)
-            PopBlock(Color(hex: "3EA1E0"), width: s * 0.34, height: s * 0.15, corner: 3, shadow: false)
-                .offset(x: s * 0.04)
-            PopBlock(Color(hex: "F2B90C"), width: s * 0.4, height: s * 0.15, corner: 3, shadow: false)
-                .offset(x: -s * 0.03)
-            PopBlock(Color(hex: "F25CA2"), width: s * 0.46, height: s * 0.15, corner: 3, shadow: false)
-            PopBlock(Color(hex: "8B5CF6"), width: s * 0.52, height: s * 0.15, corner: 3, shadow: false)
+        let u = s * 0.15
+        func b(_ color: Color, _ col: CGFloat, _ row: CGFloat) -> some View {
+            PopBlock(color, width: u, height: u, corner: 2, shadow: false)
+                .position(x: s * 0.5 + col * (u + 1), y: s * 0.84 - row * (u + 1))
+        }
+        return ZStack {
+            b(Color(hex: "8B5CF6"), -0.5, 0); b(Color(hex: "8B5CF6"), 0.5, 0)
+            b(Color(hex: "8B5CF6"), -0.5, 1); b(Color(hex: "8B5CF6"), 0.5, 1)
+            b(Color(hex: "F2B90C"), -1, 2); b(Color(hex: "F2B90C"), 0, 2); b(Color(hex: "F2B90C"), 1, 2)
+            b(Color(hex: "F2B90C"), 0, 3)
+            b(Color(hex: "3ECF7A"), -0.5, 4); b(Color(hex: "3ECF7A"), 0.5, 4)
         }
     }
 

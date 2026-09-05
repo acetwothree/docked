@@ -50,7 +50,7 @@ struct BlockTowerView: View {
                     )
             }
 
-            Text(over ? "It toppled — resetting…" : "Drag to slide · lift to drop")
+            Text(over ? "That touched down — resetting…" : "Drag to slide · lift to drop")
                 .font(.system(size: 12, weight: .heavy))
                 .foregroundStyle(over ? Color.orange : Color.secondary)
         }
@@ -63,7 +63,7 @@ struct BlockTowerView: View {
                 if score > best { best = score }
                 over = true
                 overTick += 1
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                     over = false
                     scene.reset()
                 }

@@ -38,44 +38,54 @@ struct TVKnob: View {
                     let c = CGPoint(x: size.width / 2, y: size.height / 2)
                     let face = CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)
 
-                    // knurled rim — short radial ticks around the edge
-                    var ticks = Path()
-                    let count = 24
-                    for i in 0..<count {
-                        let a = Double(i) / Double(count) * 2 * .pi
-                        let ca = CGFloat(cos(a)), sa = CGFloat(sin(a))
-                        ticks.move(to: CGPoint(x: c.x + ca * (r - 1.5), y: c.y + sa * (r - 1.5)))
-                        ticks.addLine(to: CGPoint(x: c.x + ca * (r - 4.5), y: c.y + sa * (r - 4.5)))
+                    // a soft, diffuse glow behind the dial when highlighted —
+                    // no hard ring, so it reads as lit rather than outlined
+                    if highlight {
+                        ctx.fill(Path(ellipseIn: face.insetBy(dx: -9, dy: -9)),
+                                 with: .radialGradient(Gradient(colors: [Theme.accent.opacity(0.5), .clear]),
+                                                       center: c, startRadius: r * 0.7, endRadius: r + 10))
+                    } else {
+                        // knurled rim — short radial ticks around the edge
+                        // (skipped when highlighted: cleaner, less busy)
+                        var ticks = Path()
+                        let count = 24
+                        for i in 0..<count {
+                            let a = Double(i) / Double(count) * 2 * .pi
+                            let ca = CGFloat(cos(a)), sa = CGFloat(sin(a))
+                            ticks.move(to: CGPoint(x: c.x + ca * (r - 1.5), y: c.y + sa * (r - 1.5)))
+                            ticks.addLine(to: CGPoint(x: c.x + ca * (r - 4.5), y: c.y + sa * (r - 4.5)))
+                        }
+                        ctx.stroke(ticks, with: .color(palette.key.opacity(0.35)), lineWidth: 1)
                     }
-                    ctx.stroke(ticks, with: .color(palette.key.opacity(0.35)), lineWidth: 1)
 
-                    // dial face — raised: light from top-left; a brighter,
-                    // glossier gradient when highlighted
+                    // dial face. Normally raised (lit top-left). Highlighted,
+                    // it reads as pressed in — light comes from the opposite
+                    // corner, like the surface tips away and catches the glow
+                    // from below instead.
+                    let lightCorner = highlight
+                        ? CGPoint(x: c.x + r * 0.3, y: c.y + r * 0.3)
+                        : CGPoint(x: c.x - r * 0.28, y: c.y - r * 0.28)
                     ctx.fill(Path(ellipseIn: face.insetBy(dx: 3, dy: 3)),
                              with: .radialGradient(
                                 Gradient(colors: highlight
-                                         ? [.white.opacity(0.95), palette.hi, palette.mid]
+                                         ? [Theme.accent.opacity(0.9), palette.mid, palette.deep]
                                          : [palette.hi, palette.mid, palette.deep]),
-                                center: CGPoint(x: c.x - r * 0.28, y: c.y - r * 0.28),
-                                startRadius: 0, endRadius: r * 1.4))
+                                center: lightCorner, startRadius: 0, endRadius: r * 1.4))
 
-                    // bezel + inner rim — an accent glow ring when highlighted
+                    // bezel + inner rim — the inner one darker when pressed in
                     ctx.stroke(Path(ellipseIn: face.insetBy(dx: 1, dy: 1)),
-                               with: .color(palette.key.opacity(0.7)), lineWidth: 1.5)
+                               with: .color(palette.key.opacity(highlight ? 0.85 : 0.7)), lineWidth: 1.5)
                     ctx.stroke(Path(ellipseIn: face.insetBy(dx: 4.5, dy: 4.5)),
-                               with: .color(palette.hi.opacity(0.4)), lineWidth: 1)
-                    if highlight {
-                        ctx.stroke(Path(ellipseIn: face.insetBy(dx: -1.5, dy: -1.5)),
-                                   with: .color(Theme.accent.opacity(0.85)), lineWidth: 2)
-                    }
+                               with: .color(highlight ? palette.deep.opacity(0.5) : palette.hi.opacity(0.4)),
+                               lineWidth: 1)
                 }
 
                 // engraved icon: dark cut with a hairline light edge below it —
-                // or, highlighted, a solid accent-coloured icon that pops
+                // or, highlighted, bright white so it pops against the glow
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(highlight ? Theme.accent : palette.key.opacity(0.62))
-                    .shadow(color: highlight ? .black.opacity(0.35) : palette.hi.opacity(0.55),
+                    .foregroundStyle(highlight ? Color.white : palette.key.opacity(0.62))
+                    .shadow(color: highlight ? .black.opacity(0.4) : palette.hi.opacity(0.55),
                             radius: highlight ? 1 : 0, x: highlight ? 0 : 0.7, y: highlight ? 0.6 : 0.9)
             }
             .frame(width: d, height: d)

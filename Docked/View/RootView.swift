@@ -58,8 +58,7 @@ struct RootView: View {
                                consoleRect: s.consoleInFrame,
                                dimHint: hintDim,
                                palette: app.tvTheme.palette,
-                               consoleLabel: consoleLabel,
-                               showBackLabel: openModule != nil)
+                               consoleLabel: consoleLabel)
                     .frame(width: s.video.width, height: s.video.height)
                     .position(x: s.video.midX, y: s.video.midY)
 
@@ -158,13 +157,14 @@ struct RootView: View {
     private func stretchHandle(_ s: SolvedLayout) -> some View {
         // A little taller than the console so the very bottom edge is grabbable.
         let zoneH = s.console.height + 14
-        return ZStack(alignment: .bottomLeading) {
+        return ZStack(alignment: .bottom) {
             Color.clear
+            // Centered on the bottom edge — clear of the back knob on the
+            // left and the theme/settings pair on the right.
             Image(systemName: "arrow.up.and.down")
                 .font(.system(size: 11, weight: .black))
                 .foregroundStyle(app.tvTheme.palette.hi.opacity(stretching ? 0.95 : 0.42))
-                .padding(.leading, 12)
-                .padding(.bottom, 9)
+                .padding(.bottom, 3)
         }
         .frame(width: s.console.width, height: zoneH)
         .contentShape(Rectangle())
