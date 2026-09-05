@@ -2,8 +2,12 @@
 //  MergeView.swift
 //  Docked
 //
-//  A tiny 2048. Swipe to slide the tiles; equal ones merge and add up. Best
-//  score persists.
+//  "Number Merge" — a tiny 2048. Swipe to slide the tiles; equal ones merge
+//  and add up. Each tile keeps its identity across a move (`Tile.id`), so it
+//  visibly SLIDES to its new cell rather than just changing a number at a
+//  fixed spot — that's what makes the merge direction legible. A brief
+//  direction glyph also flashes on every swipe so the input itself reads
+//  clearly. Best score persists.
 //
 
 import SwiftUI
@@ -16,14 +20,27 @@ struct MergeView: View {
     @AppStorage("docked.merge.score") private var savedScore = 0
     @AppStorage("docked.merge.over") private var savedOver = false
 
-    @State private var grid: [Int] = Array(repeating: 0, count: 16)
+    private struct Tile: Identifiable {
+        let id = UUID()
+        var value: Int
+        var row: Int
+        var col: Int
+        var pop = false   // true briefly right after this tile absorbs a merge
+    }
+
+    @State private var tiles: [Tile] = []
     @State private var score = 0
     @State private var over = false
     @State private var moveTick = 0
     @State private var mergeTick = 0
-    @State private var tripleTick = 0
-    @State private var pulse: CGFloat = 1
+    @State private var bigMergeTick = 0
     @State private var restored = false
+
+    /// The last swipe direction, shown as a brief fading glyph so the input
+    /// itself is unambiguous even when nothing on the board can move that way.
+    @State private var swipeDir: Dir? = nil
+    @State private var swipeOpacity: Double = 0
+    @State private var swipeGeneration = 0
 
     private let n = 4
 
@@ -47,7 +64,6 @@ struct MergeView: View {
                 let side = min(geo.size.width, geo.size.height)
                 board(side: side)
                     .frame(width: side, height: side)
-                    .scaleEffect(pulse)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
@@ -68,13 +84,17 @@ struct MergeView: View {
         )
         .sensoryFeedback(.impact(weight: .light), trigger: moveTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(weight: .medium), trigger: mergeTick) { _, _ in app.haptics }
-        .sensoryFeedback(.success, trigger: tripleTick) { _, _ in app.haptics }
+        .sensoryFeedback(.success, trigger: bigMergeTick) { _, _ in app.haptics }
         .onAppear {
             guard !restored else { return }
             restored = true
             let parts = savedGrid.split(separator: ",").compactMap { Int($0) }
             if parts.count == 16, parts.contains(where: { $0 != 0 }) {
-                grid = parts
+                tiles = (0..<16).compactMap { i in
+                    let v = parts[i]
+                    guard v != 0 else { return nil }
+                    return Tile(value: v, row: i / n, col: i % n)
+                }
                 score = savedScore
                 over = savedOver
             } else {
@@ -84,7 +104,7 @@ struct MergeView: View {
     }
 
     private func persist() {
-        savedGrid = grid.map(String.init).joined(separator: ",")
+        savedGrid = (0..<16).map { i in String(gridValue(row: i / n, col: i % n)) }.joined(separator: ",")
         savedScore = score
         savedOver = over
     }
@@ -92,6 +112,15 @@ struct MergeView: View {
     private var hintText: String { over ? "No moves — tap ↻" : "Swipe to merge" }
 
     private enum Dir { case up, down, left, right }
+
+    private func iconFor(_ d: Dir) -> String {
+        switch d {
+        case .up: "chevron.up"
+        case .down: "chevron.down"
+        case .left: "chevron.left"
+        case .right: "chevron.right"
+        }
+    }
 
     private func stat(_ label: String, _ v: Int) -> some View {
         VStack(spacing: 1) {
@@ -105,29 +134,46 @@ struct MergeView: View {
         let cell = (side - gap * CGFloat(n + 1)) / CGFloat(n)
         return ZStack {
             RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.06))
-            ForEach(Array(0..<16), id: \.self) { i in
-                tile(i, cell: cell, gap: gap)
+            ForEach(0..<16, id: \.self) { i in
+                let r = i / n, c = i % n
+                emptySlot(cell: cell, gap: gap, r: r, c: c)
+            }
+            ForEach(tiles) { tile in
+                tileView(tile, cell: cell, gap: gap)
+            }
+            if let d = swipeDir {
+                Image(systemName: iconFor(d))
+                    .font(.system(size: side * 0.26, weight: .black))
+                    .foregroundStyle(Theme.accent)
+                    .opacity(swipeOpacity)
+                    .allowsHitTesting(false)
             }
         }
-        .animation(.easeOut(duration: 0.13), value: grid)
     }
 
-    private func tile(_ i: Int, cell: CGFloat, gap: CGFloat) -> some View {
-        let r = i / n, c = i % n
-        let v = grid[i]
-        return RoundedRectangle(cornerRadius: 8)
-            .fill(tileColor(v))
-            .overlay {
-                if v > 0 {
-                    Text("\(v)")
-                        .font(.system(size: cell * (v >= 1000 ? 0.28 : 0.4), weight: .black, design: .rounded))
-                        .foregroundStyle(v <= 4 ? Color.primary : Color(red: 0.11, green: 0.08, blue: 0.02))
-                        .minimumScaleFactor(0.5)
-                }
-            }
+    private func emptySlot(cell: CGFloat, gap: CGFloat, r: Int, c: Int) -> some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(Color.primary.opacity(0.04))
             .frame(width: cell, height: cell)
             .position(x: gap + cell / 2 + CGFloat(c) * (cell + gap),
                       y: gap + cell / 2 + CGFloat(r) * (cell + gap))
+    }
+
+    private func tileView(_ tile: Tile, cell: CGFloat, gap: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(tileColor(tile.value))
+            .overlay {
+                Text("\(tile.value)")
+                    .font(.system(size: cell * (tile.value >= 1000 ? 0.28 : 0.4), weight: .black, design: .rounded))
+                    .foregroundStyle(tile.value <= 4 ? Color.primary : Color(red: 0.11, green: 0.08, blue: 0.02))
+                    .minimumScaleFactor(0.5)
+            }
+            .frame(width: cell, height: cell)
+            .scaleEffect(tile.pop ? 1.14 : 1)
+            .position(x: gap + cell / 2 + CGFloat(tile.col) * (cell + gap),
+                      y: gap + cell / 2 + CGFloat(tile.row) * (cell + gap))
+            .transition(.scale(scale: 0.35).combined(with: .opacity))
+            .animation(.spring(response: 0.26, dampingFraction: 0.55), value: tile.pop)
     }
 
     private func tileColor(_ v: Int) -> Color {
@@ -146,97 +192,119 @@ struct MergeView: View {
     // MARK: logic
 
     private func newGame() {
-        grid = Array(repeating: 0, count: 16)
+        tiles = []
         score = 0
         over = false
+        swipeDir = nil
+        swipeOpacity = 0
         spawn(); spawn()
         persist()
     }
 
-    private func spawn() {
-        var empty: [Int] = []
-        for i in 0..<16 where grid[i] == 0 { empty.append(i) }
-        guard let idx = empty.randomElement() else { return }
-        grid[idx] = Int.random(in: 0..<10) == 0 ? 4 : 2
+    private func gridValue(row: Int, col: Int) -> Int {
+        tiles.first { $0.row == row && $0.col == col }?.value ?? 0
     }
 
-    private func lineIndices(_ i: Int, _ dir: Dir) -> [Int] {
+    private func spawn() {
+        var empty: [(Int, Int)] = []
+        for r in 0..<n { for c in 0..<n where gridValue(row: r, col: c) == 0 { empty.append((r, c)) } }
+        guard let (r, c) = empty.randomElement() else { return }
+        tiles.append(Tile(value: Int.random(in: 0..<10) == 0 ? 4 : 2, row: r, col: c))
+    }
+
+    /// Coordinates of one row/column, ordered from the edge the swipe pushes
+    /// toward (index 0) back to the far edge.
+    private func lineCoords(_ i: Int, _ dir: Dir) -> [(row: Int, col: Int)] {
         switch dir {
-        case .left:  return (0..<4).map { i * 4 + $0 }
-        case .right: return (0..<4).map { i * 4 + (3 - $0) }
-        case .up:    return (0..<4).map { $0 * 4 + i }
-        case .down:  return (0..<4).map { (3 - $0) * 4 + i }
+        case .left:  return (0..<n).map { (row: i, col: $0) }
+        case .right: return (0..<n).map { (row: i, col: n - 1 - $0) }
+        case .up:    return (0..<n).map { (row: $0, col: i) }
+        case .down:  return (0..<n).map { (row: n - 1 - $0, col: i) }
         }
     }
 
     private func move(_ dir: Dir) {
         guard !over else { return }
-        var changed = false
-        var didMerge = false
-        var didTriple = false
 
-        for i in 0..<4 {
-            let idxs = lineIndices(i, dir)
-            var vals: [Int] = []
-            for idx in idxs where grid[idx] != 0 { vals.append(grid[idx]) }
-
-            var out: [Int] = []
-            var j = 0
-            while j < vals.count {
-                if j + 2 < vals.count && vals[j] == vals[j + 1] && vals[j] == vals[j + 2] {
-                    // three in a row collapse into one, as if two merges landed
-                    let merged = vals[j] * 4
-                    out.append(merged)
-                    score += merged
-                    didMerge = true
-                    didTriple = true
-                    j += 3
-                } else if j + 1 < vals.count && vals[j] == vals[j + 1] {
-                    let merged = vals[j] * 2
-                    out.append(merged)
-                    score += merged
-                    didMerge = true
-                    j += 2
-                } else {
-                    out.append(vals[j])
-                    j += 1
-                }
-            }
-            while out.count < 4 { out.append(0) }
-
-            for k in 0..<4 {
-                if grid[idxs[k]] != out[k] { changed = true }
-                grid[idxs[k]] = out[k]
-            }
+        // Direction glyph — flashes on every swipe, whether or not it moves
+        // anything, so the input itself always reads clearly.
+        swipeDir = dir
+        swipeGeneration += 1
+        let gen = swipeGeneration
+        withAnimation(.easeOut(duration: 0.05)) { swipeOpacity = 0.4 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            guard swipeGeneration == gen else { return }
+            withAnimation(.easeOut(duration: 0.25)) { swipeOpacity = 0 }
         }
 
-        if changed {
-            spawn()
-            moveTick += 1
-            if didMerge { mergeTick += 1 }
-            if didTriple { tripleTick += 1 }
+        var toRemove: Set<UUID> = []
+        var didMerge = false
+        var didBig = false
+        var changed = false
+        var updates: [(id: UUID, row: Int, col: Int, value: Int, pop: Bool)] = []
+
+        for i in 0..<n {
+            let coords = lineCoords(i, dir)
+            let lineTiles: [Tile] = coords.compactMap { rc in tiles.first { $0.row == rc.row && $0.col == rc.col } }
+
+            // Classic 2048 compaction: each tile merges into the one ahead of
+            // it at most once per move (a tile born from a merge can't merge
+            // again in the same move).
+            var placed: [(tile: Tile, merged: Bool)] = []
+            for cur in lineTiles {
+                if let last = placed.last, !last.merged, last.tile.value == cur.value {
+                    var t = last.tile
+                    t.value *= 2
+                    score += t.value
+                    if t.value >= 64 { didBig = true }
+                    didMerge = true
+                    toRemove.insert(cur.id)
+                    placed[placed.count - 1] = (t, true)
+                } else {
+                    placed.append((cur, false))
+                }
+            }
+            for (slot, rc) in coords.enumerated() where slot < placed.count {
+                let (t, merged) = placed[slot]
+                if t.row != rc.row || t.col != rc.col { changed = true }
+                updates.append((id: t.id, row: rc.row, col: rc.col, value: t.value, pop: merged))
+            }
+        }
+        if !toRemove.isEmpty { changed = true }
+        guard changed else { return }
+
+        withAnimation(.easeInOut(duration: 0.14)) {
+            for u in updates {
+                guard let idx = tiles.firstIndex(where: { $0.id == u.id }) else { continue }
+                tiles[idx].row = u.row
+                tiles[idx].col = u.col
+                tiles[idx].value = u.value
+                tiles[idx].pop = u.pop
+            }
+            tiles.removeAll { toRemove.contains($0.id) }
+        }
+
+        moveTick += 1
+        if didMerge { mergeTick += 1 }
+        if didBig { bigMergeTick += 1 }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { spawn() }
+            for idx in tiles.indices { tiles[idx].pop = false }
             best = max(best, score)
             if !anyMoveLeft() { over = true }
-            if didMerge { pop(big: didTriple) }
             persist()
         }
     }
 
-    /// A tiny, non-directional squeeze when tiles merge — a bigger one for a
-    /// triple collapse — without the board lurching around.
-    private func pop(big: Bool = false) {
-        withAnimation(.easeOut(duration: 0.07)) { pulse = big ? 0.92 : 0.97 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.07) {
-            withAnimation(.spring(response: big ? 0.4 : 0.34, dampingFraction: big ? 0.5 : 0.6)) { pulse = 1 }
-        }
-    }
-
     private func anyMoveLeft() -> Bool {
-        if grid.contains(0) { return true }
-        for i in 0..<16 {
-            let r = i / 4, c = i % 4
-            if c < 3 && grid[i] == grid[i + 1] { return true }
-            if r < 3 && grid[i] == grid[i + 4] { return true }
+        if tiles.count < n * n { return true }
+        for r in 0..<n {
+            for c in 0..<n {
+                let v = gridValue(row: r, col: c)
+                if c + 1 < n, v == gridValue(row: r, col: c + 1) { return true }
+                if r + 1 < n, v == gridValue(row: r + 1, col: c) { return true }
+            }
         }
         return false
     }

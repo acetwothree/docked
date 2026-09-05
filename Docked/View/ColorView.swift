@@ -29,9 +29,12 @@ struct ColorView: View {
     var body: some View {
         VStack(spacing: 0) {
             GeometryReader { geo in
-                let s = min(geo.size.width, geo.size.height)
+                let s = min(geo.size.width, geo.size.height) - 8
                 artwork(side: s)
                     .frame(width: s, height: s)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Theme.hairline, lineWidth: 1.5))
+                    .shadow(color: .black.opacity(0.22), radius: 10, y: 5)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onChange(of: fills) { _, _ in refreshExport(side: 600) }
             }
@@ -84,19 +87,28 @@ struct ColorView: View {
         .onAppear { refreshExport(side: 600) }
     }
 
+    /// Warm paper tone instead of stark white — easier on the eyes against
+    /// the app's dark chrome, and close enough to white that colours still
+    /// read true.
+    private static let paper = Color(hex: "F2EEE1")
+    /// Every line gets a light halo behind a dark core so it stays crisp
+    /// whether it's sitting on the pale paper or on a dark fill colour.
+    private static let lineDark = Color(hex: "2B2620")
+
     private func artwork(side: CGFloat) -> some View {
         ZStack {
             ForEach(Array(regions.enumerated()), id: \.offset) { pair in
                 pair.element.shape
-                    .fill(fills[pair.offset] ?? Color.primary.opacity(0.05))
-                    .overlay(pair.element.shape.stroke(Theme.ink.opacity(0.35), lineWidth: 1.5))
+                    .fill(fills[pair.offset] ?? Self.paper)
+                    .overlay(pair.element.shape.stroke(.white.opacity(0.55), lineWidth: 3.5))
+                    .overlay(pair.element.shape.stroke(Self.lineDark.opacity(0.85), lineWidth: 1.6))
                     .frame(width: pair.element.rect.width * side, height: pair.element.rect.height * side)
                     .position(x: pair.element.rect.midX * side, y: pair.element.rect.midY * side)
                     .onTapGesture { fills[pair.offset] = picked; fillTick += 1 }
             }
         }
         .frame(width: side, height: side)
-        .background(Color.white)
+        .background(Self.paper)
     }
 
     @MainActor private func refreshExport(side: CGFloat) {

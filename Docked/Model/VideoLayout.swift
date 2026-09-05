@@ -26,16 +26,17 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+// Declaration order is also the order the home grid shows them in — premium
+// activities are interleaved with free ones on purpose rather than grouped,
+// so Plus doesn't read as "everything past this point costs money".
 enum ActivityModule: String, CaseIterable, Identifiable {
-    case doodle, notes, color
-    case zen, flow, merge, drop, marble, brawl, spot
-    case pop, click, ksand, rings
+    case doodle, notes, merge, color, zen, brawl, drop, marble, spot, pop, click, ksand, rings, sandfall
     var id: String { rawValue }
 
     var category: ActivityCategory {
         switch self {
         case .doodle, .notes, .color: .create
-        case .zen, .flow, .merge, .drop, .marble, .brawl, .spot: .play
+        case .zen, .merge, .drop, .marble, .brawl, .spot, .sandfall: .play
         case .pop, .click, .ksand, .rings: .fidget
         }
     }
@@ -46,8 +47,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .notes: "Notes"
         case .color: "Color"
         case .zen: "Color Blocks"
-        case .flow: "Flow"
-        case .merge: "2048"
+        case .merge: "Number Merge"
         case .drop: "Merge"
         case .marble: "Maze Paint"
         case .brawl: "Brawl"
@@ -56,6 +56,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .click: "Clicker"
         case .ksand: "Kinetic Sand"
         case .rings: "Rings"
+        case .sandfall: "Sand Fall"
         }
     }
 
@@ -65,7 +66,6 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .notes: "note.text"
         case .color: "paintbrush.pointed.fill"
         case .zen: "square.grid.2x2.fill"
-        case .flow: "point.3.connected.trianglepath.dotted"
         case .merge: "square.stack.3d.up.fill"
         case .drop: "circle.grid.2x2.fill"
         case .marble: "circle.fill"
@@ -75,15 +75,16 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .click: "hand.tap.fill"
         case .ksand: "hand.draw.fill"
         case .rings: "circle.circle.fill"
+        case .sandfall: "hourglass"
         }
     }
 
     /// Activities behind Docked Plus.
     var isPlus: Bool {
         switch self {
-        case .doodle, .notes, .color, .zen, .drop, .marble, .pop, .click, .rings:
+        case .doodle, .notes, .color, .zen, .drop, .marble, .pop, .click, .rings, .sandfall:
             return false
-        case .flow, .merge, .brawl, .spot, .ksand:
+        case .merge, .brawl, .spot, .ksand:
             return true
         }
     }
@@ -95,7 +96,6 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .notes: "A quick scratch notepad."
         case .color: "Tap-to-fill colouring scenes."
         case .zen: "A block-drop line-clear puzzle."
-        case .flow: "Connect the matching dots without crossing."
         case .merge: "Slide-to-merge number tiles (2048)."
         case .drop: "Drop blocks into columns; equal ones merge."
         case .marble: "Slide a marble to paint every tile of the maze."
@@ -105,6 +105,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .click: "A tally clicker with a satisfying tick."
         case .ksand: "Rake patterns into a zen sand tray."
         case .rings: "Stack the rings smallest-on-top — the classic tower puzzle."
+        case .sandfall: "Colourful falling-sand tetrominoes — clear a line by filling it with one colour."
         }
     }
 

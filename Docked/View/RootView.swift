@@ -262,7 +262,6 @@ struct RootView: View {
         case .doodle:  DoodlePadView()
         case .notes:   NotesView(topClearance: topClearance)
         case .color:   ColorView()
-        case .flow:    FlowView()
         case .merge:   MergeView()
         case .drop:    MergeDropView()
         case .marble:  MarbleView()
@@ -272,6 +271,7 @@ struct RootView: View {
         case .click:   ClickPenView()
         case .rings:   RingsView()
         case .ksand:   KineticSandView()
+        case .sandfall: SandFallView(highScore: app.sandHighScore)
         case .zen:     EmptyView()   // handled above
         }
     }
