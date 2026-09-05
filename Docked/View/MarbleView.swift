@@ -59,7 +59,10 @@ struct MarbleView: View {
                 Text("\(visited.count)/\(openCells.count)")
                     .font(.system(size: 12, weight: .heavy)).monospacedDigit()
                     .foregroundStyle(cleared ? Color.green : Color.secondary)
-                    .frame(width: 30)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .frame(minWidth: 30, alignment: .trailing)
             }
 
             GeometryReader { geo in

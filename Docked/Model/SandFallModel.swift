@@ -36,6 +36,10 @@ final class SandFallModel {
     /// while it's still entering from above the top edge).
     private(set) var activeCells: [(row: Int, col: Int)] = []
     private(set) var activeColor: Color = .white
+    /// The shape (relative row/col offsets, un-shifted) and colour that will
+    /// spawn next — rolled one piece ahead so the view can show a preview.
+    private(set) var nextShape: [(row: Int, col: Int)] = []
+    private(set) var nextColor: Color = .white
     private(set) var score = 0
     private(set) var best: Int
     private(set) var phase: Phase = .play
@@ -45,6 +49,9 @@ final class SandFallModel {
     private(set) var lockTick = 0
     private(set) var clearTick = 0
     private(set) var overTick = 0
+    /// Bumped every time a fresh piece appears — the view uses this to kick
+    /// off the automatic slow descent right away.
+    private(set) var spawnTick = 0
 
     private static let palette: [Color] = [
         Color(hex: "E0473E"), Color(hex: "F2883C"), Color(hex: "F2B90C"),
@@ -71,6 +78,7 @@ final class SandFallModel {
         self.cols = cols
         self.rows = rows
         self.best = best
+        rollNext()
         spawn()
     }
 
@@ -85,8 +93,23 @@ final class SandFallModel {
         return Self.palette.randomElement()!
     }
 
+    /// Rolls the shape+colour that will appear NEXT (not the one spawning
+    /// now) — called once up front and again every time `spawn()` consumes
+    /// the previously-rolled one, so there's always a piece ready to preview.
+    private func rollNext() {
+        nextShape = Self.templates.randomElement()!
+        nextColor = rollColor()
+        // `rollColor()` biases toward `lastColor`, which `spawn()` only
+        // updates to the piece that's about to become active — fine, this
+        // just means the preview's bias reflects the piece before it.
+    }
+
     private func spawn() {
-        let template = Self.templates.randomElement()!
+        let template = nextShape
+        activeColor = nextColor
+        lastColor = activeColor
+        rollNext()
+
         let minRow = template.map(\.row).min() ?? 0
         let minCol = template.map(\.col).min() ?? 0
         let maxCol = template.map(\.col).max() ?? 0
@@ -94,12 +117,12 @@ final class SandFallModel {
         let shiftRow = -1 - minRow                       // top row lands at -1
         let shiftCol = (cols - width) / 2 - minCol
         activeCells = template.map { (row: $0.row + shiftRow, col: $0.col + shiftCol) }
-        activeColor = rollColor()
-        lastColor = activeColor
 
         if !canPlace(activeCells) {
             phase = .over
             overTick += 1
+        } else {
+            spawnTick += 1
         }
     }
 
@@ -264,6 +287,7 @@ final class SandFallModel {
         phase = .play
         clearingCells = []
         lastColor = nil
+        rollNext()
         spawn()
     }
 }

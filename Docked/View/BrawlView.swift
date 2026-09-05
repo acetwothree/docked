@@ -24,13 +24,16 @@ struct BrawlView: View {
     @State private var slashAt = Date()
     /// 1 right when a life is lost, eased back to 0 — flashes the player red.
     @State private var hitFlash: CGFloat = 0
+    /// When a Blast powerup last cleared the board — drives a brief expanding
+    /// shockwave in the canvas instead of the enemies just vanishing.
+    @State private var blastAt: Date? = nil
 
     private let ticker = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                canvas(size: geo.size, tick: lastTick, hitFlash: hitFlash)
+                canvas(size: geo.size, tick: lastTick, hitFlash: hitFlash, blastAt: blastAt)
                 hud
                 overlay
             }
@@ -68,13 +71,14 @@ struct BrawlView: View {
         .onChange(of: game.phase) { _, p in
             if p == .over, game.score > best { best = game.score }
         }
+        .onChange(of: game.blastTick) { _, _ in blastAt = Date() }
         .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: swipeTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: hitTick) { _, _ in app.haptics }
         .sensoryFeedback(.error, trigger: hurtTick) { _, _ in app.haptics }
         .sensoryFeedback(.success, trigger: game.blastTick) { _, _ in app.haptics }
     }
 
-    private func canvas(size: CGSize, tick: Date, hitFlash: CGFloat) -> some View {
+    private func canvas(size: CGSize, tick: Date, hitFlash: CGFloat, blastAt: Date?) -> some View {
         _ = tick
         return Canvas { ctx, cs in
             let c = CGPoint(x: cs.width / 2, y: cs.height / 2)
@@ -143,6 +147,23 @@ struct BrawlView: View {
             if hitFlash > 0 {
                 ctx.fill(Path(roundedRect: prect, cornerRadius: 11, style: .continuous),
                          with: .color(Color.red.opacity(hitFlash)))
+            }
+
+            // Blast powerup — a bright ring expands out from the player and
+            // fades, instead of every enemy on the board just disappearing.
+            if let blastAt {
+                let dur = 0.45
+                let age = Date().timeIntervalSince(blastAt)
+                if age >= 0, age < dur {
+                    let p = CGFloat(age / dur)
+                    let orange = Color(hex: "F2883C")
+                    let ringR = 14 + p * (reach * 1.05)
+                    let ring = Path(ellipseIn: CGRect(x: c.x - ringR, y: c.y - ringR, width: ringR * 2, height: ringR * 2))
+                    ctx.stroke(ring, with: .color(orange.opacity((1 - p) * 0.9)), lineWidth: 5 * (1 - p * 0.5))
+                    // a soft fill just inside the ring gives it some body
+                    ctx.fill(Path(ellipseIn: CGRect(x: c.x - ringR * 0.7, y: c.y - ringR * 0.7, width: ringR * 1.4, height: ringR * 1.4)),
+                             with: .color(orange.opacity((1 - p) * 0.16)))
+                }
             }
         }
     }
@@ -250,7 +271,7 @@ final class BrawlModel {
         score += 1
         switch kind {
         case .normal: break
-        case .freeze: freezeTimeLeft = 4
+        case .freeze: freezeTimeLeft = 3
         case .blast:
             score += enemies.count
             enemies.removeAll()
@@ -265,7 +286,7 @@ final class BrawlModel {
         elapsed += dt
         if freezeTimeLeft > 0 { freezeTimeLeft = max(0, freezeTimeLeft - dt) }
         let baseSpeed = 0.30 + elapsed * 0.009
-        speed = freezeTimeLeft > 0 ? baseSpeed * 0.35 : baseSpeed
+        speed = freezeTimeLeft > 0 ? baseSpeed * 0.55 : baseSpeed
 
         for i in enemies.indices { enemies[i].dist -= speed * dt }
 

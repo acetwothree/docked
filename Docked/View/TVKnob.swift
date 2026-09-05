@@ -33,20 +33,27 @@ struct TVKnob: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { pressed = false }
         } label: {
             ZStack {
+                // A soft, diffuse glow behind the dial when highlighted — a
+                // plain round shape sized bigger than the knob and layered
+                // behind it, so it fades out as a circle. (Drawing this
+                // inside the Canvas below clipped it to the Canvas's own
+                // square bounds, which showed up as a hard yellow square.)
+                if highlight {
+                    Circle()
+                        .fill(RadialGradient(colors: [Theme.accent.opacity(0.55), .clear],
+                                             center: .center, startRadius: d * 0.32, endRadius: d * 0.62))
+                        .frame(width: d * 1.55, height: d * 1.55)
+                        .allowsHitTesting(false)
+                }
+
                 Canvas { ctx, size in
                     let r = min(size.width, size.height) / 2
                     let c = CGPoint(x: size.width / 2, y: size.height / 2)
                     let face = CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)
 
-                    // a soft, diffuse glow behind the dial when highlighted —
-                    // no hard ring, so it reads as lit rather than outlined
-                    if highlight {
-                        ctx.fill(Path(ellipseIn: face.insetBy(dx: -9, dy: -9)),
-                                 with: .radialGradient(Gradient(colors: [Theme.accent.opacity(0.5), .clear]),
-                                                       center: c, startRadius: r * 0.7, endRadius: r + 10))
-                    } else {
-                        // knurled rim — short radial ticks around the edge
-                        // (skipped when highlighted: cleaner, less busy)
+                    // knurled rim — short radial ticks around the edge
+                    // (skipped when highlighted: cleaner, less busy)
+                    if !highlight {
                         var ticks = Path()
                         let count = 24
                         for i in 0..<count {

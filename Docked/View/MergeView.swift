@@ -170,7 +170,7 @@ struct MergeView: View {
             .overlay {
                 Text("\(tile.value)")
                     .font(.system(size: cell * (tile.value >= 1000 ? 0.28 : 0.4), weight: .black, design: .rounded))
-                    .foregroundStyle(tile.value <= 4 ? Color.primary : Color(red: 0.11, green: 0.08, blue: 0.02))
+                    .foregroundStyle(tile.value <= 8 ? Color(red: 0.24, green: 0.17, blue: 0.05) : Color.white)
                     .minimumScaleFactor(0.5)
             }
             .frame(width: cell, height: cell)
@@ -181,16 +181,24 @@ struct MergeView: View {
             .animation(.spring(response: 0.26, dampingFraction: 0.55), value: tile.pop)
     }
 
+    /// A real colour per tier (classic-2048 style) instead of one accent hue
+    /// getting steadily more opaque — much easier to read the board at a
+    /// glance, and just more fun to look at.
     private func tileColor(_ v: Int) -> Color {
         switch v {
         case 0: return Color.primary.opacity(0.04)
-        case 2: return Theme.accent.opacity(0.22)
-        case 4: return Theme.accent.opacity(0.36)
-        case 8: return Theme.accent.opacity(0.5)
-        case 16: return Theme.accent.opacity(0.64)
-        case 32: return Theme.accent.opacity(0.78)
-        case 64: return Theme.accent.opacity(0.9)
-        default: return Theme.accent
+        case 2: return Color(hex: "EDE0C8")
+        case 4: return Color(hex: "F2CE8F")
+        case 8: return Color(hex: "F2A65A")
+        case 16: return Color(hex: "F2814D")
+        case 32: return Color(hex: "F25C4D")
+        case 64: return Color(hex: "E63946")
+        case 128: return Color(hex: "F2D74E")
+        case 256: return Color(hex: "F2C230")
+        case 512: return Color(hex: "6FCF97")
+        case 1024: return Color(hex: "4EA8DE")
+        case 2048: return Color(hex: "9D6FF2")
+        default: return Color(hex: "F23DA0")
         }
     }
 

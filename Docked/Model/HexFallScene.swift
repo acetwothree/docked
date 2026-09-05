@@ -67,6 +67,14 @@ final class HexFallScene: SKScene {
 
     override func didChangeSize(_ oldSize: CGSize) {
         super.didChangeSize(oldSize)
+        // SwiftUI can set `scene.size` (via HexFallView's `sized(_:to:)`,
+        // called while it's still laying out the SpriteView) BEFORE SpriteKit
+        // has actually presented the scene and called `didMove(to:)` — the
+        // moment that creates `cam`. Without this guard, that early size
+        // change ran `buildEverything()` and force-unwrapped a still-nil
+        // `cam`, crashing the instant Hex Fall opened. `didMove` builds the
+        // board itself once it does fire, so it's safe to just skip here.
+        guard cam != nil else { return }
         if !isOver, abs(oldSize.width - size.width) > 20 || abs(oldSize.height - size.height) > 20 {
             buildEverything()
         }
@@ -75,6 +83,10 @@ final class HexFallScene: SKScene {
     func reset() { buildEverything() }
 
     private func buildEverything() {
+        // `reset()` is public (the toolbar's reset button calls it directly)
+        // and this force-unwraps `cam` at the bottom — bail out if it's
+        // somehow called before `didMove(to:)` has created the camera.
+        guard cam != nil else { return }
         for b in bricks { b.removeFromParent() }
         bricks = []
         hexagon?.removeFromParent()

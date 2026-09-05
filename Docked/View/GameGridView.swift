@@ -21,10 +21,18 @@ struct GameGridView: View {
 
     private let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
+    /// Favorited games first (in their normal relative order), then
+    /// everything else — so starring a game visibly bumps it to the top.
+    private var orderedModules: [ActivityModule] {
+        let favSet = Set(favorites)
+        return ActivityModule.allCases.filter { favSet.contains($0) }
+            + ActivityModule.allCases.filter { !favSet.contains($0) }
+    }
+
     var body: some View {
         ScrollView {
             LazyVGrid(columns: cols, spacing: 12) {
-                ForEach(ActivityModule.allCases) { mod in
+                ForEach(orderedModules) { mod in
                     GameCard(
                         mod: mod,
                         isFavorite: favorites.contains(mod),
@@ -34,6 +42,7 @@ struct GameGridView: View {
                     )
                 }
             }
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: favorites)
             .padding(.horizontal, 2)
 
             moreCard
@@ -444,10 +453,16 @@ private struct GamePreview: View {
     /// scattered polka-dot pattern.
     private func pop(_ s: CGFloat) -> some View {
         let n = 5
-        let d = s / CGFloat(n) - 2.5
-        return VStack(spacing: 2.5) {
+        // Sized with real margin on all sides (rather than nearly filling the
+        // s×s box) — `.drawingGroup()` rasterizes this card to its own
+        // bounds, so a grid that already hugs the edges gets its top row
+        // clipped the moment it's nudged upward to center.
+        let gap: CGFloat = 2.5
+        let boardSide = s * 0.8
+        let d = (boardSide - CGFloat(n - 1) * gap) / CGFloat(n)
+        return VStack(spacing: gap) {
             ForEach(0..<n, id: \.self) { _ in
-                HStack(spacing: 2.5) {
+                HStack(spacing: gap) {
                     ForEach(0..<n, id: \.self) { _ in
                         Circle()
                             .fill(RadialGradient(colors: [.white.opacity(0.5), Color(hex: "C77DFF").opacity(0.35)],
@@ -458,7 +473,7 @@ private struct GamePreview: View {
                 }
             }
         }
-        .offset(y: -s * 0.05)
+        .offset(y: -s * 0.03)
     }
 
     private func click(_ s: CGFloat) -> some View {

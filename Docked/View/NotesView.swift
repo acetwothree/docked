@@ -79,7 +79,10 @@ private struct NotesEditorSheet: View {
             // still leaves a usable typing band.
             let topInset = min(max(64, topClearance + 20), geo.size.height * 0.7)
 
-            ZStack(alignment: .top) {
+            // The word-count/Done bar lives at the BOTTOM of the sheet, not
+            // the top — the top is exactly where the floating video sits, so
+            // pinning Done there risked it being covered by the PiP window.
+            ZStack(alignment: .bottom) {
                 Theme.backdrop.ignoresSafeArea()
 
                 TextEditor(text: $store.text)
@@ -88,7 +91,7 @@ private struct NotesEditorSheet: View {
                     .scrollContentBackground(.hidden)
                     .padding(.horizontal, 12)
                     .padding(.top, topInset)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 56)
 
                 HStack(spacing: 10) {
                     Text("\(wordCount) words")
@@ -104,14 +107,6 @@ private struct NotesEditorSheet: View {
                 }
                 .padding(.horizontal, 14).padding(.vertical, 8)
                 .background(.ultraThinMaterial)
-
-                Text("Text starts here, clear of the floating video. Drag the video aside if it still overlaps.")
-                    .font(.system(size: 10)).foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 20)
-                    .padding(.top, topInset - 22)
-                    .allowsHitTesting(false)
             }
         }
         .onAppear { focused = true }

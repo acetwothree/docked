@@ -52,9 +52,9 @@ struct DoodlePadView: View {
                 ForEach(palette, id: \.self) { hex in
                     Circle()
                         .fill(Color(hex: hex))
-                        .frame(width: 25, height: 25)
+                        .frame(width: 32, height: 32)
                         .overlay {
-                            Circle().strokeBorder(.white.opacity(!erasing && colorHex == hex ? 0.95 : 0.15), lineWidth: 2.5)
+                            Circle().strokeBorder(.white.opacity(!erasing && colorHex == hex ? 0.95 : 0.15), lineWidth: 3)
                         }
                         .frame(maxWidth: .infinity)
                         .contentShape(Circle())
@@ -69,10 +69,10 @@ struct DoodlePadView: View {
                     Button { lineWidth = w } label: {
                         Circle()
                             .fill(erasing ? Color.secondary : Color(hex: colorHex))
-                            .frame(width: min(w + 6, 24), height: min(w + 6, 24))
-                            .frame(width: 34, height: 34)
+                            .frame(width: min(w + 8, 30), height: min(w + 8, 30))
+                            .frame(width: 42, height: 42)
                             .background(on ? Color.primary.opacity(0.12) : Color.clear,
-                                       in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                       in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                             .frame(maxWidth: .infinity)
                             .contentShape(Rectangle())
                     }
@@ -85,11 +85,11 @@ struct DoodlePadView: View {
                 if let exportImage {
                     ShareLink(item: exportImage, preview: SharePreview("Doodle", image: exportImage)) {
                         Image(systemName: "square.and.arrow.up")
-                            .frame(width: 34, height: 34).frame(maxWidth: .infinity).contentShape(Rectangle())
+                            .frame(width: 42, height: 42).frame(maxWidth: .infinity).contentShape(Rectangle())
                     }
                 } else {
                     Image(systemName: "square.and.arrow.up")
-                        .frame(width: 34, height: 34).frame(maxWidth: .infinity)
+                        .frame(width: 42, height: 42).frame(maxWidth: .infinity)
                         .foregroundStyle(.tertiary)
                 }
 
@@ -98,7 +98,7 @@ struct DoodlePadView: View {
                 toolButton("trash", tint: .red) { store.clear() }
                     .disabled(store.strokes.isEmpty)
             }
-            .font(.system(size: 15, weight: .semibold))
+            .font(.system(size: 18, weight: .semibold))
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(.ultraThinMaterial)
@@ -109,8 +109,8 @@ struct DoodlePadView: View {
         Button(action: action) {
             Image(systemName: icon)
                 .foregroundStyle(tint)
-                .frame(width: 34, height: 34)
-                .background(bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .frame(width: 42, height: 42)
+                .background(bg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
         }

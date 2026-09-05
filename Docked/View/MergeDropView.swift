@@ -85,10 +85,11 @@ struct MergeDropView: View {
                             .fill(color(next).opacity(0.14))
                             .frame(width: cw - 2, height: boardH)
                             .position(x: CGFloat(hc) * cw + cw / 2, y: boardH / 2)
-                        // ghost of the block that will drop
+                        // ghost of the block that will drop — floats above the
+                        // board entirely so a filled top row never hides it
                         blockTile(next, side: cw - 8)
                             .opacity(0.4)
-                            .position(x: CGFloat(hc) * cw + cw / 2, y: ch / 2)
+                            .position(x: CGFloat(hc) * cw + cw / 2, y: -ch * 0.62)
                     }
 
                     ForEach(Array(0..<(cols * rows)), id: \.self) { i in
@@ -212,7 +213,7 @@ struct MergeDropView: View {
         next = Int.random(in: 1...3)
 
         let endY = CGFloat(landing) * ch + ch / 2
-        falling = FallingPiece(col: col, val: val, y: ch / 2)
+        falling = FallingPiece(col: col, val: val, y: -ch * 0.62)
         let dur = min(0.4, 0.12 + Double(max(1, landing)) * 0.04)
         withAnimation(.easeIn(duration: dur)) {
             falling?.y = endY
