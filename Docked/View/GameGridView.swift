@@ -219,6 +219,14 @@ private struct GamePreview: View {
         GeometryReader { geo in
             let s = min(geo.size.width, geo.size.height)
             content(s)
+                // Every icon positions its shapes with `.position(x: frac*s, …)`
+                // assuming an s×s box with its own origin — without pinning that
+                // box's frame explicitly here, the ZStack's *actual* content
+                // bounds (the union of the shapes, not a full s×s square) is what
+                // gets centered next, which silently drags off-center compositions
+                // that aren't symmetric. Fixing the frame to s×s first, THEN
+                // centering that in the card, is what actually centers them.
+                .frame(width: s, height: s)
                 .frame(width: geo.size.width, height: geo.size.height)
                 .compositingGroup()
                 .drawingGroup()
@@ -240,15 +248,24 @@ private struct GamePreview: View {
         case .click:   click(s)
         case .ksand:   sand(s)
         case .rings:   rings(s)
-        case .sandfall: sandfall(s)
+        case .crumble: sandfall(s)
+        case .hexfall: hexfall(s)
+        case .blocktower: blocktower(s)
         }
     }
 
+    /// A little scribble spiral — reads as an actual doodle, and it's
+    /// centred by construction (built around the box's own centre).
     private func doodle(_ s: CGFloat) -> some View {
         Path { p in
-            let pts: [(CGFloat, CGFloat)] = [(0.2, 0.68), (0.35, 0.32), (0.46, 0.62), (0.57, 0.28), (0.68, 0.6), (0.8, 0.38)]
-            for (i, pt) in pts.enumerated() {
-                let cg = CGPoint(x: pt.0 * s, y: pt.1 * s)
+            let turns = 2.3
+            let steps = 48
+            for i in 0...steps {
+                let t = CGFloat(i) / CGFloat(steps)
+                let angle = Double(t) * turns * 2 * .pi
+                let r = t * 0.38
+                let cg = CGPoint(x: (0.5 + r * CGFloat(cos(angle))) * s,
+                                 y: (0.5 + r * CGFloat(sin(angle))) * s)
                 if i == 0 { p.move(to: cg) } else { p.addLine(to: cg) }
             }
         }
@@ -257,24 +274,24 @@ private struct GamePreview: View {
     }
 
     private func notes(_ s: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: s * 0.1) {
-            ForEach(Array([0.62, 0.48, 0.56].enumerated()), id: \.offset) { _, w in
-                Capsule().fill(Color.white.opacity(0.28)).frame(width: s * w, height: s * 0.07)
+        VStack(alignment: .leading, spacing: s * 0.12) {
+            ForEach(Array([0.86, 0.64, 0.76].enumerated()), id: \.offset) { _, w in
+                Capsule().fill(Color.white.opacity(0.3)).frame(width: s * w, height: s * 0.09)
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            Image(systemName: "pencil").font(.system(size: s * 0.24, weight: .bold))
+            Image(systemName: "pencil").font(.system(size: s * 0.3, weight: .bold))
                 .foregroundStyle(Color(hex: "4A9CFF"))
                 .shadow(color: Color(hex: "4A9CFF").opacity(0.6), radius: 4)
-                .offset(x: s * 0.22, y: s * 0.22)
+                .offset(x: s * 0.2, y: s * 0.26)
         }
     }
 
     private func color(_ s: CGFloat) -> some View {
         ZStack {
-            PopSphere(color: Color(hex: "E0473E"), size: s * 0.48).offset(x: -s * 0.17, y: -s * 0.08)
-            PopSphere(color: Color(hex: "F2B90C"), size: s * 0.48).offset(x: s * 0.17, y: -s * 0.08)
-            PopSphere(color: Color(hex: "3ECF7A"), size: s * 0.48).offset(x: 0, y: s * 0.16)
+            PopSphere(color: Color(hex: "E0473E"), size: s * 0.48).offset(x: -s * 0.17, y: -s * 0.14)
+            PopSphere(color: Color(hex: "F2B90C"), size: s * 0.48).offset(x: s * 0.17, y: -s * 0.14)
+            PopSphere(color: Color(hex: "3ECF7A"), size: s * 0.48).offset(x: 0, y: s * 0.14)
             Image(systemName: "paintbrush.pointed.fill")
                 .font(.system(size: s * 0.24, weight: .bold))
                 .foregroundStyle(.white)
@@ -314,12 +331,12 @@ private struct GamePreview: View {
 
     private func merge(_ s: CGFloat) -> some View {
         VStack(spacing: s * 0.05) {
-            numberTile("2", Color(hex: "3ECF7A"), s * 0.3, s * 0.24)
+            numberTile("2", Color(hex: "3ECF7A"), s * 0.38, s * 0.27)
             HStack(spacing: s * 0.05) {
-                numberTile("4", Color(hex: "3EA1E0"), s * 0.3, s * 0.24)
-                numberTile("8", Color(hex: "8B5CF6"), s * 0.3, s * 0.24)
+                numberTile("4", Color(hex: "3EA1E0"), s * 0.38, s * 0.27)
+                numberTile("8", Color(hex: "8B5CF6"), s * 0.38, s * 0.27)
             }
-            numberTile("16", Color(hex: "F25CA2"), s * 0.42, s * 0.24)
+            numberTile("16", Color(hex: "F25CA2"), s * 0.5, s * 0.27)
         }
     }
 
@@ -331,21 +348,21 @@ private struct GamePreview: View {
         }
     }
 
+    /// A diamond loop, centred by construction, with the ball at the top
+    /// vertex — reads as a painted path without any directional bias.
     private func maze(_ s: CGFloat) -> some View {
         ZStack {
             Path { p in
-                p.move(to: CGPoint(x: s * 0.22, y: s * 0.25))
-                p.addLine(to: CGPoint(x: s * 0.22, y: s * 0.5))
-                p.addLine(to: CGPoint(x: s * 0.5, y: s * 0.5))
-                p.addLine(to: CGPoint(x: s * 0.5, y: s * 0.25))
-                p.addLine(to: CGPoint(x: s * 0.78, y: s * 0.25))
-                p.addLine(to: CGPoint(x: s * 0.78, y: s * 0.75))
-                p.addLine(to: CGPoint(x: s * 0.42, y: s * 0.75))
+                p.move(to: CGPoint(x: s * 0.5, y: s * 0.16))
+                p.addLine(to: CGPoint(x: s * 0.16, y: s * 0.5))
+                p.addLine(to: CGPoint(x: s * 0.5, y: s * 0.84))
+                p.addLine(to: CGPoint(x: s * 0.84, y: s * 0.5))
+                p.closeSubpath()
             }
-            .stroke(Color(hex: "E0473E"), style: StrokeStyle(lineWidth: s * 0.13, lineCap: .round, lineJoin: .round))
+            .stroke(Color(hex: "E0473E"), style: StrokeStyle(lineWidth: s * 0.12, lineCap: .round, lineJoin: .round))
             .shadow(color: Color(hex: "E0473E").opacity(0.5), radius: 3)
             PopSphere(color: Color(hex: "E8EBF2"), size: s * 0.2)
-                .position(x: s * 0.22, y: s * 0.25)
+                .position(x: s * 0.5, y: s * 0.16)
         }
     }
 
@@ -419,22 +436,27 @@ private struct GamePreview: View {
         }
     }
 
-    /// A sandy tray with raked lines — warm tan, not purple.
+    /// A dark wooden tray holding pale sand with raked grooves — high
+    /// contrast so it actually reads as sand, not a flat purple pattern.
     private func sand(_ s: CGFloat) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color(hex: "8B6F47"))
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(hex: "4A3826"))
                 .frame(width: s * 0.94, height: s * 0.94)
-            VStack(spacing: s * 0.13) {
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(LinearGradient(colors: [Color(hex: "E8CFA0"), Color(hex: "D2AE72")],
+                                     startPoint: .top, endPoint: .bottom))
+                .frame(width: s * 0.8, height: s * 0.8)
+            VStack(spacing: s * 0.12) {
                 ForEach(0..<4, id: \.self) { i in
                     Path { p in
                         p.move(to: CGPoint(x: 0, y: 0))
-                        p.addCurve(to: CGPoint(x: s * 0.72, y: 0),
-                                  control1: CGPoint(x: s * 0.24, y: i.isMultiple(of: 2) ? -s * 0.08 : s * 0.08),
-                                  control2: CGPoint(x: s * 0.48, y: i.isMultiple(of: 2) ? s * 0.08 : -s * 0.08))
+                        p.addCurve(to: CGPoint(x: s * 0.64, y: 0),
+                                  control1: CGPoint(x: s * 0.21, y: i.isMultiple(of: 2) ? -s * 0.08 : s * 0.08),
+                                  control2: CGPoint(x: s * 0.43, y: i.isMultiple(of: 2) ? s * 0.08 : -s * 0.08))
                     }
-                    .stroke(Color(hex: "E8CFA0"), style: StrokeStyle(lineWidth: s * 0.035, lineCap: .round))
-                    .frame(width: s * 0.72, height: s * 0.05)
+                    .stroke(Color(hex: "9C7A46").opacity(0.8), style: StrokeStyle(lineWidth: s * 0.03, lineCap: .round))
+                    .frame(width: s * 0.64, height: s * 0.05)
                 }
             }
         }
@@ -477,6 +499,36 @@ private struct GamePreview: View {
             ForEach(0..<count, id: \.self) { i in
                 PopBlock(sandColors[i % sandColors.count], width: size, height: size, corner: 2, shadow: false)
             }
+        }
+    }
+
+    /// A hexagon balanced on a slightly toppled little tower — tap-to-clear.
+    private func hexfall(_ s: CGFloat) -> some View {
+        VStack(spacing: 1) {
+            Polygon(sides: 6)
+                .fill(Color(hex: "3EA1E0"))
+                .overlay(Polygon(sides: 6).stroke(.white.opacity(0.3), lineWidth: 1.5))
+                .frame(width: s * 0.36, height: s * 0.32)
+                .rotationEffect(.degrees(6))
+                .shadow(color: .black.opacity(0.3), radius: 2, y: 1.5)
+            PopBlock(Color(hex: "F2B90C"), width: s * 0.4, height: s * 0.14, corner: 3, shadow: false)
+                .rotationEffect(.degrees(6)).offset(x: s * 0.03)
+            PopBlock(Color(hex: "E0473E"), width: s * 0.4, height: s * 0.14, corner: 3, shadow: false)
+                .offset(x: -s * 0.05)
+            PopBlock(Color(hex: "8B5CF6"), width: s * 0.44, height: s * 0.14, corner: 3, shadow: false)
+        }
+    }
+
+    /// A taller, straight stack — the "keep it balanced" stacking game.
+    private func blocktower(_ s: CGFloat) -> some View {
+        VStack(spacing: 2) {
+            PopBlock(Color(hex: "3ECF7A"), width: s * 0.26, height: s * 0.15, corner: 3, shadow: false)
+            PopBlock(Color(hex: "3EA1E0"), width: s * 0.34, height: s * 0.15, corner: 3, shadow: false)
+                .offset(x: s * 0.04)
+            PopBlock(Color(hex: "F2B90C"), width: s * 0.4, height: s * 0.15, corner: 3, shadow: false)
+                .offset(x: -s * 0.03)
+            PopBlock(Color(hex: "F25CA2"), width: s * 0.46, height: s * 0.15, corner: 3, shadow: false)
+            PopBlock(Color(hex: "8B5CF6"), width: s * 0.52, height: s * 0.15, corner: 3, shadow: false)
         }
     }
 

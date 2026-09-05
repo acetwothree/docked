@@ -41,6 +41,8 @@ final class AppModel {
         static let popClears = "docked.pop.clears"
         static let tttGames = "docked.ttt.games"
         static let sandHigh = "docked.sand.highScore"
+        static let hexHigh = "docked.hexfall.highScore"
+        static let towerHigh = "docked.tower.highScore"
     }
 
     /// The video always sits in the top band now — kept as a constant so the
@@ -70,6 +72,8 @@ final class AppModel {
     var popClearCount: Int { didSet { store(popClearCount, K.popClears) } }
     var tttGames: Int { didSet { store(tttGames, K.tttGames) } }
     var sandHighScore: Int { didSet { store(sandHighScore, K.sandHigh) } }
+    var hexHighScore: Int { didSet { store(hexHighScore, K.hexHigh) } }
+    var towerHighScore: Int { didSet { store(towerHighScore, K.towerHigh) } }
 
     /// Lifetime tally for the Clicker fidget. Never reset — not even by
     /// "Clear all app data".
@@ -102,6 +106,8 @@ final class AppModel {
         popClearCount = d.integer(forKey: K.popClears)
         tttGames = d.integer(forKey: K.tttGames)
         sandHighScore = d.integer(forKey: K.sandHigh)
+        hexHighScore = d.integer(forKey: K.hexHigh)
+        towerHighScore = d.integer(forKey: K.towerHigh)
         if let raw = d.array(forKey: K.pinned) as? [String] {
             let restored = raw.compactMap(ActivityModule.init(rawValue:))
             pinnedModules = restored.isEmpty ? AppModel.defaultPinned : restored
@@ -143,6 +149,8 @@ final class AppModel {
         popClearCount = 0
         tttGames = 0
         sandHighScore = 0
+        hexHighScore = 0
+        towerHighScore = 0
         module = .doodle
         favorites = []
         pinnedModules = AppModel.defaultPinned

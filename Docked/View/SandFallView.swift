@@ -2,11 +2,11 @@
 //  SandFallView.swift
 //  Docked
 //
-//  "Sand Fall" — coloured tetromino pieces fall, then crumble into loose sand
-//  that trickles into gaps. A colour clears once a connected patch of it
-//  spans every column from the left wall to the right wall. Pieces don't
-//  rotate — just drag left/right to slide them (they follow your finger 1:1)
-//  and swipe down to drop.
+//  "Crumble Drop" — coloured tetromino pieces fall smoothly, then crumble
+//  into loose sand that trickles into gaps. A colour clears once a connected
+//  patch of it spans every column from the left wall to the right wall.
+//  Pieces don't rotate — drag left/right to slide them (they follow your
+//  finger 1:1), and either tap or swipe down to drop instantly.
 //
 //  Settled grains keep a stable identity (`Grain.id`) across the model's
 //  settle passes, so `ForEach(model.grains)` animates each one sliding to its
@@ -25,7 +25,11 @@ struct SandFallView: View {
     /// finger movement only applies the DELTA each time (free 1:1 tracking).
     @State private var dragAppliedCols = 0
 
-    private let fallTimer = Timer.publish(every: 0.55, on: .main, in: .common).autoconnect()
+    /// Ticks fast with an animation exactly as long as the gap between ticks,
+    /// so one linear step's motion ends right as the next begins — that's
+    /// what reads as a smooth continuous fall instead of a jerky hop.
+    private static let fallInterval = 0.15
+    private let fallTimer = Timer.publish(every: fallInterval, on: .main, in: .common).autoconnect()
 
     init(highScore: Int) {
         _model = State(initialValue: SandFallModel(best: highScore))
@@ -51,7 +55,7 @@ struct SandFallView: View {
                 board(w: geo.size.width, h: geo.size.height)
             }
 
-            Text(model.phase == .over ? "Sand piled up — resetting…" : "Drag left/right to slide · swipe down to drop")
+            Text(model.phase == .over ? "Sand piled up — resetting…" : "Drag left/right to slide · tap to drop")
                 .font(.system(size: 11, weight: .heavy))
                 .foregroundStyle(model.phase == .over ? Color.orange : Color.secondary)
                 .lineLimit(1).minimumScaleFactor(0.7)
@@ -60,7 +64,7 @@ struct SandFallView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onReceive(fallTimer) { _ in
             guard model.phase == .play else { return }
-            withAnimation(.linear(duration: 0.18)) { _ = model.stepDown() }
+            withAnimation(.linear(duration: Self.fallInterval)) { _ = model.stepDown() }
         }
         .onChange(of: model.lockTick) { _, _ in settleLoop() }
         .onChange(of: model.overTick) { _, _ in
@@ -133,13 +137,21 @@ struct SandFallView: View {
         }
         .frame(width: w, height: h)
         .contentShape(Rectangle())
-        .gesture(dragGesture(cell: cell))
+        // A plain tap (never exceeds the drag's minimum distance) falls
+        // through to the tap gesture and drops instantly; anything that
+        // moves far enough is treated as a slide, with a fast downward one
+        // still working as a drop too.
+        .gesture(dragGesture(cell: cell).exclusively(before: tapToDropGesture))
+    }
+
+    private var tapToDropGesture: some Gesture {
+        TapGesture().onEnded { withAnimation(.easeIn(duration: 0.1)) { model.hardDrop() } }
     }
 
     /// Free 1:1 horizontal dragging (not step swipes) plus a downward swipe
     /// to hard-drop.
     private func dragGesture(cell: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 4)
+        DragGesture(minimumDistance: 8)
             .onChanged { v in
                 guard cell > 0 else { return }
                 let wanted = Int((v.translation.width / cell).rounded())
@@ -153,7 +165,7 @@ struct SandFallView: View {
             }
             .onEnded { v in
                 let dx = v.translation.width, dy = v.translation.height
-                if dy > 60, abs(dy) > abs(dx) * 1.2 {
+                if dy > 40, abs(dy) > abs(dx) * 1.2 {
                     withAnimation(.easeIn(duration: 0.1)) { model.hardDrop() }
                 }
                 dragAppliedCols = 0

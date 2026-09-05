@@ -63,6 +63,10 @@ final class SandFallModel {
         [(0, 2), (1, 0), (1, 1), (1, 2)],              // L
     ]
 
+    /// The last colour dealt — pieces are biased to repeat it so it's easier
+    /// to actually build a same-colour wall-to-wall connection.
+    private var lastColor: Color?
+
     init(cols: Int = 9, rows: Int = 14, best: Int) {
         self.cols = cols
         self.rows = rows
@@ -76,6 +80,11 @@ final class SandFallModel {
         Set(grains.map { $0.row * cols + $0.col })
     }
 
+    private func rollColor() -> Color {
+        if let last = lastColor, Double.random(in: 0..<1) < 0.55 { return last }
+        return Self.palette.randomElement()!
+    }
+
     private func spawn() {
         let template = Self.templates.randomElement()!
         let minRow = template.map(\.row).min() ?? 0
@@ -85,7 +94,8 @@ final class SandFallModel {
         let shiftRow = -1 - minRow                       // top row lands at -1
         let shiftCol = (cols - width) / 2 - minCol
         activeCells = template.map { (row: $0.row + shiftRow, col: $0.col + shiftCol) }
-        activeColor = Self.palette.randomElement()!
+        activeColor = rollColor()
+        lastColor = activeColor
 
         if !canPlace(activeCells) {
             phase = .over
@@ -243,6 +253,7 @@ final class SandFallModel {
         score = 0
         phase = .play
         clearingCells = []
+        lastColor = nil
         spawn()
     }
 }

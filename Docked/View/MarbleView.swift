@@ -5,11 +5,11 @@
 //  "Maze Paint" — swipe and the marble slides until it hits a wall or the
 //  edge. Paint every open tile to clear the level. Levels are random mazes (a
 //  recursive-backtracker carve), regenerated at load time until a full-clear
-//  order is verified to exist — an unsolvable layout is never shown. If the
-//  player's own move order still paints them into a corner the rest can't
-//  reach, `paintableBySliding` catches it right away and the SAME maze
-//  restarts (never swapped for a different one) so they can try a better
-//  order. Grid size grows with the level. Level persists.
+//  order is verified to exist — an unsolvable layout is never shown, and among
+//  the solvable candidates found, the most fragmented one (smallest largest
+//  wall cluster) wins, so obstacles split up more as levels grow harder
+//  instead of clumping into one or two big blocks. Grid size grows with the
+//  level. Level persists.
 //
 
 import SwiftUI
@@ -25,7 +25,6 @@ struct MarbleView: View {
     @State private var visited: Set<Int> = []
     @State private var pos = 0
     @State private var cleared = false
-    @State private var stuck = false
     @State private var loaded = false
     @State private var moveTick = 0
     @State private var hitTick = 0
@@ -64,18 +63,18 @@ struct MarbleView: View {
             }
 
             GeometryReader { geo in
-                let side = min(geo.size.width, geo.size.height) * 0.86
+                let side = min(geo.size.width, geo.size.height) * 0.94
                 board(side: side)
                     .frame(width: side, height: side)
-                    // A light top-down-but-tilted skew, closer to the
-                    // isometric-looking reference than a flat plan view.
-                    .rotation3DEffect(.degrees(26), axis: (x: 1, y: 0, z: 0), perspective: 0.3)
+                    // Just a touch of top-down-but-tilted skew — enough to
+                    // read as 3D without distorting the board.
+                    .rotation3DEffect(.degrees(13), axis: (x: 1, y: 0, z: 0), perspective: 0.12)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
-            Text(cleared ? "Cleared!" : stuck ? "No path left — restarting…" : "Swipe to roll · paint every tile")
+            Text(cleared ? "Cleared!" : "Swipe to roll · paint every tile")
                 .font(.system(size: 12, weight: .heavy))
-                .foregroundStyle(cleared ? Color.green : stuck ? Color.orange : Color.secondary)
+                .foregroundStyle(cleared ? Color.green : Color.secondary)
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -91,7 +90,6 @@ struct MarbleView: View {
         .sensoryFeedback(.impact(weight: .light), trigger: moveTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: hitTick) { _, _ in app.haptics }
         .sensoryFeedback(.success, trigger: winTick) { _, _ in app.haptics }
-        .sensoryFeedback(.error, trigger: stuck) { _, now in now && app.haptics }
         .onAppear { if !loaded { load(level); loaded = true } }
     }
 
@@ -183,7 +181,7 @@ struct MarbleView: View {
     // MARK: movement
 
     private func roll(_ dc: Int, _ dr: Int) {
-        guard !cleared, !stuck else { return }
+        guard !cleared else { return }
         var c = pos % cols
         var r = pos / cols
         var moved = false
@@ -209,24 +207,15 @@ struct MarbleView: View {
                 level = next
                 load(next)
             }
-        } else if !Self.paintableBySliding(mw: cols, mh: rows, isOpen: { !walls.contains($0) },
-                                          start: pos, covered: visited) {
-            // However this position was reached, the rest of the board can no
-            // longer all be painted from here. The maze itself is always
-            // generated with a full solution, so just restart THIS layout —
-            // never swap in a different maze — and try a better order.
-            stuck = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { restartLevel() }
         }
     }
 
     /// Resets the marble to the start of the SAME maze — no new layout is
-    /// generated. Used by both the reset button and the stuck-recovery timer.
+    /// generated. Used by the reset button.
     private func restartLevel() {
         pos = 0
         visited = [0]
         cleared = false
-        stuck = false
     }
 
     // MARK: maze generation (recursive backtracker)
@@ -240,17 +229,24 @@ struct MarbleView: View {
         let maxBraid = min(0.45, 0.06 * Double(lvl))
 
         var chosen: [Bool] = []
-        // Regenerate until every open tile can be reached AND painted by
-        // sliding. Later attempts braid less, so a plain (always-solvable)
-        // maze is the guaranteed fallback.
+        var bestClusterSize = Int.max
+        // Try a batch of layouts (later ones braid less, so a plain
+        // always-solvable maze is the guaranteed fallback), keep every
+        // solvable one, and pick whichever splits its walls into the
+        // smallest largest cluster — the more fragmented the obstacles, the
+        // harder the level reads without ever risking an unsolvable board.
         for attempt in 0..<22 {
             let braid = attempt < 20 ? maxBraid * (1 - Double(attempt) / 20) : 0
             let grid = Self.generate(mw: mw, mh: mh, braid: braid)
-            if Self.paintableBySliding(mw: mw, mh: mh, isOpen: { grid[$0] }, start: 0, covered: []) {
-                chosen = grid
-                break
+            guard Self.paintableBySliding(mw: mw, mh: mh, isOpen: { grid[$0] }, start: 0, covered: []) else {
+                if chosen.isEmpty { chosen = grid }   // last-resort fallback if nothing solvable is found
+                continue
             }
-            chosen = grid   // keep last as a fallback
+            let cluster = Self.maxWallClusterSize(grid, mw: mw, mh: mh)
+            if cluster < bestClusterSize {
+                bestClusterSize = cluster
+                chosen = grid
+            }
         }
 
         cols = mw
@@ -262,7 +258,6 @@ struct MarbleView: View {
         pos = 0
         visited = [0]
         cleared = false
-        stuck = false
     }
 
     /// Recursive-backtracker carve from (0,0), then optional braiding.
@@ -356,5 +351,34 @@ struct MarbleView: View {
             if !covered.contains(i) { return false }
         }
         return true
+    }
+
+    /// Size of the biggest 4-connected group of wall cells — the smaller
+    /// this is, the more the obstacles read as scattered pieces rather than
+    /// one or two big blocks.
+    private static func maxWallClusterSize(_ isOpen: [Bool], mw: Int, mh: Int) -> Int {
+        var seen = Set<Int>()
+        var best = 0
+        for start in 0..<(mw * mh) where !isOpen[start] && !seen.contains(start) {
+            var count = 0
+            var queue = [start]
+            seen.insert(start)
+            var qi = 0
+            while qi < queue.count {
+                let cur = queue[qi]; qi += 1
+                count += 1
+                let x = cur % mw, y = cur / mw
+                for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                    let nx = x + dx, ny = y + dy
+                    guard nx >= 0, nx < mw, ny >= 0, ny < mh else { continue }
+                    let ni = ny * mw + nx
+                    guard !seen.contains(ni), !isOpen[ni] else { continue }
+                    seen.insert(ni)
+                    queue.append(ni)
+                }
+            }
+            best = max(best, count)
+        }
+        return best
     }
 }

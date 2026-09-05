@@ -67,35 +67,22 @@ struct BrawlView: View {
         _ = tick
         return Canvas { ctx, cs in
             let c = CGPoint(x: cs.width / 2, y: cs.height / 2)
-            let reach = min(cs.width, cs.height) / 2 - 12
+            let reach = min(cs.width, cs.height) / 2 - 6
             let ringR = reach * BrawlModel.strikeDist
             let dirs: [CGPoint] = [CGPoint(x: 0, y: -1), CGPoint(x: 1, y: 0),
                                    CGPoint(x: 0, y: 1), CGPoint(x: -1, y: 0)]
 
-            // soft vignette background
-            ctx.fill(Path(CGRect(origin: .zero, size: cs)),
-                     with: .radialGradient(Gradient(colors: [Theme.accent.opacity(0.06), .clear]),
-                                           center: c, startRadius: 0, endRadius: reach))
+            // one solid arena floor — a mat, not a set of crossing axis lines
+            let floorRect = CGRect(x: c.x - reach, y: c.y - reach, width: reach * 2, height: reach * 2)
+            ctx.fill(Path(ellipseIn: floorRect), with: .color(Theme.ink.opacity(0.05)))
+            ctx.stroke(Path(ellipseIn: floorRect), with: .color(Theme.ink.opacity(0.12)), lineWidth: 2)
 
-            // lane guides — thin solid lines fading toward the centre
-            for d in dirs {
-                var p = Path()
-                p.move(to: CGPoint(x: c.x + d.x * ringR, y: c.y + d.y * ringR))
-                p.addLine(to: CGPoint(x: c.x + d.x * reach, y: c.y + d.y * reach))
-                ctx.stroke(p, with: .color(Theme.ink.opacity(0.10)),
-                           style: StrokeStyle(lineWidth: 2, lineCap: .round))
-            }
-
-            // strike zone — a filled disc so "in range" reads at a glance
-            let ringRect = CGRect(x: c.x - ringR, y: c.y - ringR, width: ringR * 2, height: ringR * 2)
-            ctx.fill(Path(ellipseIn: ringRect), with: .color(Theme.accent.opacity(0.10)))
-            ctx.stroke(Path(ellipseIn: ringRect), with: .color(Theme.accent.opacity(0.45)), lineWidth: 2)
-
-            // slash — a wedge that shoots from the player toward the swipe
+            // slash — a wedge that shoots from the player toward the swipe;
+            // this alone shows the reach, so there's no separate ring drawn.
             if let sd = slashDir {
                 let age = Date().timeIntervalSince(slashAt)
-                if age < 0.18 {
-                    let o = CGFloat(1 - age / 0.18)
+                if age < 0.1 {
+                    let o = CGFloat(1 - age / 0.1)
                     let d = dirs[sd]
                     let ang = atan2(Double(d.y), Double(d.x))
                     let len = ringR + 14
@@ -114,19 +101,19 @@ struct BrawlView: View {
                 let d = dirs[e.dir]
                 let px = c.x + d.x * reach * e.dist
                 let py = c.y + d.y * reach * e.dist
-                let s: CGFloat = 22
+                let s: CGFloat = 26
                 let r = CGRect(x: px - s / 2, y: py - s / 2, width: s, height: s)
-                ctx.fill(Path(roundedRect: r, cornerRadius: 5, style: .continuous),
+                ctx.fill(Path(roundedRect: r, cornerRadius: 6, style: .continuous),
                          with: .color(Theme.ink.opacity(0.8)))
             }
 
             // player — soft glow + a slow idle bob
             let bob = CGFloat(sin(Double(game.elapsed) * 2.2)) * 2
-            let ps: CGFloat = 36
+            let ps: CGFloat = 42
             let prect = CGRect(x: c.x - ps / 2, y: c.y - ps / 2 + bob, width: ps, height: ps)
-            ctx.fill(Path(ellipseIn: prect.insetBy(dx: -8, dy: -8)),
+            ctx.fill(Path(ellipseIn: prect.insetBy(dx: -9, dy: -9)),
                      with: .color(Theme.accent.opacity(0.18)))
-            ctx.fill(Path(roundedRect: prect, cornerRadius: 9, style: .continuous),
+            ctx.fill(Path(roundedRect: prect, cornerRadius: 11, style: .continuous),
                      with: .color(Theme.accent))
         }
     }
@@ -144,7 +131,7 @@ struct BrawlView: View {
                     }
                 }
             }
-            .padding(14)
+            .padding(10)
             Spacer()
         }
     }

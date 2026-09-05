@@ -133,7 +133,7 @@ struct SpotView: View {
 
     private func deal() {
         target = randomCreature()
-        let count = min(24, 6 + round * 2)
+        let count = min(28, 8 + round * 3)
         var list: [Creature] = []
         while list.count < count - 1 {
             let c = randomCreature()
@@ -146,7 +146,7 @@ struct SpotView: View {
     }
 
     private func start() {
-        round = 1; score = 0; timeLeft = 20
+        round = 1; score = 0; timeLeft = 15
         deal()
         running = true
     }
@@ -156,11 +156,11 @@ struct SpotView: View {
         if i == answer {
             score += round * 10
             round += 1
-            timeLeft = min(timeLeft + 4, 30)
+            timeLeft = min(timeLeft + 2.5, 22)
             hitTick += 1
             deal()
         } else {
-            timeLeft -= 3
+            timeLeft -= 4
             missTick += 1
             wrongIdx = i
             if timeLeft <= 0 { endGame() }

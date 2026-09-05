@@ -104,10 +104,11 @@ struct VideoFrameView: View {
                        with: .color(palette.key.opacity(0.4)), lineWidth: 1)
         }
 
-        // --- engraved console text — centered in the gap between the Back
-        // knob and the Theme/Settings pair (either the open game's name, or
-        // the app's own name when nothing's open) ---
-        let cx = (knobs.back.x + knobs.theme.x) / 2
+        // --- engraved console text — centered on the console itself (the
+        // Back knob sits alone on the left and Theme/Settings pair on the
+        // right, so the true console midpoint is clear space) — either the
+        // open game's name, or the app's own name when nothing's open ---
+        let cx = consoleRect.midX
         let cy = consoleRect.midY
         let font = Font.system(size: 10, weight: .black, design: .rounded)
         // A light halo in every direction first (carries it on the dark

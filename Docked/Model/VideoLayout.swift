@@ -27,17 +27,17 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
 }
 
 // Declaration order is also the order the home grid shows them in: doodle,
-// Color Blocks, Color, Maze Paint, Number Merge and Pop lead (the most-used
-// free activities), then the rest of the free set, then every Plus activity
-// last.
+// Color Blocks, Color, Maze Paint, Number Merge and Crumble Drop lead ahead
+// of Pop (the most-used free activities), then the rest of the free set,
+// then every Plus activity last.
 enum ActivityModule: String, CaseIterable, Identifiable {
-    case doodle, zen, color, marble, drop, pop, notes, click, rings, sandfall, merge, brawl, spot, ksand
+    case doodle, zen, color, marble, drop, crumble, pop, notes, click, rings, hexfall, blocktower, merge, brawl, spot, ksand
     var id: String { rawValue }
 
     var category: ActivityCategory {
         switch self {
         case .doodle, .notes, .color: .create
-        case .zen, .merge, .drop, .marble, .brawl, .spot, .sandfall: .play
+        case .zen, .merge, .drop, .marble, .brawl, .spot, .crumble, .hexfall, .blocktower: .play
         case .pop, .click, .ksand, .rings: .fidget
         }
     }
@@ -57,7 +57,9 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .click: "Clicker"
         case .ksand: "Kinetic Sand"
         case .rings: "Rings"
-        case .sandfall: "Sand Fall"
+        case .crumble: "Crumble Drop"
+        case .hexfall: "Hex Fall"
+        case .blocktower: "Block Tower"
         }
     }
 
@@ -76,14 +78,16 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .click: "hand.tap.fill"
         case .ksand: "hand.draw.fill"
         case .rings: "circle.circle.fill"
-        case .sandfall: "hourglass"
+        case .crumble: "square.stack.3d.down.forward.fill"
+        case .hexfall: "hexagon.fill"
+        case .blocktower: "cube.fill"
         }
     }
 
     /// Activities behind Docked Plus.
     var isPlus: Bool {
         switch self {
-        case .doodle, .notes, .color, .zen, .drop, .marble, .pop, .click, .rings, .sandfall:
+        case .doodle, .notes, .color, .zen, .drop, .marble, .pop, .click, .rings, .crumble, .hexfall, .blocktower:
             return false
         case .merge, .brawl, .spot, .ksand:
             return true
@@ -106,7 +110,9 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .click: "A tally clicker with a satisfying tick."
         case .ksand: "Rake patterns into a zen sand tray."
         case .rings: "Stack the rings smallest-on-top — the classic tower puzzle."
-        case .sandfall: "Colourful falling-sand tetrominoes — clear a line by filling it with one colour."
+        case .crumble: "Falling pieces crumble into sand — connect one colour wall to wall."
+        case .hexfall: "Tap blocks off a tower without tipping the hexagon on top."
+        case .blocktower: "Stack falling pieces as high as you can without toppling."
         }
     }
 

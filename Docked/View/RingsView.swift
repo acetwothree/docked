@@ -31,8 +31,13 @@ struct RingsView: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack {
-                Text("RINGS \(ringCount)")
-                    .font(.system(size: 12, weight: .heavy)).tracking(1).foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    stepBtn("minus.circle.fill", enabled: ringCount > 3) { newGame(ringCount - 1) }
+                    Text("RINGS \(ringCount)")
+                        .font(.system(size: 12, weight: .heavy)).tracking(1).foregroundStyle(.secondary)
+                        .frame(minWidth: 58)
+                    stepBtn("plus.circle.fill", enabled: ringCount < 7) { newGame(ringCount + 1) }
+                }
                 Spacer()
                 Text("MOVES \(moves)")
                     .font(.system(size: 12, weight: .heavy)).monospacedDigit()
@@ -101,21 +106,10 @@ struct RingsView: View {
                 .frame(width: W, height: H)
             }
 
-            Text(solved ? "Solved in \(moves)! Tap ↻ or add a ring"
+            Text(solved ? "Solved in \(moves)! Use +/− above to change the ring count"
                  : held == nil ? "Tap a peg to lift its top ring" : "Tap a peg to drop it")
                 .font(.system(size: 12, weight: .heavy))
                 .foregroundStyle(solved ? Color.green : Color.secondary)
-
-            if solved {
-                Button { newGame(min(7, ringCount + 1)) } label: {
-                    Label("Add a ring", systemImage: "plus.circle.fill")
-                        .font(.system(size: 14, weight: .heavy))
-                        .padding(.horizontal, 16).padding(.vertical, 7)
-                        .background(Theme.accent, in: Capsule())
-                        .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
-                }
-                .buttonStyle(.plain)
-            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -124,6 +118,17 @@ struct RingsView: View {
         .sensoryFeedback(.error, trigger: nopeTick) { _, _ in app.haptics }
         .sensoryFeedback(.success, trigger: winTick) { _, _ in app.haptics }
         .onAppear { if !loaded { newGame(ringCount); loaded = true } }
+    }
+
+    private func stepBtn(_ icon: String, enabled: Bool, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(enabled ? Color.secondary : Color.secondary.opacity(0.3))
+                .frame(width: 22, height: 22)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 
     private func ringBar(size: Int, unit: CGFloat, height: CGFloat) -> some View {

@@ -31,6 +31,10 @@ struct RootView: View {
     @State private var hintDim = false
     @State private var stretchStart: CGFloat? = nil
     @State private var stretching = false
+    /// A one-time "tap here to go back" callout the first time a game opens —
+    /// the back knob alone wasn't discoverable enough. Shown once, ever.
+    @AppStorage("docked.hasSeenBackHint") private var hasSeenBackHint = false
+    @State private var showBackHint = false
 
     var body: some View {
         GeometryReader { safeGeo in
@@ -74,6 +78,13 @@ struct RootView: View {
                     DebugOverlay(solved: s)
                 }
 
+                if showBackHint {
+                    backHint(s)
+                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                        .allowsHitTesting(false)
+                        .zIndex(25)
+                }
+
                 // First-run onboarding — an overlay, so the live dashboard
                 // stays visible (dimmed) behind it.
                 if showOnboarding {
@@ -98,7 +109,9 @@ struct RootView: View {
                 plusContext = nil
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showPlus = true }
             })
-            .presentationDetents([.medium, .large])
+            // Medium only — Settings should never be draggable up to a full
+            // screen that would sit over the video area.
+            .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showPlus, onDismiss: {
@@ -130,6 +143,30 @@ struct RootView: View {
                 Task { await store.refreshEntitlements() }
             }
         }
+        .onChange(of: openModule) { old, new in
+            guard old == nil, new != nil, !hasSeenBackHint else { return }
+            withAnimation(.easeIn(duration: 0.25)) { showBackHint = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
+                withAnimation(.easeOut(duration: 0.3)) { showBackHint = false }
+                hasSeenBackHint = true
+            }
+        }
+    }
+
+    /// Points up at the back knob, shown once the first time a game opens.
+    private func backHint(_ s: SolvedLayout) -> some View {
+        let backX = LayoutSolver.knobLayout(inConsole: s.console).back.x
+        return VStack(spacing: 2) {
+            Text("Tap here to go back")
+                .font(.system(size: 11, weight: .heavy))
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(Theme.accent, in: Capsule())
+                .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
+            Image(systemName: "arrow.up")
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundStyle(Theme.accent)
+        }
+        .position(x: backX, y: s.video.maxY + 28)
     }
 
     private func endEditing() {
@@ -268,7 +305,9 @@ struct RootView: View {
         case .click:   ClickPenView()
         case .rings:   RingsView()
         case .ksand:   KineticSandView()
-        case .sandfall: SandFallView(highScore: app.sandHighScore)
+        case .crumble: SandFallView(highScore: app.sandHighScore)
+        case .hexfall: HexFallView(highScore: app.hexHighScore)
+        case .blocktower: BlockTowerView(highScore: app.towerHighScore)
         case .zen:     EmptyView()   // handled above
         }
     }
