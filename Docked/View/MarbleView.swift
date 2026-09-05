@@ -2,8 +2,8 @@
 //  MarbleView.swift
 //  Docked
 //
-//  "Roll" — swipe and the marble slides until it hits a wall or the edge.
-//  Paint every open tile to clear the level. Levels are random mazes (a
+//  "Maze Paint" — swipe and the marble slides until it hits a wall or the
+//  edge. Paint every open tile to clear the level. Levels are random mazes (a
 //  recursive-backtracker carve), so the corridors twist differently every
 //  time and the marble stops at every junction — which means a full sweep is
 //  always possible. Grid size grows with the level. Level persists.
@@ -20,6 +20,9 @@ struct MarbleView: View {
     @State private var walls: Set<Int> = []
     @State private var openCells: Set<Int> = []
     @State private var visited: Set<Int> = []
+    /// Order cells were painted, oldest first — the trailing ember dots fade
+    /// out the further back they are from the marble.
+    @State private var visitOrder: [Int] = []
     @State private var pos = 0
     @State private var cleared = false
     @State private var loaded = false
@@ -27,24 +30,52 @@ struct MarbleView: View {
     @State private var hitTick = 0
     @State private var winTick = 0
 
+    private static let boardBG = Color(hex: "12141C")
+    private static let tileLight = Color(hex: "8CA3D6")
+    private static let tileDark = Color(hex: "5E6FA0")
+    private static let wallTop = Color(hex: "23262F")
+    private static let wallSide = Color(hex: "0B0C11")
+    private static let trailRed = Color(hex: "D93A3A")
+
+    private var difficulty: String {
+        switch level {
+        case ..<8: "EASY"
+        case 8..<16: "MEDIUM"
+        case 16..<26: "HARD"
+        default: "EXTRA HARD"
+        }
+    }
+
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             HStack {
-                Text("LEVEL \(level)")
-                    .font(.system(size: 13, weight: .heavy)).tracking(1)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("\(visited.count)/\(openCells.count)")
-                    .font(.system(size: 11, weight: .heavy)).monospacedDigit()
-                    .foregroundStyle(cleared ? Color.green : Color.secondary)
-                Spacer()
                 Button { load(level) } label: {
                     Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 34, height: 30)
+                        .frame(width: 30, height: 30)
+                        .background(Color.primary.opacity(0.06), in: Circle())
                 }
                 .buttonStyle(.plain)
+
+                Spacer(minLength: 0)
+
+                VStack(spacing: 3) {
+                    Text(difficulty)
+                        .font(.system(size: 10, weight: .black)).tracking(1.4)
+                        .padding(.horizontal, 10).padding(.vertical, 3)
+                        .background(Color.primary.opacity(0.08), in: Capsule())
+                        .foregroundStyle(.secondary)
+                    Text("Level \(level)")
+                        .font(.system(size: 17, weight: .black, design: .rounded))
+                }
+
+                Spacer(minLength: 0)
+
+                Text("\(visited.count)/\(openCells.count)")
+                    .font(.system(size: 12, weight: .heavy)).monospacedDigit()
+                    .foregroundStyle(cleared ? Color.green : Color.secondary)
+                    .frame(width: 30)
             }
 
             GeometryReader { geo in
@@ -54,7 +85,7 @@ struct MarbleView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
-            Text(cleared ? "Cleared!" : "Swipe to roll · cover every tile")
+            Text(cleared ? "Cleared!" : "Swipe to roll · paint every tile")
                 .font(.system(size: 12, weight: .heavy))
                 .foregroundStyle(cleared ? Color.green : Color.secondary)
         }
@@ -77,33 +108,77 @@ struct MarbleView: View {
 
     private func board(side: CGFloat) -> some View {
         let span = CGFloat(max(cols, rows))
-        let gap: CGFloat = 3
+        let gap: CGFloat = 4
         let cell = (side - gap * (span + 1)) / span
         let count = cols * rows
         return ZStack {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Self.boardBG)
             ForEach(Array(0..<count), id: \.self) { i in
                 cellView(i, cell: cell, gap: gap)
             }
-            Circle().fill(Theme.accent)
-                .frame(width: cell * 0.72, height: cell * 0.72)
+            ForEach(Array(visitOrder.enumerated()), id: \.offset) { pair in
+                if pair.element != pos {
+                    let age = visitOrder.count - 1 - pair.offset
+                    let fade = max(0, 1 - CGFloat(age) * 0.12)
+                    Circle()
+                        .fill(Color(hex: "FF8A3D").opacity(0.85 * fade))
+                        .frame(width: cell * 0.16, height: cell * 0.16)
+                        .position(x: gap + cell / 2 + CGFloat(pair.element % cols) * (cell + gap),
+                                  y: gap + cell / 2 + CGFloat(pair.element / cols) * (cell + gap))
+                }
+            }
+            // marble — a light gloss sphere with a grounding shadow
+            Ellipse()
+                .fill(Color.black.opacity(0.28))
+                .frame(width: cell * 0.6, height: cell * 0.18)
+                .offset(y: cell * 0.32)
                 .position(x: gap + cell / 2 + CGFloat(pos % cols) * (cell + gap),
                           y: gap + cell / 2 + CGFloat(pos / cols) * (cell + gap))
-                .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+                .animation(.snappy(duration: 0.14), value: pos)
+            Circle()
+                .fill(RadialGradient(colors: [.white, Color(hex: "C7CCD6")],
+                                     center: UnitPoint(x: 0.35, y: 0.3), startRadius: 1, endRadius: cell * 0.5))
+                .frame(width: cell * 0.72, height: cell * 0.72)
+                .overlay(Circle().stroke(.black.opacity(0.08), lineWidth: 1))
+                .position(x: gap + cell / 2 + CGFloat(pos % cols) * (cell + gap),
+                          y: gap + cell / 2 + CGFloat(pos / cols) * (cell + gap))
                 .animation(.snappy(duration: 0.14), value: pos)
         }
     }
 
+    @ViewBuilder
     private func cellView(_ i: Int, cell: CGFloat, gap: CGFloat) -> some View {
         let c = i % cols, r = i / cols
-        let fill: Color
-        if walls.contains(i) { fill = Color.primary.opacity(0.55) }
-        else if visited.contains(i) { fill = Theme.accent.opacity(0.30) }
-        else { fill = Color.primary.opacity(0.07) }
-        return RoundedRectangle(cornerRadius: 5, style: .continuous)
-            .fill(fill)
-            .frame(width: cell, height: cell)
-            .position(x: gap + cell / 2 + CGFloat(c) * (cell + gap),
-                      y: gap + cell / 2 + CGFloat(r) * (cell + gap))
+        let cx = gap + cell / 2 + CGFloat(c) * (cell + gap)
+        let cy = gap + cell / 2 + CGFloat(r) * (cell + gap)
+        if walls.contains(i) {
+            // A raised black block: a darker "side" offset down-right peeking
+            // out from behind the top face, for a bit of 3D depth.
+            ZStack {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(Self.wallSide)
+                    .frame(width: cell, height: cell)
+                    .offset(x: 1.5, y: 2)
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(Self.wallTop)
+                    .frame(width: cell, height: cell)
+            }
+            .position(x: cx, y: cy)
+        } else {
+            let painted = visited.contains(i)
+            ZStack {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(painted ? AnyShapeStyle(Self.trailRed)
+                                  : AnyShapeStyle(LinearGradient(colors: [Self.tileLight, Self.tileDark],
+                                                                startPoint: .top, endPoint: .bottom)))
+                    .frame(width: cell, height: cell)
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .stroke(.white.opacity(painted ? 0.12 : 0.22), lineWidth: 1)
+                    .frame(width: cell, height: cell)
+            }
+            .position(x: cx, y: cy)
+        }
     }
 
     // MARK: movement
@@ -120,7 +195,7 @@ struct MarbleView: View {
             let ni = nr * cols + nc
             if walls.contains(ni) { hitWall = true; break }
             c = nc; r = nr
-            visited.insert(ni)
+            if visited.insert(ni).inserted { visitOrder.append(ni) }
             moved = true
         }
         guard moved else { return }
@@ -170,6 +245,7 @@ struct MarbleView: View {
         openCells = o
         pos = 0
         visited = [0]
+        visitOrder = [0]
         cleared = false
     }
 

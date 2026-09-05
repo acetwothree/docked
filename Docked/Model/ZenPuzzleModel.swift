@@ -45,6 +45,10 @@ final class ZenPuzzleModel {
     private(set) var phase: Phase = .play
     /// Set of "r,c" keys currently animating out from a line clear.
     private(set) var clearing: Set<String> = []
+    /// Which whole rows/columns just cleared — drives a flash across the
+    /// exact line, not just the individual cells.
+    private(set) var clearingRows: Set<Int> = []
+    private(set) var clearingCols: Set<Int> = []
     /// Bumps every time one or more lines clear — a haptic trigger.
     private(set) var clearEvents = 0
     /// Bumps on every successful placement — a light haptic trigger.
@@ -129,6 +133,8 @@ final class ZenPuzzleModel {
         score = 0
         phase = .play
         clearing.removeAll()
+        clearingRows.removeAll()
+        clearingCols.removeAll()
         pendingWipe = true
         pendingRestore = nil
         dock = [Self.roll(), Self.roll(), Self.roll()]
@@ -200,9 +206,13 @@ final class ZenPuzzleModel {
             if p.count == 2 { board[p[0]][p[1]] = nil }
         }
         clearing = keys
+        clearingRows = Set(fullRows)
+        clearingCols = Set(fullCols)
         clearEvents += 1
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) { [weak self] in
             self?.clearing.removeAll()
+            self?.clearingRows.removeAll()
+            self?.clearingCols.removeAll()
         }
         return fullRows.count + fullCols.count
     }

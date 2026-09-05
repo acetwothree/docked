@@ -79,24 +79,34 @@ struct ZenPuzzleView: View {
 
     private struct ConfigKey: Equatable { var size: CGSize; var header: Bool }
 
-    // MARK: Line-clear flash (lowkey)
+    // MARK: Line-clear flash — a bright bar across the exact row/column that
+    // cleared, so the animation reads as "that line" rather than scattered cells.
 
     @ViewBuilder private func clearFlash(_ g: ZenGeom) -> some View {
+        let boardW = CGFloat(g.cols) * (g.cell + g.gap) - g.gap
+        let boardH = CGFloat(g.rows) * (g.cell + g.gap) - g.gap
         ZStack(alignment: .topLeading) {
-            ForEach(Array(model.clearing), id: \.self) { key in
-                let p = key.split(separator: ",").compactMap { Int($0) }
-                if p.count == 2 {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.white.opacity(0.5))
-                        .blendMode(.plusLighter)
-                        .frame(width: g.cell, height: g.cell)
-                        .position(x: g.ox + CGFloat(p[1]) * (g.cell + g.gap) + g.cell / 2,
-                                  y: g.oy + CGFloat(p[0]) * (g.cell + g.gap) + g.cell / 2)
-                        .transition(.scale(scale: 1.25).combined(with: .opacity))
-                }
+            ForEach(Array(model.clearingRows), id: \.self) { r in
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(LinearGradient(colors: [.white.opacity(0.15), .white.opacity(0.9), .white.opacity(0.15)],
+                                         startPoint: .leading, endPoint: .trailing))
+                    .blendMode(.plusLighter)
+                    .frame(width: boardW, height: g.cell)
+                    .position(x: g.ox + boardW / 2, y: g.oy + CGFloat(r) * (g.cell + g.gap) + g.cell / 2)
+                    .transition(.opacity)
+            }
+            ForEach(Array(model.clearingCols), id: \.self) { c in
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(LinearGradient(colors: [.white.opacity(0.15), .white.opacity(0.9), .white.opacity(0.15)],
+                                         startPoint: .top, endPoint: .bottom))
+                    .blendMode(.plusLighter)
+                    .frame(width: g.cell, height: boardH)
+                    .position(x: g.ox + CGFloat(c) * (g.cell + g.gap) + g.cell / 2, y: g.oy + boardH / 2)
+                    .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.3), value: model.clearing)
+        .animation(.easeOut(duration: 0.32), value: model.clearingRows)
+        .animation(.easeOut(duration: 0.32), value: model.clearingCols)
         .allowsHitTesting(false)
     }
 
@@ -157,13 +167,38 @@ struct ZenPuzzleView: View {
             ForEach(Array(0..<shape.height), id: \.self) { r in
                 HStack(spacing: gap) {
                     ForEach(Array(0..<shape.width), id: \.self) { c in
-                        RoundedRectangle(cornerRadius: 3, style: .continuous)
-                            .fill(filled.contains("\(r),\(c)") ? AnyShapeStyle(shape.gradient) : AnyShapeStyle(Color.clear))
-                            .frame(width: dot, height: dot)
+                        if filled.contains("\(r),\(c)") {
+                            shadedBlock(shape.gradient, corner: 3).frame(width: dot, height: dot)
+                        } else {
+                            Color.clear.frame(width: dot, height: dot)
+                        }
                     }
                 }
             }
         }
+    }
+
+    /// A gradient-filled block with a bright top-left sheen and a dark
+    /// bottom-right shadow, so the colours pop more than a flat fill.
+    private func shadedBlock(_ fill: LinearGradient, corner: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: corner, style: .continuous)
+            .fill(fill)
+            .overlay(alignment: .top) {
+                RoundedRectangle(cornerRadius: corner / 2, style: .continuous)
+                    .fill(.white.opacity(0.5))
+                    .frame(height: max(1.5, corner))
+                    .padding(.horizontal, max(1, corner * 0.6))
+                    .padding(.top, 1)
+            }
+            .overlay(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: corner / 2, style: .continuous)
+                    .fill(.black.opacity(0.35))
+                    .frame(height: max(1.5, corner))
+                    .padding(.horizontal, max(1, corner * 0.6))
+                    .padding(.bottom, 1)
+            }
+            .overlay(RoundedRectangle(cornerRadius: corner, style: .continuous).stroke(.white.opacity(0.18), lineWidth: 0.75))
+            .shadow(color: .black.opacity(0.25), radius: 1.5, y: 1)
     }
 
     // MARK: Drag
@@ -172,12 +207,18 @@ struct ZenPuzzleView: View {
         DragGesture(minimumDistance: 0, coordinateSpace: .named("zen"))
             .onChanged { v in
                 guard model.phase == .play, let shape = model.dock[i] else { return }
-                // Amplify the travel a touch so the piece keeps up with the
-                // thumb without a 1:1 slog.
-                let amp: CGFloat = 1.12
+                // Right at the dock the piece tracks the thumb closely. The
+                // further up you drag, the more extra lift gets added on top
+                // of the raw finger travel, so reaching the top rows of the
+                // board never needs a full-length swipe.
+                let dx = v.location.x - v.startLocation.x
+                let dyRaw = v.location.y - v.startLocation.y   // negative = moving up
+                let upTravel = max(0, -dyRaw)
+                let upFrac = min(1, upTravel / 240)
+                let gain: CGFloat = 1.1 + upFrac * 0.9         // 1.1× near the dock, up to 2.0× higher up
                 let loc = CGPoint(
-                    x: v.startLocation.x + (v.location.x - v.startLocation.x) * amp,
-                    y: v.startLocation.y + (v.location.y - v.startLocation.y) * amp)
+                    x: v.startLocation.x + dx * 1.1,
+                    y: v.startLocation.y + dyRaw * gain)
                 drag = DragState(slot: i, shape: shape, location: loc)
             }
             .onEnded { _ in
@@ -198,9 +239,11 @@ struct ZenPuzzleView: View {
             ForEach(Array(0..<d.shape.height), id: \.self) { r in
                 HStack(spacing: g.gap) {
                     ForEach(Array(0..<d.shape.width), id: \.self) { c in
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(filled.contains("\(r),\(c)") ? AnyShapeStyle(d.shape.gradient) : AnyShapeStyle(Color.clear))
-                            .frame(width: g.cell, height: g.cell)
+                        if filled.contains("\(r),\(c)") {
+                            shadedBlock(d.shape.gradient, corner: 5).frame(width: g.cell, height: g.cell)
+                        } else {
+                            Color.clear.frame(width: g.cell, height: g.cell)
+                        }
                     }
                 }
             }
@@ -228,10 +271,19 @@ struct ZenPuzzleView: View {
                         Gradient(colors: palette),
                         startPoint: rect.origin,
                         endPoint: CGPoint(x: rect.maxX, y: rect.maxY)))
-                    ctx.fill(Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: 3)),
-                             with: .color(.white.opacity(0.28)))
-                    ctx.fill(Path(CGRect(x: rect.minX, y: rect.maxY - 3, width: rect.width, height: 3)),
-                             with: .color(.black.opacity(0.28)))
+                    // A punchier bevel — bright top+left sheen, dark bottom+right
+                    // shadow — so each block reads as a raised, glossy piece.
+                    let inset = rect.insetBy(dx: 2, dy: 2)
+                    ctx.fill(Path(roundedRect: CGRect(x: inset.minX, y: inset.minY, width: inset.width, height: 4),
+                                  cornerRadius: 2),
+                             with: .color(.white.opacity(0.5)))
+                    ctx.fill(Path(CGRect(x: inset.minX, y: inset.minY + 3, width: 2.5, height: inset.height - 6)),
+                             with: .color(.white.opacity(0.3)))
+                    ctx.fill(Path(roundedRect: CGRect(x: inset.minX, y: inset.maxY - 4, width: inset.width, height: 4),
+                                  cornerRadius: 2),
+                             with: .color(.black.opacity(0.4)))
+                    ctx.fill(Path(CGRect(x: inset.maxX - 2.5, y: inset.minY + 3, width: 2.5, height: inset.height - 6)),
+                             with: .color(.black.opacity(0.3)))
                 } else {
                     ctx.fill(path, with: .color(Color.primary.opacity(0.055)))
                 }
