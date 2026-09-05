@@ -214,8 +214,8 @@ struct ZenPuzzleView: View {
                 let dx = v.location.x - v.startLocation.x
                 let dyRaw = v.location.y - v.startLocation.y   // negative = moving up
                 let upTravel = max(0, -dyRaw)
-                let upFrac = min(1, upTravel / 240)
-                let gain: CGFloat = 1.1 + upFrac * 0.9         // 1.1× near the dock, up to 2.0× higher up
+                let upFrac = min(1, upTravel / 300)
+                let gain: CGFloat = 1.05 + upFrac * 0.35       // 1.05× near the dock, up to 1.4× higher up
                 let loc = CGPoint(
                     x: v.startLocation.x + dx * 1.1,
                     y: v.startLocation.y + dyRaw * gain)

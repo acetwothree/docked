@@ -125,7 +125,7 @@ struct SettingsView: View {
                                             set: { store.devUnlock = $0 })).labelsHidden()
                                     }
                                     divider
-                                    row(icon: "tv", "Etched badge on the TV") {
+                                    row(icon: "tv", "Force \"Free iOS App\" on the TV (for ads)") {
                                         Toggle("", isOn: $app.tvBadge).labelsHidden()
                                     }
                                     divider

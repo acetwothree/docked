@@ -12,6 +12,9 @@ import SwiftUI
 struct TVKnob: View {
     var icon: String
     var palette: TVPalette
+    /// false dims the knob and disables its tap — used for the back knob
+    /// when there's nowhere to go back to (already on the game grid).
+    var enabled: Bool = true
     var action: () -> Void
 
     @State private var pressed = false
@@ -20,6 +23,7 @@ struct TVKnob: View {
 
     var body: some View {
         Button {
+            guard enabled else { return }
             pressed = true
             action()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { pressed = false }
@@ -63,6 +67,7 @@ struct TVKnob: View {
             }
             .frame(width: d, height: d)
             .scaleEffect(pressed ? 0.93 : 1)
+            .opacity(enabled ? 1 : 0.4)
             .animation(.easeOut(duration: 0.12), value: pressed)
             .shadow(color: .black.opacity(0.3), radius: 2, y: 1.5)
             .contentShape(Circle())

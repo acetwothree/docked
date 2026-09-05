@@ -58,7 +58,7 @@ struct RootView: View {
                                consoleRect: s.consoleInFrame,
                                dimHint: hintDim,
                                palette: app.tvTheme.palette,
-                               showBadge: app.tvBadge)
+                               consoleLabel: consoleLabel)
                     .frame(width: s.video.width, height: s.video.height)
                     .position(x: s.video.midX, y: s.video.midY)
 
@@ -137,6 +137,15 @@ struct RootView: View {
             #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
+    /// The console text: the open game's name, or the app's own name when
+    /// nothing's open — or always the app name if the developer has forced it
+    /// on (Settings ▸ Developer), handy for recording ads without a game name
+    /// showing.
+    private var consoleLabel: String {
+        guard !app.tvBadge, let mod = openModule else { return "DOCKED · FREE iOS APP" }
+        return mod.title.uppercased()
+    }
+
     /// The whole bottom bar of the TV cabinet is the screen-fit control: press
     /// and drag anywhere along it — the wood strip, the speaker grille, between
     /// and around the knobs — up or down to stretch the screen so the border
@@ -183,10 +192,13 @@ struct RootView: View {
         let pal = app.tvTheme.palette
         ZStack {
             if centers.count == 3 {
-                // Left → right: Premium, Theme, Settings (settings is the
-                // right-most, easiest-reach knob).
-                TVKnob(icon: "sparkles", palette: pal) {
-                    endEditing(); plusContext = nil; pendingModuleAfterPlus = nil; showPlus = true
+                // Left → right: Back, Theme, Settings (settings is the
+                // right-most, easiest-reach knob). Back only does anything once
+                // a game is open — Docked Plus lives in Settings and on locked
+                // game cards instead of its own knob now.
+                TVKnob(icon: "chevron.left", palette: pal, enabled: openModule != nil) {
+                    endEditing()
+                    withAnimation(.snappy(duration: 0.22)) { openModule = nil }
                 }
                 .position(centers[0])
 
@@ -210,23 +222,17 @@ struct RootView: View {
         .allowsHitTesting(true)
     }
 
-    // MARK: content — the game grid, or an open game behind a back arrow
+    // MARK: content — the game grid, or an open game (back arrow is a TV knob)
 
     @ViewBuilder
     private func contentHost(solved s: SolvedLayout) -> some View {
         if let mod = openModule {
-            VStack(spacing: 0) {
-                gameHeader(mod)
-                Group {
-                    if mod == .zen {
-                        ZenPuzzleView(tabsAreHeader: s.tabIsHeader, layoutKey: app.layout,
-                                     highScore: app.zenHighScore)
-                    } else {
-                        framed(moduleBody(mod))
-                            .clipShape(RoundedRectangle(cornerRadius: mod == .pop ? 0 : 20, style: .continuous))
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if mod == .zen {
+                ZenPuzzleView(tabsAreHeader: s.tabIsHeader, layoutKey: app.layout,
+                             highScore: app.zenHighScore)
+            } else {
+                framed(moduleBody(mod, topClearance: s.video.maxY))
+                    .clipShape(RoundedRectangle(cornerRadius: mod == .pop ? 0 : 20, style: .continuous))
             }
         } else {
             GameGridView(
@@ -236,37 +242,6 @@ struct RootView: View {
                 onToggleFav: { app.toggleFavorite($0) }
             )
         }
-    }
-
-    /// One consistent header on every open game: a back arrow to the grid and
-    /// the game's name.
-    private func gameHeader(_ mod: ActivityModule) -> some View {
-        HStack {
-            Button {
-                endEditing()
-                withAnimation(.snappy(duration: 0.22)) { openModule = nil }
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 15, weight: .heavy))
-                    .foregroundStyle(Theme.ink)
-                    .frame(width: 32, height: 32)
-                    .background(Theme.paper, in: Circle())
-                    .overlay(Circle().stroke(Theme.hairline))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Back to games")
-
-            Spacer(minLength: 8)
-            Text(mod.title.uppercased())
-                .font(.system(size: 12, weight: .heavy)).tracking(1.4)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Spacer(minLength: 8)
-
-            Color.clear.frame(width: 32, height: 32)   // balances the back button
-        }
-        .padding(.horizontal, 4)
-        .padding(.bottom, 8)
     }
 
     private func pick(_ picked: ActivityModule) {
@@ -282,10 +257,10 @@ struct RootView: View {
     }
 
     @ViewBuilder
-    private func moduleBody(_ mod: ActivityModule) -> some View {
+    private func moduleBody(_ mod: ActivityModule, topClearance: CGFloat) -> some View {
         switch mod {
         case .doodle:  DoodlePadView()
-        case .notes:   NotesView()
+        case .notes:   NotesView(topClearance: topClearance)
         case .color:   ColorView()
         case .flow:    FlowView()
         case .merge:   MergeView()

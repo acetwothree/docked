@@ -11,6 +11,10 @@ import SwiftUI
 
 struct NotesView: View {
     @Environment(NotesStore.self) private var store
+    /// How far down the true screen the TV/video zone reaches — the editor
+    /// sheet uses this exact value so it can never sit under the video,
+    /// wherever the user actually parks it.
+    var topClearance: CGFloat
     @State private var editing = false
 
     var body: some View {
@@ -30,7 +34,7 @@ struct NotesView: View {
             footer
         }
         .sheet(isPresented: $editing) {
-            NotesEditorSheet(store: store)
+            NotesEditorSheet(store: store, topClearance: topClearance)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.hidden)
                 .presentationBackgroundInteraction(.enabled)
@@ -63,15 +67,17 @@ struct NotesView: View {
 
 private struct NotesEditorSheet: View {
     @Bindable var store: NotesStore
+    var topClearance: CGFloat
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focused: Bool
 
     var body: some View {
         GeometryReader { geo in
-            // Start the writing area low on the screen — below where a docked
-            // floating video sits — so the video never covers the text you're
-            // typing. The editor scrolls within this lower band.
-            let topInset = max(64, geo.size.height * 0.42)
+            // Start the writing area exactly below the TV/video zone (plus a
+            // little breathing room) — never a guess, so the video can never
+            // cover the text you're typing. Clamped so a heavily stretched TV
+            // still leaves a usable typing band.
+            let topInset = min(max(64, topClearance + 20), geo.size.height * 0.7)
 
             ZStack(alignment: .top) {
                 Theme.backdrop.ignoresSafeArea()

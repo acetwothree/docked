@@ -4,9 +4,11 @@
 //
 //  "Maze Paint" — swipe and the marble slides until it hits a wall or the
 //  edge. Paint every open tile to clear the level. Levels are random mazes (a
-//  recursive-backtracker carve), so the corridors twist differently every
-//  time and the marble stops at every junction — which means a full sweep is
-//  always possible. Grid size grows with the level. Level persists.
+//  recursive-backtracker carve, regenerated until at least one full-clear
+//  order exists). If the player's own move order ever paints them into a
+//  corner the rest can't reach, `paintableBySliding` catches it right away
+//  and the level quietly reshuffles instead of leaving them stuck. Grid size
+//  grows with the level. Level persists.
 //
 
 import SwiftUI
@@ -20,11 +22,9 @@ struct MarbleView: View {
     @State private var walls: Set<Int> = []
     @State private var openCells: Set<Int> = []
     @State private var visited: Set<Int> = []
-    /// Order cells were painted, oldest first — the trailing ember dots fade
-    /// out the further back they are from the marble.
-    @State private var visitOrder: [Int] = []
     @State private var pos = 0
     @State private var cleared = false
+    @State private var stuck = false
     @State private var loaded = false
     @State private var moveTick = 0
     @State private var hitTick = 0
@@ -36,15 +36,6 @@ struct MarbleView: View {
     private static let wallTop = Color(hex: "23262F")
     private static let wallSide = Color(hex: "0B0C11")
     private static let trailRed = Color(hex: "D93A3A")
-
-    private var difficulty: String {
-        switch level {
-        case ..<8: "EASY"
-        case 8..<16: "MEDIUM"
-        case 16..<26: "HARD"
-        default: "EXTRA HARD"
-        }
-    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -60,15 +51,8 @@ struct MarbleView: View {
 
                 Spacer(minLength: 0)
 
-                VStack(spacing: 3) {
-                    Text(difficulty)
-                        .font(.system(size: 10, weight: .black)).tracking(1.4)
-                        .padding(.horizontal, 10).padding(.vertical, 3)
-                        .background(Color.primary.opacity(0.08), in: Capsule())
-                        .foregroundStyle(.secondary)
-                    Text("Level \(level)")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
-                }
+                Text("Level \(level)")
+                    .font(.system(size: 17, weight: .black, design: .rounded))
 
                 Spacer(minLength: 0)
 
@@ -85,9 +69,9 @@ struct MarbleView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
-            Text(cleared ? "Cleared!" : "Swipe to roll · paint every tile")
+            Text(cleared ? "Cleared!" : stuck ? "No path left — reshuffling…" : "Swipe to roll · paint every tile")
                 .font(.system(size: 12, weight: .heavy))
-                .foregroundStyle(cleared ? Color.green : Color.secondary)
+                .foregroundStyle(cleared ? Color.green : stuck ? Color.orange : Color.secondary)
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -103,6 +87,7 @@ struct MarbleView: View {
         .sensoryFeedback(.impact(weight: .light), trigger: moveTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: hitTick) { _, _ in app.haptics }
         .sensoryFeedback(.success, trigger: winTick) { _, _ in app.haptics }
+        .sensoryFeedback(.error, trigger: stuck) { _, now in now && app.haptics }
         .onAppear { if !loaded { load(level); loaded = true } }
     }
 
@@ -115,18 +100,8 @@ struct MarbleView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Self.boardBG)
             ForEach(Array(0..<count), id: \.self) { i in
-                cellView(i, cell: cell, gap: gap)
-            }
-            ForEach(Array(visitOrder.enumerated()), id: \.offset) { pair in
-                if pair.element != pos {
-                    let age = visitOrder.count - 1 - pair.offset
-                    let fade = max(0, 1 - CGFloat(age) * 0.12)
-                    Circle()
-                        .fill(Color(hex: "FF8A3D").opacity(0.85 * fade))
-                        .frame(width: cell * 0.16, height: cell * 0.16)
-                        .position(x: gap + cell / 2 + CGFloat(pair.element % cols) * (cell + gap),
-                                  y: gap + cell / 2 + CGFloat(pair.element / cols) * (cell + gap))
-                }
+                if walls.contains(i) { wallCellView(i, cell: cell, gap: gap) }
+                else { cellView(i, cell: cell, gap: gap) }
             }
             // marble — a light gloss sphere with a grounding shadow
             Ellipse()
@@ -147,44 +122,64 @@ struct MarbleView: View {
         }
     }
 
-    @ViewBuilder
+    /// Open tile — a lowkey trail: the red fill simply fades in as it's
+    /// painted, no extra marks or dots.
     private func cellView(_ i: Int, cell: CGFloat, gap: CGFloat) -> some View {
         let c = i % cols, r = i / cols
         let cx = gap + cell / 2 + CGFloat(c) * (cell + gap)
         let cy = gap + cell / 2 + CGFloat(r) * (cell + gap)
-        if walls.contains(i) {
-            // A raised black block: a darker "side" offset down-right peeking
-            // out from behind the top face, for a bit of 3D depth.
-            ZStack {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(Self.wallSide)
-                    .frame(width: cell, height: cell)
-                    .offset(x: 1.5, y: 2)
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(Self.wallTop)
-                    .frame(width: cell, height: cell)
-            }
-            .position(x: cx, y: cy)
-        } else {
-            let painted = visited.contains(i)
-            ZStack {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(painted ? AnyShapeStyle(Self.trailRed)
-                                  : AnyShapeStyle(LinearGradient(colors: [Self.tileLight, Self.tileDark],
-                                                                startPoint: .top, endPoint: .bottom)))
-                    .frame(width: cell, height: cell)
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .stroke(.white.opacity(painted ? 0.12 : 0.22), lineWidth: 1)
-                    .frame(width: cell, height: cell)
-            }
-            .position(x: cx, y: cy)
+        let painted = visited.contains(i)
+        return ZStack {
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(LinearGradient(colors: [Self.tileLight, Self.tileDark],
+                                     startPoint: .top, endPoint: .bottom))
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(Self.trailRed)
+                .opacity(painted ? 1 : 0)
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .stroke(.white.opacity(painted ? 0.12 : 0.22), lineWidth: 1)
         }
+        .frame(width: cell, height: cell)
+        .animation(.easeOut(duration: 0.22), value: painted)
+        .position(x: cx, y: cy)
+    }
+
+    /// Wall tiles fuse into one solid blob wherever they touch — there's no
+    /// reason for them to read as individual squares when nothing can ever
+    /// roll onto them. `UnevenRoundedRectangle` rounds only the corners that
+    /// don't border another wall cell.
+    private func wallCellView(_ i: Int, cell: CGFloat, gap: CGFloat) -> some View {
+        let c = i % cols, r = i / cols
+        let cx = gap + cell / 2 + CGFloat(c) * (cell + gap)
+        let cy = gap + cell / 2 + CGFloat(r) * (cell + gap)
+        func isWall(_ cc: Int, _ rr: Int) -> Bool {
+            guard cc >= 0, cc < cols, rr >= 0, rr < rows else { return false }
+            return walls.contains(rr * cols + cc)
+        }
+        let up = isWall(c, r - 1), down = isWall(c, r + 1)
+        let left = isWall(c - 1, r), right = isWall(c + 1, r)
+        let bridge = gap + 1
+        let w = cell + (left ? bridge : 0) + (right ? bridge : 0)
+        let h = cell + (up ? bridge : 0) + (down ? bridge : 0)
+        let ox = (right ? bridge : 0) - (left ? bridge : 0)
+        let oy = (down ? bridge : 0) - (up ? bridge : 0)
+        let r5: CGFloat = 5
+        let shape = UnevenRoundedRectangle(
+            topLeadingRadius: (up || left) ? 0 : r5,
+            bottomLeadingRadius: (down || left) ? 0 : r5,
+            bottomTrailingRadius: (down || right) ? 0 : r5,
+            topTrailingRadius: (up || right) ? 0 : r5)
+        return ZStack {
+            shape.fill(Self.wallSide).frame(width: w, height: h).offset(x: 1.5, y: 2)
+            shape.fill(Self.wallTop).frame(width: w, height: h)
+        }
+        .position(x: cx + ox / 2, y: cy + oy / 2)
     }
 
     // MARK: movement
 
     private func roll(_ dc: Int, _ dr: Int) {
-        guard !cleared else { return }
+        guard !cleared, !stuck else { return }
         var c = pos % cols
         var r = pos / cols
         var moved = false
@@ -195,7 +190,7 @@ struct MarbleView: View {
             let ni = nr * cols + nc
             if walls.contains(ni) { hitWall = true; break }
             c = nc; r = nr
-            if visited.insert(ni).inserted { visitOrder.append(ni) }
+            visited.insert(ni)
             moved = true
         }
         guard moved else { return }
@@ -210,6 +205,14 @@ struct MarbleView: View {
                 level = next
                 load(next)
             }
+        } else if !Self.paintableBySliding(mw: cols, mh: rows, isOpen: { !walls.contains($0) },
+                                          start: pos, covered: visited) {
+            // However this position was reached, the rest of the board can no
+            // longer all be painted from here — reshuffle rather than leave
+            // the player stuck for good.
+            stuck = true
+            let lvl = level
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { load(lvl) }
         }
     }
 
@@ -230,7 +233,7 @@ struct MarbleView: View {
         for attempt in 0..<22 {
             let braid = attempt < 20 ? maxBraid * (1 - Double(attempt) / 20) : 0
             let grid = Self.generate(mw: mw, mh: mh, braid: braid)
-            if Self.paintableBySliding(grid, mw: mw, mh: mh) {
+            if Self.paintableBySliding(mw: mw, mh: mh, isOpen: { grid[$0] }, start: 0, covered: []) {
                 chosen = grid
                 break
             }
@@ -245,8 +248,8 @@ struct MarbleView: View {
         openCells = o
         pos = 0
         visited = [0]
-        visitOrder = [0]
         cleared = false
+        stuck = false
     }
 
     /// Recursive-backtracker carve from (0,0), then optional braiding.
@@ -296,10 +299,14 @@ struct MarbleView: View {
         return isOpen
     }
 
-    /// True if, sliding from cell 0, every open cell is either a place the
-    /// marble can come to rest or a cell some slide passes over — i.e. every
-    /// tile is paintable.
-    private static func paintableBySliding(_ isOpen: [Bool], mw: Int, mh: Int) -> Bool {
+    /// True if, sliding from `start` (treating `covered` as already painted),
+    /// every open cell is either a place the marble can come to rest or a
+    /// cell some slide passes over — i.e. the rest of the board is still
+    /// fully paintable from here. Used both to vet a freshly generated maze
+    /// (`start: 0, covered: []`) and, after every move, to catch the player
+    /// having painted themselves into an unwinnable corner.
+    private static func paintableBySliding(mw: Int, mh: Int, isOpen: (Int) -> Bool,
+                                           start: Int, covered initial: Set<Int>) -> Bool {
         func idx(_ x: Int, _ y: Int) -> Int { y * mw + x }
         let dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)]
 
@@ -308,17 +315,18 @@ struct MarbleView: View {
             var path: [Int] = []
             while true {
                 let nx = x + dx, ny = y + dy
-                if nx < 0 || nx >= mw || ny < 0 || ny >= mh || !isOpen[idx(nx, ny)] { break }
+                if nx < 0 || nx >= mw || ny < 0 || ny >= mh || !isOpen(idx(nx, ny)) { break }
                 x = nx; y = ny
                 path.append(idx(x, y))
             }
             return (idx(x, y), path)
         }
 
-        guard isOpen[0] else { return false }
-        var rest: Set<Int> = [0]
-        var queue = [0]
-        var covered: Set<Int> = [0]
+        guard isOpen(start) else { return false }
+        var rest: Set<Int> = [start]
+        var queue = [start]
+        var covered = initial
+        covered.insert(start)
         var qi = 0
         while qi < queue.count {
             let cur = queue[qi]; qi += 1
@@ -331,7 +339,7 @@ struct MarbleView: View {
                 }
             }
         }
-        for i in 0..<(mw * mh) where isOpen[i] {
+        for i in 0..<(mw * mh) where isOpen(i) {
             if !covered.contains(i) { return false }
         }
         return true

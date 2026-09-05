@@ -4,9 +4,10 @@
 //
 //  The whole TV set, drawn as one wood cabinet: the screen opening near the
 //  top (the app background shows through, so unfilled PiP area reads as
-//  letterbox bars) and a console strip along the bottom with a speaker grille,
-//  the "DOCKED" name and three recessed knob wells. RootView drops the real
-//  knob buttons onto the wells.
+//  letterbox bars) and a console strip along the bottom with a speaker
+//  grille, an engraved label (the open game's name, or the app's own name)
+//  centered between the grille and three recessed knob wells. RootView drops
+//  the real knob buttons onto the wells.
 //
 
 import SwiftUI
@@ -18,7 +19,9 @@ struct VideoFrameView: View {
     var consoleRect: CGRect
     var dimHint: Bool
     var palette: TVPalette
-    var showBadge: Bool = true
+    /// Engraved console text — the open game's name, or the app's own name
+    /// when nothing's open (or when forced on for ad recordings).
+    var consoleLabel: String = "DOCKED · FREE iOS APP"
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -102,33 +105,33 @@ struct VideoFrameView: View {
             gx += 6
         }
 
-        // --- engraved badge on the console (shifted right of the grille so the
-        // drag cue near the bottom-left corner doesn't collide with it) ---
-        if showBadge {
-            let badge = "DOCKED · FREE iOS APP"
-            let bx = gx + 22
-            let cy = consoleRect.midY
-            let font = Font.system(size: 10, weight: .black, design: .rounded)
-            // A light halo in every direction first (carries it on the dark
-            // woods), then the dark cut on top (carries it on the pale woods) —
-            // so the text always has an edge whatever the console tone is.
-            let halo = Text(badge).font(font).foregroundColor(palette.hi.opacity(0.85))
-            for off in [CGSize(width: -0.8, height: -0.8), CGSize(width: 0.8, height: -0.8),
-                        CGSize(width: -0.8, height: 0.8), CGSize(width: 0.8, height: 0.8)] {
-                ctx.draw(halo, at: CGPoint(x: bx + off.width, y: cy + off.height), anchor: .leading)
-            }
-            ctx.draw(Text(badge).font(font).foregroundColor(palette.deep.opacity(0.95)),
-                     at: CGPoint(x: bx, y: cy), anchor: .leading)
-        }
-
         // --- knob wells ---
-        for c in LayoutSolver.knobCenters(inConsole: consoleRect) {
+        let knobCenters = LayoutSolver.knobCenters(inConsole: consoleRect)
+        for c in knobCenters {
             let d = LayoutSolver.knobDiameter + 8
             ctx.fill(Path(ellipseIn: CGRect(x: c.x - d/2, y: c.y - d/2, width: d, height: d)),
                      with: .color(palette.deep.opacity(0.5)))
             ctx.stroke(Path(ellipseIn: CGRect(x: c.x - d/2, y: c.y - d/2, width: d, height: d)),
                        with: .color(palette.key.opacity(0.4)), lineWidth: 1)
         }
+
+        // --- engraved console text — centered in the gap between the
+        // grille and the knob wells (either the open game's name, or the
+        // app's own name when nothing's open) ---
+        let knobsStart = (knobCenters.first?.x ?? consoleRect.maxX - 16) - (LayoutSolver.knobDiameter + 8) / 2 - 8
+        let cx = (gx + knobsStart) / 2
+        let cy = consoleRect.midY
+        let font = Font.system(size: 10, weight: .black, design: .rounded)
+        // A light halo in every direction first (carries it on the dark
+        // woods), then the dark cut on top (carries it on the pale woods) —
+        // so the text always has an edge whatever the console tone is.
+        let halo = Text(consoleLabel).font(font).foregroundColor(palette.hi.opacity(0.85))
+        for off in [CGSize(width: -0.8, height: -0.8), CGSize(width: 0.8, height: -0.8),
+                    CGSize(width: -0.8, height: 0.8), CGSize(width: 0.8, height: 0.8)] {
+            ctx.draw(halo, at: CGPoint(x: cx + off.width, y: cy + off.height), anchor: .center)
+        }
+        ctx.draw(Text(consoleLabel).font(font).foregroundColor(palette.deep.opacity(0.95)),
+                 at: CGPoint(x: cx, y: cy), anchor: .center)
 
         // cabinet keyline (no top-corner rivets — the video can drift over
         // the top corners, so there's nothing there to cover).

@@ -48,7 +48,10 @@ final class AppModel {
     let layout: VideoLayout = .top
 
     var tvTheme: TVTheme { didSet { store(tvTheme.rawValue, K.tvTheme) } }
-    /// Etched "DOCKED · FREE APP" text on the console (nice for ad recordings).
+    /// Forces the console to always read "DOCKED · FREE iOS APP" instead of
+    /// the open game's name — handy for recording ads. Off by default; the
+    /// console normally shows whichever game is open (or the app name when
+    /// none is).
     var tvBadge: Bool { didSet { store(tvBadge, K.tvBadge) } }
     /// Extra points added to the screen opening's height, so the user can drag
     /// the TV to wrap whatever the current video source's aspect ratio is.
@@ -84,7 +87,7 @@ final class AppModel {
     init() {
         let d = UserDefaults.standard
         tvTheme = TVTheme(rawValue: d.string(forKey: K.tvTheme) ?? "") ?? .walnut
-        tvBadge = (d.object(forKey: K.tvBadge) as? Bool) ?? true
+        tvBadge = (d.object(forKey: K.tvBadge) as? Bool) ?? false
         tvStretch = CGFloat(d.double(forKey: K.tvStretch))   // 0 when unset
         favorites = (d.array(forKey: K.favorites) as? [String] ?? []).compactMap(ActivityModule.init(rawValue:))
         module = ActivityModule(rawValue: d.string(forKey: K.module) ?? "") ?? .doodle
