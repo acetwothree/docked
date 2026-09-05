@@ -2,9 +2,9 @@
 //  ZenPuzzleView.swift
 //  Docked
 //
-//  "Blocks" — a 7x7 grid between the video and the tab bar, a 3-slot dock
-//  hugging the tab-bar edge, drag-to-place with a live ghost, and a soft
-//  flash when a line clears. Out of moves auto-resets.
+//  "Color Blocks" — a grid filling the game area, a 3-slot dock hugging its
+//  bottom edge, drag-to-place with a live ghost, and a bright flash across
+//  the exact row/column when a line clears. Out of moves auto-resets.
 //
 
 import SwiftUI

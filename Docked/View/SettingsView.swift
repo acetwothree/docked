@@ -115,7 +115,7 @@ struct SettingsView: View {
                                         dismiss()
                                     }
                                     divider
-                                    devButton("Reset Blocks best", "gauge") { app.zenHighScore = 0 }
+                                    devButton("Reset Color Blocks best", "gauge") { app.zenHighScore = 0 }
                                 }
                                 divider
                                 VStack(spacing: 0) {
