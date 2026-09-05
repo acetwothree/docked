@@ -41,11 +41,7 @@ final class AppModel {
         static let flowLevel = "docked.flow.level"
         static let popClears = "docked.pop.clears"
         static let tttGames = "docked.ttt.games"
-        static let coins = "docked.casino.coins"
-        static let coinsSeeded = "docked.casino.seeded"
     }
-
-    static let startingCoins = 250
 
     /// The video always sits in the top band now — kept as a constant so the
     /// layout code keeps working without a UI toggle.
@@ -71,16 +67,6 @@ final class AppModel {
     var flowLevel: Int { didSet { store(flowLevel, K.flowLevel) } }
     var popClearCount: Int { didSet { store(popClearCount, K.popClears) } }
     var tttGames: Int { didSet { store(tttGames, K.tttGames) } }
-
-    /// Play-money chips for the Gambling section. Seeded once; if you hit zero
-    /// a short timer (running only while the app is open) tops you back up.
-    var coins: Int { didSet { store(coins, K.coins) } }
-    /// When the next free-chips grant fires (nil = balance isn't empty).
-    var chipRefillAt: Date? = nil
-    @ObservationIgnored private var chipTimer: Timer?
-
-    static let chipRefillDelay: TimeInterval = 30
-    static let chipRefillAmount = 50
 
     /// Lifetime tally for the Clicker fidget. Never reset — not even by
     /// "Clear all app data".
@@ -113,12 +99,6 @@ final class AppModel {
         flowLevel = d.integer(forKey: K.flowLevel)
         popClearCount = d.integer(forKey: K.popClears)
         tttGames = d.integer(forKey: K.tttGames)
-        if d.bool(forKey: K.coinsSeeded) {
-            coins = d.integer(forKey: K.coins)
-        } else {
-            coins = AppModel.startingCoins
-            d.set(true, forKey: K.coinsSeeded)
-        }
         if let raw = d.array(forKey: K.pinned) as? [String] {
             let restored = raw.compactMap(ActivityModule.init(rawValue:))
             pinnedModules = restored.isEmpty ? AppModel.defaultPinned : restored
@@ -133,50 +113,6 @@ final class AppModel {
         } else {
             pinnedModules.append(mod)
         }
-    }
-
-    // MARK: Casino chips
-
-    /// Take a bet. Returns false if the balance can't cover it.
-    @discardableResult
-    func placeBet(_ amount: Int) -> Bool {
-        guard amount > 0, coins >= amount else { return false }
-        coins -= amount
-        checkChipRefill()
-        return true
-    }
-
-    func awardChips(_ amount: Int) {
-        guard amount > 0 else { return }
-        coins += amount
-        checkChipRefill()
-    }
-
-    /// Call on a gambling view's appear / on foreground. Starts the refill
-    /// timer if you're broke, or grants immediately if it already elapsed.
-    func checkChipRefill() {
-        if coins > 0 {
-            chipTimer?.invalidate(); chipTimer = nil
-            chipRefillAt = nil
-            return
-        }
-        // broke
-        if let at = chipRefillAt {
-            if Date() >= at { grantRefill() }
-            return
-        }
-        let deadline = Date().addingTimeInterval(AppModel.chipRefillDelay)
-        chipRefillAt = deadline
-        chipTimer = Timer.scheduledTimer(withTimeInterval: AppModel.chipRefillDelay,
-                                         repeats: false) { [weak self] _ in
-            self?.grantRefill()
-        }
-    }
-
-    private func grantRefill() {
-        chipTimer?.invalidate(); chipTimer = nil
-        chipRefillAt = nil
-        coins = max(coins, AppModel.chipRefillAmount)
     }
 
     func toggleFavorite(_ mod: ActivityModule) {
@@ -204,7 +140,6 @@ final class AppModel {
         flowLevel = 0
         popClearCount = 0
         tttGames = 0
-        coins = AppModel.startingCoins
         module = .doodle
         favorites = []
         pinnedModules = AppModel.defaultPinned

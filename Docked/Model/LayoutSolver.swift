@@ -15,9 +15,8 @@ struct SolvedLayout {
     var pip: CGRect           // approximate PiP window footprint (the opening)
     var video: CGRect         // the whole TV cabinet — bezel + console
     var console: CGRect       // knob strip at the bottom of the cabinet (screen coords)
-    var tab: CGRect
     var tabIsHeader: Bool
-    var content: CGRect       // module area, below the cabinet
+    var content: CGRect       // everything below the cabinet — the game grid or an open module
     var occupiesTop: Bool
 
     /// The opening, in `video`-local coordinates (for VideoFrameView).
@@ -33,8 +32,6 @@ struct SolvedLayout {
 }
 
 enum LayoutSolver {
-
-    static let tabHeight: CGFloat = 60
 
     static let bezelSide: CGFloat = 10
     static let bezelTop: CGFloat = 18          // extra wood above the video so an
@@ -54,7 +51,6 @@ enum LayoutSolver {
                       insetTop: CGFloat, insetBottom: CGFloat,
                       stretch: CGFloat = 0) -> SolvedLayout {
         let W = size.width, H = size.height
-        let TAB = tabHeight
 
         let bw = (W - bandSideInset * 2).rounded()
         let s = min(max(stretch, stretchRange.lowerBound), stretchRange.upperBound)
@@ -69,18 +65,17 @@ enum LayoutSolver {
         let console = CGRect(x: video.minX, y: vMinY + bezelTop + bh + bezelBottom,
                              width: video.width, height: consoleHeight)
 
-        // Footer: just the activity chooser, inside the safe area.
-        let tab = CGRect(x: 0, y: H - insetBottom - TAB, width: W, height: TAB)
-
+        // Everything below the cabinet, down to the safe area — the game grid
+        // when nothing's open, or the active module framed inside it.
         let G: CGFloat = 8
         let cTop = video.maxY + G
-        let cBot = tab.minY - G
+        let cBot = H - insetBottom - 4
         let content = CGRect(x: 8, y: cTop, width: W - 16, height: max(80, cBot - cTop))
 
         // Blocks reads `tabIsHeader` as "dock at the top of the play area"; keep
         // its dock at the bottom, near the thumbs.
         return SolvedLayout(
-            pip: pip, video: video, console: console, tab: tab, tabIsHeader: false,
+            pip: pip, video: video, console: console, tabIsHeader: false,
             content: content, occupiesTop: true
         )
     }

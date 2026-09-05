@@ -23,7 +23,6 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
     case create = "Create"
     case play = "Play"
     case fidget = "Fidget"
-    case gamble = "Gambling"
     var id: String { rawValue }
 }
 
@@ -31,7 +30,6 @@ enum ActivityModule: String, CaseIterable, Identifiable {
     case doodle, notes, color
     case zen, flow, merge, drop, marble, brawl, spot
     case pop, click, ksand, rings
-    case scratch, blackjack, poker
     var id: String { rawValue }
 
     var category: ActivityCategory {
@@ -39,7 +37,6 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .doodle, .notes, .color: .create
         case .zen, .flow, .merge, .drop, .marble, .brawl, .spot: .play
         case .pop, .click, .ksand, .rings: .fidget
-        case .scratch, .blackjack, .poker: .gamble
         }
     }
 
@@ -48,20 +45,17 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .doodle: "Doodle"
         case .notes: "Notes"
         case .color: "Color"
-        case .zen: "Blocks"
+        case .zen: "Color Blocks"
         case .flow: "Flow"
         case .merge: "2048"
         case .drop: "Merge"
-        case .marble: "Roll"
+        case .marble: "Maze Paint"
         case .brawl: "Brawl"
         case .spot: "Spot"
         case .pop: "Pop"
         case .click: "Clicker"
         case .ksand: "Kinetic Sand"
         case .rings: "Rings"
-        case .scratch: "Scratcher"
-        case .blackjack: "Blackjack"
-        case .poker: "Draw Poker"
         }
     }
 
@@ -81,17 +75,13 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .click: "hand.tap.fill"
         case .ksand: "hand.draw.fill"
         case .rings: "circle.circle.fill"
-        case .scratch: "rectangle.dashed"
-        case .blackjack: "suit.club.fill"
-        case .poker: "suit.spade.fill"
         }
     }
 
     /// Activities behind Docked Plus.
     var isPlus: Bool {
         switch self {
-        case .doodle, .notes, .color, .zen, .drop, .marble, .pop, .click, .rings,
-             .scratch, .blackjack, .poker:
+        case .doodle, .notes, .color, .zen, .drop, .marble, .pop, .click, .rings:
             return false
         case .flow, .merge, .brawl, .spot, .ksand:
             return true
@@ -115,9 +105,6 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .click: "A tally clicker with a satisfying tick."
         case .ksand: "Rake patterns into a zen sand tray."
         case .rings: "Stack the rings smallest-on-top — the classic tower puzzle."
-        case .scratch: "Scratch-off cards — match three to win chips."
-        case .blackjack: "Simple blackjack against the dealer."
-        case .poker: "Five-card draw poker against the dealer."
         }
     }
 
@@ -127,7 +114,6 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .create: Color(hex: "4A9CFF")
         case .play:   Color(hex: "3ECF7A")
         case .fidget: Color(hex: "C77DFF")
-        case .gamble: Color(hex: "F5C518")
         }
     }
 }

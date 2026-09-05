@@ -3,9 +3,10 @@
 //  Docked
 //
 //  The single screen. Nested GeometryReaders give a full-screen coordinate
-//  space; `LayoutSolver` places the TV cabinet at the top, a centred activity
-//  chooser at the bottom, and the module in between. Settings / Theme / Plus
-//  live on the console knobs.
+//  space; `LayoutSolver` places the TV cabinet at the top, with everything
+//  below it given over to the game grid — or, once a game is open, that game
+//  behind a small back-arrow header. Settings / Theme / Plus live on the
+//  console knobs.
 //
 
 import SwiftUI
@@ -19,13 +20,14 @@ struct RootView: View {
 
     @State private var showSettings = false
     @State private var showOnboarding = false
-    @State private var showPicker = false
     @State private var showPlus = false
+    /// The game currently open; nil shows the grid.
+    @State private var openModule: ActivityModule? = nil
     /// Set just before opening the paywall so it can name what the user tapped.
     @State private var plusContext: String? = nil
-    /// When the paywall was opened from a locked picker card, reopen the picker
-    /// on dismiss so "Maybe later" lands back where the user was.
-    @State private var reopenPickerAfterPlus = false
+    /// When the paywall was opened from a locked grid card, open straight into
+    /// that game if the purchase went through.
+    @State private var pendingModuleAfterPlus: ActivityModule? = nil
     @State private var hintDim = false
     @State private var stretchStart: CGFloat? = nil
     @State private var stretching = false
@@ -46,16 +48,10 @@ struct RootView: View {
                 ZStack(alignment: .topLeading) {
                     Theme.backdrop
 
-                    // module content
-                    moduleHost(solved: s)
+                    // content — the game grid, or the open game
+                    contentHost(solved: s)
                     .frame(width: s.content.width, height: s.content.height)
-                    .clipShape(RoundedRectangle(cornerRadius: moduleCorner, style: .continuous))
                     .position(x: s.content.midX, y: s.content.midY)
-
-                // footer — just the activity chooser, centred
-                TabBarView(onPicker: { endEditing(); showPicker = true })
-                    .frame(width: s.tab.width, height: s.tab.height)
-                    .position(x: s.tab.midX, y: s.tab.midY)
 
                 // the TV set — one wood cabinet, screen + console
                 VideoFrameView(hole: s.holeInFrame,
@@ -78,32 +74,6 @@ struct RootView: View {
                     DebugOverlay(solved: s)
                 }
 
-                if showPicker {
-                    ActivityPickerPanel(
-                        solved: s,
-                        current: app.module,
-                        favorites: app.favorites,
-                        hasPlus: store.entitled,
-                        chips: app.coins,
-                        chipRefillAt: app.chipRefillAt,
-                        themeTint: app.tvTheme.palette.mid,
-                        onPick: { picked in
-                            if picked.isPlus && !store.entitled {
-                                plusContext = "\(picked.title) — \(picked.blurb)"
-                                reopenPickerAfterPlus = true
-                                showPicker = false
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) { showPlus = true }
-                            } else {
-                                withAnimation(.snappy(duration: 0.24)) { app.module = picked }
-                                showPicker = false
-                            }
-                        },
-                        onToggleFav: { app.toggleFavorite($0) },
-                        onClose: { showPicker = false }
-                    )
-                    .zIndex(15)
-                }
-
                 // First-run onboarding — an overlay, so the live dashboard
                 // stays visible (dimmed) behind it.
                 if showOnboarding {
@@ -116,8 +86,7 @@ struct RootView: View {
                     .zIndex(20)
                 }
                 }
-                .animation(.easeInOut(duration: 0.25), value: app.module)
-                .animation(.easeInOut(duration: 0.22), value: showPicker)
+                .animation(.easeInOut(duration: 0.22), value: openModule)
                 .animation(.easeInOut(duration: 0.3), value: showOnboarding)
             }
             .ignoresSafeArea()
@@ -133,11 +102,12 @@ struct RootView: View {
             .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showPlus, onDismiss: {
-            plusContext = nil
-            if reopenPickerAfterPlus && !store.entitled {
-                showPicker = true
+            if store.entitled, let pending = pendingModuleAfterPlus {
+                app.module = pending
+                withAnimation(.snappy(duration: 0.24)) { openModule = pending }
             }
-            reopenPickerAfterPlus = false
+            plusContext = nil
+            pendingModuleAfterPlus = nil
         }) {
             PlusSheet(context: plusContext)
                 .presentationDragIndicator(.visible)
@@ -158,13 +128,8 @@ struct RootView: View {
             if phase != .active { doodle.saveNow() }
             if phase == .active {
                 Task { await store.refreshEntitlements() }
-                app.checkChipRefill()
             }
         }
-    }
-
-    private var moduleCorner: CGFloat {
-        (app.module == .zen || app.module == .pop) ? 0 : 20
     }
 
     private func endEditing() {
@@ -221,7 +186,7 @@ struct RootView: View {
                 // Left → right: Premium, Theme, Settings (settings is the
                 // right-most, easiest-reach knob).
                 TVKnob(icon: "sparkles", palette: pal) {
-                    endEditing(); plusContext = nil; showPlus = true
+                    endEditing(); plusContext = nil; pendingModuleAfterPlus = nil; showPlus = true
                 }
                 .position(centers[0])
 
@@ -245,35 +210,94 @@ struct RootView: View {
         .allowsHitTesting(true)
     }
 
+    // MARK: content — the game grid, or an open game behind a back arrow
+
     @ViewBuilder
-    private func moduleHost(solved s: SolvedLayout) -> some View {
-        if app.module == .zen {
-            ZenPuzzleView(tabsAreHeader: s.tabIsHeader, layoutKey: app.layout, highScore: app.zenHighScore)
+    private func contentHost(solved s: SolvedLayout) -> some View {
+        if let mod = openModule {
+            VStack(spacing: 0) {
+                gameHeader(mod)
+                Group {
+                    if mod == .zen {
+                        ZenPuzzleView(tabsAreHeader: s.tabIsHeader, layoutKey: app.layout,
+                                     highScore: app.zenHighScore)
+                    } else {
+                        framed(moduleBody(mod))
+                            .clipShape(RoundedRectangle(cornerRadius: mod == .pop ? 0 : 20, style: .continuous))
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         } else {
-            framed(moduleBody)
+            GameGridView(
+                hasPlus: store.entitled,
+                favorites: app.favorites,
+                onPick: pick,
+                onToggleFav: { app.toggleFavorite($0) }
+            )
+        }
+    }
+
+    /// One consistent header on every open game: a back arrow to the grid and
+    /// the game's name.
+    private func gameHeader(_ mod: ActivityModule) -> some View {
+        HStack {
+            Button {
+                endEditing()
+                withAnimation(.snappy(duration: 0.22)) { openModule = nil }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 15, weight: .heavy))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 32, height: 32)
+                    .background(Theme.paper, in: Circle())
+                    .overlay(Circle().stroke(Theme.hairline))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back to games")
+
+            Spacer(minLength: 8)
+            Text(mod.title.uppercased())
+                .font(.system(size: 12, weight: .heavy)).tracking(1.4)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+
+            Color.clear.frame(width: 32, height: 32)   // balances the back button
+        }
+        .padding(.horizontal, 4)
+        .padding(.bottom, 8)
+    }
+
+    private func pick(_ picked: ActivityModule) {
+        if picked.isPlus && !store.entitled {
+            plusContext = "\(picked.title) — \(picked.blurb)"
+            pendingModuleAfterPlus = picked
+            showPlus = true
+        } else {
+            endEditing()
+            app.module = picked
+            withAnimation(.snappy(duration: 0.24)) { openModule = picked }
         }
     }
 
     @ViewBuilder
-    private var moduleBody: some View {
-        switch app.module {
-        case .doodle:    DoodlePadView()
-        case .notes:     NotesView()
-        case .color:     ColorView()
-        case .flow:      FlowView()
-        case .merge:     MergeView()
-        case .drop:      MergeDropView()
-        case .marble:    MarbleView()
-        case .brawl:     BrawlView()
-        case .spot:      SpotView()
-        case .poker:     DrawPokerView()
-        case .pop:       PopView()
-        case .click:     ClickPenView()
-        case .rings:     RingsView()
-        case .scratch:   ScratchGameView()
-        case .blackjack: BlackjackView()
-        case .ksand:     KineticSandView()
-        case .zen:       EmptyView()   // handled above
+    private func moduleBody(_ mod: ActivityModule) -> some View {
+        switch mod {
+        case .doodle:  DoodlePadView()
+        case .notes:   NotesView()
+        case .color:   ColorView()
+        case .flow:    FlowView()
+        case .merge:   MergeView()
+        case .drop:    MergeDropView()
+        case .marble:  MarbleView()
+        case .brawl:   BrawlView()
+        case .spot:    SpotView()
+        case .pop:     PopView()
+        case .click:   ClickPenView()
+        case .rings:   RingsView()
+        case .ksand:   KineticSandView()
+        case .zen:     EmptyView()   // handled above
         }
     }
 
@@ -292,7 +316,6 @@ private struct DebugOverlay: View {
             box(solved.video, "frame", .red)
             box(solved.console, "console", .yellow)
             box(solved.content, "content", .green)
-            box(solved.tab, "tab", .blue)
         }
         .allowsHitTesting(false)
     }
