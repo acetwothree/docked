@@ -2,20 +2,21 @@
 //  NotesView.swift
 //  Docked
 //
-//  The strip between the video and the tab bar is too short to type in with
-//  the keyboard up, so the inline view is a scrollable preview and editing
-//  happens in a full-height sheet. `NotesStore.text` autosaves on every edit.
+//  The strip between the video and the tab bar is short, so the resting view
+//  is a scrollable preview. Tapping it opens an editor that slides up over
+//  this same area — which already sits below the TV layout — rather than a
+//  separate full-screen sheet. `NotesStore.text` autosaves on every edit.
 //
 
 import SwiftUI
 
 struct NotesView: View {
     @Environment(NotesStore.self) private var store
-    /// How far down the true screen the TV/video zone reaches — the editor
-    /// sheet uses this exact value so it can never sit under the video,
-    /// wherever the user actually parks it.
+    /// Kept for call-site compatibility; the inline editor already lives
+    /// below the TV so it isn't needed for placement.
     var topClearance: CGFloat
     @State private var editing = false
+    @FocusState private var focused: Bool
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -29,16 +30,57 @@ struct NotesView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
-            .onTapGesture { editing = true }
+            .onTapGesture { open() }
 
             footer
+
+            if editing {
+                editor
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(1)
+            }
         }
-        .sheet(isPresented: $editing) {
-            NotesEditorSheet(store: store, topClearance: topClearance)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.hidden)
-                .presentationBackgroundInteraction(.enabled)
+        .onChange(of: editing) { _, on in
+            if on { DispatchQueue.main.async { focused = true } } else { focused = false }
         }
+    }
+
+    private func open() {
+        withAnimation(.easeOut(duration: 0.22)) { editing = true }
+    }
+    private func close() {
+        focused = false
+        withAnimation(.easeOut(duration: 0.2)) { editing = false }
+    }
+
+    private var editor: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text("\(wordCount) words")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Button(action: close) {
+                    Text("Done").font(.system(size: 14, weight: .heavy))
+                        .padding(.horizontal, 16).padding(.vertical, 7)
+                        .background(Theme.accent, in: Capsule())
+                        .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .background(.ultraThinMaterial)
+
+            TextEditor(text: $store.text)
+                .focused($focused)
+                .font(.body)
+                .scrollContentBackground(.hidden)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 6)
+        }
+        .background(Theme.paper)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Theme.hairline))
+        .shadow(color: .black.opacity(0.28), radius: 14, y: -2)
     }
 
     private var footer: some View {
@@ -46,7 +88,7 @@ struct NotesView: View {
             Text("\(wordCount) words · \(store.text.count) chars")
                 .font(.caption).foregroundStyle(.secondary)
             Spacer()
-            Button { editing = true } label: {
+            Button { open() } label: {
                 Label("Edit", systemImage: "pencil").font(.system(size: 14, weight: .semibold))
             }
             ShareLink(item: store.text) { Image(systemName: "square.and.arrow.up") }
@@ -58,61 +100,6 @@ struct NotesView: View {
         }
         .padding(.horizontal, 12).padding(.vertical, 7)
         .background(.ultraThinMaterial)
-    }
-
-    private var wordCount: Int {
-        store.text.split { $0 == " " || $0.isNewline }.count
-    }
-}
-
-private struct NotesEditorSheet: View {
-    @Bindable var store: NotesStore
-    var topClearance: CGFloat
-    @Environment(\.dismiss) private var dismiss
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        GeometryReader { geo in
-            // Start the writing area exactly below the TV/video zone (plus a
-            // little breathing room) — never a guess, so the video can never
-            // cover the text you're typing. Clamped so a heavily stretched TV
-            // still leaves a usable typing band.
-            let topInset = min(max(64, topClearance + 20), geo.size.height * 0.7)
-
-            // The word-count/Done bar lives at the BOTTOM of the sheet, not
-            // the top — the top is exactly where the floating video sits, so
-            // pinning Done there risked it being covered by the PiP window.
-            ZStack(alignment: .bottom) {
-                Theme.backdrop.ignoresSafeArea()
-
-                TextEditor(text: $store.text)
-                    .focused($focused)
-                    .font(.body)
-                    .scrollContentBackground(.hidden)
-                    .padding(.horizontal, 12)
-                    .padding(.top, topInset)
-                    .padding(.bottom, 56)
-
-                HStack(spacing: 10) {
-                    Text("\(wordCount) words")
-                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
-                    Spacer(minLength: 0)
-                    Button { dismiss() } label: {
-                        Text("Done").font(.system(size: 14, weight: .heavy))
-                            .padding(.horizontal, 16).padding(.vertical, 7)
-                            .background(Theme.accent, in: Capsule())
-                            .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 14).padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-            }
-        }
-        // Deferring one runloop tick (rather than setting it straight inside
-        // onAppear, before the view is in the window) is what lets the
-        // keyboard rise together with the sheet instead of a beat later.
-        .onAppear { DispatchQueue.main.async { focused = true } }
     }
 
     private var wordCount: Int {

@@ -16,10 +16,6 @@ struct GameGridView: View {
     var favorites: [ActivityModule]
     var onPick: (ActivityModule) -> Void
     var onToggleFav: (ActivityModule) -> Void
-    /// Owned by RootView so it survives this view being torn down and rebuilt
-    /// when a game opens and closes — lets the grid come back where you left it
-    /// instead of jumping to the top.
-    @Binding var scrollAnchor: ActivityModule?
 
     @Environment(\.requestReview) private var requestReview
 
@@ -46,7 +42,6 @@ struct GameGridView: View {
                     )
                 }
             }
-            .scrollTargetLayout()
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: favorites)
             .padding(.horizontal, 2)
 
@@ -55,7 +50,6 @@ struct GameGridView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 18)
         }
-        .scrollPosition(id: $scrollAnchor, anchor: .top)
         .scrollIndicators(.hidden)
     }
 

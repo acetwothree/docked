@@ -47,7 +47,7 @@ struct DoodlePadView: View {
     }
 
     private var toolbar: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
             HStack(spacing: 0) {
                 ForEach(palette, id: \.self) { hex in
                     Circle()

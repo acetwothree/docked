@@ -90,7 +90,7 @@ struct RingsView: View {
                         if let h = held, h.peg == p {
                             ringBar(size: h.size, unit: unit, height: ringH)
                                 .position(x: cx, y: 16)
-                                .transition(.move(edge: .top).combined(with: .opacity))
+                                .transition(.opacity)
                         }
                     }
 
@@ -100,12 +100,12 @@ struct RingsView: View {
                             Rectangle().fill(Color.clear)
                                 .frame(width: pegW, height: H)
                                 .contentShape(Rectangle())
-                                .onTapGesture { withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) { tapPeg(p) } }
+                                .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { tapPeg(p) } }
                         }
                     }
                 }
                 .frame(width: W, height: H)
-                .animation(.spring(response: 0.32, dampingFraction: 0.72), value: pegs)
+                .animation(.easeInOut(duration: 0.2), value: pegs)
             }
 
             Text(solved ? "Solved in \(moves)! Use +/− above to change the ring count"
@@ -133,30 +133,25 @@ struct RingsView: View {
         .disabled(!enabled)
     }
 
-    /// An actual ring: a coloured band with a real transparent hole punched
-    /// through the middle (via `destinationOut`), so the peg behind it shows
-    /// through — it reads as threaded on the peg, not a flat bar.
+    /// A clean disc seen edge-on: a rounded bar with a soft top-to-bottom
+    /// shade and one thin highlight line. No cut-out, no heavy gloss.
     private func ringBar(size: Int, unit: CGFloat, height: CGFloat) -> some View {
         let w = 22 + CGFloat(size) * unit
         let color = ringColors[(size - 1) % ringColors.count]
-        let holeW = max(6, w - height * 1.5)
         return Capsule(style: .continuous)
-            .fill(LinearGradient(colors: [color, color.opacity(0.68)],
-                                 startPoint: .top, endPoint: .bottom))
+            .fill(LinearGradient(
+                colors: [color.opacity(0.92), color, color.opacity(0.78)],
+                startPoint: .top, endPoint: .bottom))
             .overlay(alignment: .top) {
-                Capsule().fill(.white.opacity(0.35))
-                    .frame(width: w * 0.55, height: max(1.5, height * 0.16))
-                    .padding(.top, height * 0.14)
-            }
-            .overlay {
                 Capsule()
-                    .frame(width: holeW, height: height * 0.44)
-                    .blendMode(.destinationOut)
+                    .fill(.white.opacity(0.18))
+                    .frame(height: max(1, height * 0.18))
+                    .padding(.horizontal, height * 0.4)
+                    .padding(.top, height * 0.12)
             }
-            .overlay(Capsule().stroke(.white.opacity(0.3), lineWidth: 1))
-            .compositingGroup()
+            .overlay(Capsule(style: .continuous).stroke(.black.opacity(0.12), lineWidth: 1))
             .frame(width: w, height: height)
-            .shadow(color: .black.opacity(0.28), radius: 2.5, y: 1.5)
+            .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
     }
 
     private func newGame(_ n: Int) {

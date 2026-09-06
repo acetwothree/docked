@@ -31,9 +31,6 @@ struct RootView: View {
     @State private var hintDim = false
     @State private var stretchStart: CGFloat? = nil
     @State private var stretching = false
-    /// Remembers roughly where the activity grid was scrolled, so returning
-    /// from a game doesn't snap it back to the top.
-    @State private var gridScrollAnchor: ActivityModule? = nil
 
     var body: some View {
         GeometryReader { safeGeo in
@@ -165,11 +162,8 @@ struct RootView: View {
             // Centered on the bottom edge — clear of the back knob on the
             // left and the theme/settings pair on the right.
             Image(systemName: "arrow.up.and.down")
-                .font(.system(size: 14, weight: .black))
-                // Always the bright "in use" colour so the hint is actually
-                // legible, not just while you're dragging it.
-                .foregroundStyle(app.tvTheme.palette.hi.opacity(0.95))
-                .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(app.tvTheme.palette.hi.opacity(stretching ? 0.9 : 0.5))
                 .padding(.bottom, 3)
         }
         .frame(width: s.console.width, height: zoneH)
@@ -234,22 +228,30 @@ struct RootView: View {
 
     @ViewBuilder
     private func contentHost(solved s: SolvedLayout) -> some View {
-        if let mod = openModule {
-            if mod == .zen {
-                ZenPuzzleView(tabsAreHeader: s.tabIsHeader, layoutKey: app.layout,
-                             highScore: app.zenHighScore)
-            } else {
-                framed(moduleBody(mod, topClearance: s.video.maxY))
-                    .clipShape(RoundedRectangle(cornerRadius: mod == .pop ? 0 : 20, style: .continuous))
-            }
-        } else {
+        ZStack {
+            // The grid stays mounted underneath an open game — that's what
+            // keeps its scroll position, so leaving a game drops you back
+            // exactly where you were in the list rather than at the top.
             GameGridView(
                 hasPlus: store.entitled,
                 favorites: app.favorites,
                 onPick: pick,
-                onToggleFav: { app.toggleFavorite($0) },
-                scrollAnchor: $gridScrollAnchor
+                onToggleFav: { app.toggleFavorite($0) }
             )
+
+            if let mod = openModule {
+                Group {
+                    if mod == .zen {
+                        ZenPuzzleView(tabsAreHeader: s.tabIsHeader, layoutKey: app.layout,
+                                     highScore: app.zenHighScore)
+                    } else {
+                        framed(moduleBody(mod, topClearance: s.video.maxY))
+                            .clipShape(RoundedRectangle(cornerRadius: mod == .pop ? 0 : 20, style: .continuous))
+                    }
+                }
+                .background(Theme.backdrop)
+                .transition(.opacity)
+            }
         }
     }
 

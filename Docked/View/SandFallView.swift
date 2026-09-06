@@ -132,9 +132,9 @@ struct SandFallView: View {
         // band" — a dashed starting line, with new pieces entering from
         // above it and a tiny preview of the next one parked in the corner.
         let cellW = w / CGFloat(model.cols)
-        // ~3 rows' worth of height reserved at the top for the spawn band, so
-        // the dashed line sits lower and a full piece fits above it.
-        let cellH = h / (CGFloat(model.rows) + 3)
+        // ~2.5 rows reserved at the top for the spawn band, so the dashed
+        // line sits a little lower and a whole piece fits above it.
+        let cellH = h / (CGFloat(model.rows) + 2.5)
         let bandH = h - CGFloat(model.rows) * cellH
         func y(_ row: Int) -> CGFloat { bandH + CGFloat(row) * cellH + cellH / 2 }
 
@@ -180,9 +180,9 @@ struct SandFallView: View {
                     .id(streak.gen)
             }
 
-            let previewBox = min(bandH * 0.8, cellW * 2.6)
+            let previewBox = min(bandH * 0.78, cellW * 3.2)
             nextPreview(box: previewBox)
-                .position(x: w - previewBox / 2 - 8, y: bandH * 0.5)
+                .position(x: w - previewBox / 2 - 10, y: bandH * 0.5)
         }
         .frame(width: w, height: h)
         .contentShape(Rectangle())
@@ -199,25 +199,27 @@ struct SandFallView: View {
         }
     }
 
-    /// A tiny scaled-down rendering of `model.nextShape`, in its own colour —
-    /// the "what's coming" square, parked above the dashed line.
+    /// A tiny rendering of the next piece in its own colour — no frame around
+    /// it, and centred on its actual bounding box so it sits dead centre
+    /// whatever shape it is.
     private func nextPreview(box: CGFloat) -> some View {
         let cells = model.nextShape
-        let maxRow = max(1, cells.map(\.row).max() ?? 1)
-        let maxCol = max(1, cells.map(\.col).max() ?? 1)
-        let unit = box / CGFloat(max(maxRow, maxCol) + 1)
+        let rs = cells.map(\.row), cs = cells.map(\.col)
+        let minR = rs.min() ?? 0, maxR = rs.max() ?? 0
+        let minC = cs.min() ?? 0, maxC = cs.max() ?? 0
+        let spanC = CGFloat(maxC - minC + 1), spanR = CGFloat(maxR - minR + 1)
+        let unit = box / max(spanC, spanR)
+        let pieceW = spanC * unit, pieceH = spanR * unit
         return ZStack {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color.white.opacity(0.06))
-                .frame(width: box, height: box)
             ForEach(Array(cells.enumerated()), id: \.offset) { _, c in
-                RoundedRectangle(cornerRadius: max(1, unit * 0.18), style: .continuous)
+                RoundedRectangle(cornerRadius: max(1, unit * 0.16), style: .continuous)
                     .fill(model.nextColor)
                     .frame(width: max(1, unit - 1.5), height: max(1, unit - 1.5))
-                    .position(x: CGFloat(c.col) * unit + unit / 2, y: CGFloat(c.row) * unit + unit / 2)
+                    .position(x: (CGFloat(c.col - minC) + 0.5) * unit,
+                              y: (CGFloat(c.row - minR) + 0.5) * unit)
             }
         }
-        .frame(width: box, height: box)
+        .frame(width: pieceW, height: pieceH)
     }
 
     /// Column-step dragging with a short glide per step (a hair of easing, so

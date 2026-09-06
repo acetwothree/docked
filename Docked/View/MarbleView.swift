@@ -29,10 +29,12 @@ struct MarbleView: View {
     @State private var moveTick = 0
     @State private var hitTick = 0
     @State private var winTick = 0
+    /// True briefly while the marble is being slid back to the start because
+    /// the last unpainted tiles are no longer reachable from where it is.
+    @State private var repositioning = false
 
     private static let boardBG = Color(hex: "12141C")
-    private static let tileLight = Color(hex: "8CA3D6")
-    private static let tileDark = Color(hex: "5E6FA0")
+    private static let tileOpen = Color(hex: "7486B4")
     private static let wallTop = Color(hex: "23262F")
     private static let wallSide = Color(hex: "0B0C11")
 
@@ -84,9 +86,13 @@ struct MarbleView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
-            Text(cleared ? "Cleared!" : "Swipe to roll · paint every tile")
+            Text(cleared ? "Cleared!"
+                 : repositioning ? "No path back — sliding you home"
+                 : "Swipe to roll · paint every tile")
                 .font(.system(size: 12, weight: .heavy))
-                .foregroundStyle(cleared ? Color.green : Color.secondary)
+                .foregroundStyle(cleared ? Color.green
+                                 : repositioning ? Color.orange : Color.secondary)
+                .lineLimit(1).minimumScaleFactor(0.8)
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -107,93 +113,65 @@ struct MarbleView: View {
 
     private func board(side: CGFloat) -> some View {
         let span = CGFloat(max(cols, rows))
-        let gap: CGFloat = 4
-        let cell = (side - gap * (span + 1)) / span
-        let count = cols * rows
+        // No gaps — open tiles butt right up against each other so the walkable
+        // area reads as one connected path, not a grid of little squares.
+        let cell = side / span
+        func center(_ p: Int) -> CGPoint {
+            CGPoint(x: cell / 2 + CGFloat(p % cols) * cell,
+                    y: cell / 2 + CGFloat(p / cols) * cell)
+        }
+        let mpos = center(pos)
         return ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Self.boardBG)
-            ForEach(Array(0..<count), id: \.self) { i in
-                if walls.contains(i) { wallCellView(i, cell: cell, gap: gap) }
-                else { cellView(i, cell: cell, gap: gap) }
+
+            // one flat sheet for every open tile — seamless
+            ForEach(Array(openCells).sorted(), id: \.self) { i in
+                Rectangle().fill(Self.tileOpen)
+                    .frame(width: cell + 0.5, height: cell + 0.5)
+                    .position(center(i))
             }
-            // marble — a light gloss sphere with a grounding shadow
+            // the painted ribbon — same trick, one flat block per painted tile
+            ForEach(Array(visited).sorted(), id: \.self) { i in
+                Rectangle().fill(trail)
+                    .frame(width: cell + 0.5, height: cell + 0.5)
+                    .position(center(i))
+            }
+            // walls fused into blobs
+            ForEach(Array(walls).sorted(), id: \.self) { i in
+                wallCellView(i, cell: cell)
+            }
+
             Ellipse()
                 .fill(Color.black.opacity(0.28))
                 .frame(width: cell * 0.6, height: cell * 0.18)
-                .offset(y: cell * 0.32)
-                .position(x: gap + cell / 2 + CGFloat(pos % cols) * (cell + gap),
-                          y: gap + cell / 2 + CGFloat(pos / cols) * (cell + gap))
-                .animation(.snappy(duration: 0.14), value: pos)
+                .position(x: mpos.x, y: mpos.y + cell * 0.32)
+                .animation(.easeOut(duration: 0.16), value: pos)
             Circle()
                 .fill(RadialGradient(colors: [.white, Color(hex: "C7CCD6")],
                                      center: UnitPoint(x: 0.35, y: 0.3), startRadius: 1, endRadius: cell * 0.5))
                 .frame(width: cell * 0.72, height: cell * 0.72)
                 .overlay(Circle().stroke(.black.opacity(0.08), lineWidth: 1))
-                .position(x: gap + cell / 2 + CGFloat(pos % cols) * (cell + gap),
-                          y: gap + cell / 2 + CGFloat(pos / cols) * (cell + gap))
-                .animation(.snappy(duration: 0.14), value: pos)
+                .position(mpos)
+                .animation(.easeOut(duration: 0.16), value: pos)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    /// Open tile. The painted trail is a single continuous ribbon — a painted
-    /// cell grows by the gap toward every painted neighbour so the seams (and
-    /// the grid stroke under them) disappear. Unpainted tiles keep the faint
-    /// grid so the maze still reads.
-    private func cellView(_ i: Int, cell: CGFloat, gap: CGFloat) -> some View {
+    /// Wall tiles fuse into one solid blob wherever they touch.
+    /// `UnevenRoundedRectangle` rounds only the corners that don't border
+    /// another wall cell.
+    private func wallCellView(_ i: Int, cell: CGFloat) -> some View {
         let c = i % cols, r = i / cols
-        let cx = gap + cell / 2 + CGFloat(c) * (cell + gap)
-        let cy = gap + cell / 2 + CGFloat(r) * (cell + gap)
-        let painted = visited.contains(i)
-
-        func isPainted(_ cc: Int, _ rr: Int) -> Bool {
-            guard cc >= 0, cc < cols, rr >= 0, rr < rows else { return false }
-            return visited.contains(rr * cols + cc)
-        }
-        let up = painted && isPainted(c, r - 1)
-        let down = painted && isPainted(c, r + 1)
-        let left = painted && isPainted(c - 1, r)
-        let right = painted && isPainted(c + 1, r)
-        let bridge = gap + 1
-        let pw = cell + (left ? bridge : 0) + (right ? bridge : 0)
-        let ph = cell + (up ? bridge : 0) + (down ? bridge : 0)
-        let ox = (right ? bridge : 0) - (left ? bridge : 0)
-        let oy = (down ? bridge : 0) - (up ? bridge : 0)
-
-        return ZStack {
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .fill(LinearGradient(colors: [Self.tileLight, Self.tileDark],
-                                     startPoint: .top, endPoint: .bottom))
-                .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .stroke(.white.opacity(0.22), lineWidth: 1))
-                .frame(width: cell, height: cell)
-            if painted {
-                RoundedRectangle(cornerRadius: (up || down || left || right) ? 3 : 6, style: .continuous)
-                    .fill(trail)
-                    .frame(width: pw, height: ph)
-                    .offset(x: ox / 2, y: oy / 2)
-            }
-        }
-        .frame(width: cell, height: cell)
-        .animation(.easeOut(duration: 0.2), value: painted)
-        .position(x: cx, y: cy)
-    }
-
-    /// Wall tiles fuse into one solid blob wherever they touch — there's no
-    /// reason for them to read as individual squares when nothing can ever
-    /// roll onto them. `UnevenRoundedRectangle` rounds only the corners that
-    /// don't border another wall cell.
-    private func wallCellView(_ i: Int, cell: CGFloat, gap: CGFloat) -> some View {
-        let c = i % cols, r = i / cols
-        let cx = gap + cell / 2 + CGFloat(c) * (cell + gap)
-        let cy = gap + cell / 2 + CGFloat(r) * (cell + gap)
+        let cx = cell / 2 + CGFloat(c) * cell
+        let cy = cell / 2 + CGFloat(r) * cell
         func isWall(_ cc: Int, _ rr: Int) -> Bool {
             guard cc >= 0, cc < cols, rr >= 0, rr < rows else { return false }
             return walls.contains(rr * cols + cc)
         }
         let up = isWall(c, r - 1), down = isWall(c, r + 1)
         let left = isWall(c - 1, r), right = isWall(c + 1, r)
-        let bridge = gap + 1
+        let bridge: CGFloat = 1
         let w = cell + (left ? bridge : 0) + (right ? bridge : 0)
         let h = cell + (up ? bridge : 0) + (down ? bridge : 0)
         let ox = (right ? bridge : 0) - (left ? bridge : 0)
@@ -239,6 +217,23 @@ struct MarbleView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 level = next
                 load(next)
+            }
+            return
+        }
+
+        // Never let the player get stranded: if the tiles still unpainted
+        // can't all be reached from where the marble now sits, slide it back
+        // to the start (keeping everything already painted) — the maze is
+        // always finishable from the start, so this can't loop forever.
+        let ok = Self.paintableBySliding(mw: cols, mh: rows,
+                                         isOpen: { openCells.contains($0) },
+                                         start: pos, covered: visited)
+        if !ok {
+            repositioning = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+                withAnimation(.easeOut(duration: 0.18)) { pos = 0 }
+                visited.insert(0)
+                repositioning = false
             }
         }
     }

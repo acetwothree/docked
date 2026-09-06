@@ -74,7 +74,7 @@ final class SandFallModel {
     /// to actually build a same-colour wall-to-wall connection.
     private var lastColor: Color?
 
-    init(cols: Int = 9, rows: Int = 14, best: Int) {
+    init(cols: Int = 8, rows: Int = 11, best: Int) {
         self.cols = cols
         self.rows = rows
         self.best = best

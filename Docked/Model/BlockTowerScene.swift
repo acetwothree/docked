@@ -39,9 +39,10 @@ final class BlockTowerScene: SKScene {
     /// True from the moment a piece is dropped until it has settled — the
     /// camera target is frozen for that whole span.
     private var awaitingSettle = false
+    private var settledFrames = 0
 
     /// How high above the tower top a fresh piece hovers.
-    private var hoverGap: CGFloat { size.height * 0.34 }
+    private var hoverGap: CGFloat { size.height * 0.26 }
 
     override func didMove(to view: SKView) {
         backgroundColor = .clear
@@ -71,6 +72,7 @@ final class BlockTowerScene: SKScene {
         score = 0
         isOver = false
         awaitingSettle = false
+        settledFrames = 0
         physicsWorld.speed = 1
         onScoreChange?(0)
         cam.position = CGPoint(x: size.width / 2, y: size.height / 2)
@@ -196,6 +198,7 @@ final class BlockTowerScene: SKScene {
         onScoreChange?(score)
         onLand?()
         awaitingSettle = true            // freeze the camera target until it rests
+        settledFrames = 0
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
             guard let self, !self.isOver else { return }
             self.spawnPiece()
@@ -205,20 +208,23 @@ final class BlockTowerScene: SKScene {
     override func update(_ currentTime: TimeInterval) {
         guard !isOver, cam != nil else { return }
 
-        // Only re-aim the camera once the piece that just dropped has come to
-        // rest (or after a safety timeout). While it's still moving, the
-        // target — and therefore the camera — holds completely still.
+        // Only re-aim the camera once the piece that just dropped has been
+        // fully still for a moment. While it's still moving even slightly,
+        // the target — and the camera — hold completely still.
         if awaitingSettle {
-            let settled: Bool = {
+            let still: Bool = {
                 guard let b = placed.last?.physicsBody else { return true }
                 let v = b.velocity
-                return (v.dx * v.dx + v.dy * v.dy) < 90 && abs(b.angularVelocity) < 0.12
+                return (v.dx * v.dx + v.dy * v.dy) < 16 && abs(b.angularVelocity) < 0.05
             }()
-            if settled {
-                // Camera sits a little ABOVE the tower top, so most of the
-                // screen shows the tower BELOW the newest piece, not sky.
-                camTargetY = max(camTargetY, currentStackTopY() + size.height * 0.12)
+            settledFrames = still ? settledFrames + 1 : 0
+            if settledFrames >= 12 {
+                // Camera sits BELOW the tower top, so ~2/3 of the screen
+                // shows the tower under the newest piece — and the piece
+                // still drops from high up.
+                camTargetY = max(camTargetY, currentStackTopY() - size.height * 0.15)
                 awaitingSettle = false
+                settledFrames = 0
             }
         }
         camTargetY = max(camTargetY, size.height / 2)
