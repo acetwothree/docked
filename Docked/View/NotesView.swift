@@ -19,7 +19,8 @@ struct NotesView: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        @Bindable var store = store
+        return ZStack(alignment: .bottom) {
             ScrollView {
                 Text(store.text.isEmpty ? "Tap to jot quotes, timestamps, notes…" : store.text)
                     .font(.body)
@@ -35,7 +36,7 @@ struct NotesView: View {
             footer
 
             if editing {
-                editor
+                editor(text: $store.text)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(1)
             }
@@ -53,7 +54,7 @@ struct NotesView: View {
         withAnimation(.easeOut(duration: 0.2)) { editing = false }
     }
 
-    private var editor: some View {
+    private func editor(text: Binding<String>) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Text("\(wordCount) words")
@@ -70,7 +71,7 @@ struct NotesView: View {
             .padding(.horizontal, 14).padding(.vertical, 8)
             .background(.ultraThinMaterial)
 
-            TextEditor(text: $store.text)
+            TextEditor(text: text)
                 .focused($focused)
                 .font(.body)
                 .scrollContentBackground(.hidden)
