@@ -62,7 +62,7 @@ struct RingsView: View {
                 let W = geo.size.width, H = geo.size.height
                 let pegW = W / 3
                 let baseY = H - 18
-                let ringH = min(20, (H - 60) / CGFloat(max(3, ringCount + 1)))
+                let ringH = min(24, (H - 60) / CGFloat(max(3, ringCount + 1)))
                 let unit = (pegW - 24) / CGFloat(ringCount + 1)
 
                 ZStack {
@@ -90,6 +90,7 @@ struct RingsView: View {
                         if let h = held, h.peg == p {
                             ringBar(size: h.size, unit: unit, height: ringH)
                                 .position(x: cx, y: 16)
+                                .transition(.move(edge: .top).combined(with: .opacity))
                         }
                     }
 
@@ -99,11 +100,12 @@ struct RingsView: View {
                             Rectangle().fill(Color.clear)
                                 .frame(width: pegW, height: H)
                                 .contentShape(Rectangle())
-                                .onTapGesture { tapPeg(p) }
+                                .onTapGesture { withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) { tapPeg(p) } }
                         }
                     }
                 }
                 .frame(width: W, height: H)
+                .animation(.spring(response: 0.32, dampingFraction: 0.72), value: pegs)
             }
 
             Text(solved ? "Solved in \(moves)! Use +/− above to change the ring count"
@@ -131,12 +133,30 @@ struct RingsView: View {
         .disabled(!enabled)
     }
 
+    /// An actual ring: a coloured band with a real transparent hole punched
+    /// through the middle (via `destinationOut`), so the peg behind it shows
+    /// through — it reads as threaded on the peg, not a flat bar.
     private func ringBar(size: Int, unit: CGFloat, height: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: height / 2, style: .continuous)
-            .fill(ringColors[(size - 1) % ringColors.count])
-            .overlay(RoundedRectangle(cornerRadius: height / 2).stroke(.white.opacity(0.25), lineWidth: 1))
-            .frame(width: 22 + CGFloat(size) * unit, height: height)
-            .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+        let w = 22 + CGFloat(size) * unit
+        let color = ringColors[(size - 1) % ringColors.count]
+        let holeW = max(6, w - height * 1.5)
+        return Capsule(style: .continuous)
+            .fill(LinearGradient(colors: [color, color.opacity(0.68)],
+                                 startPoint: .top, endPoint: .bottom))
+            .overlay(alignment: .top) {
+                Capsule().fill(.white.opacity(0.35))
+                    .frame(width: w * 0.55, height: max(1.5, height * 0.16))
+                    .padding(.top, height * 0.14)
+            }
+            .overlay {
+                Capsule()
+                    .frame(width: holeW, height: height * 0.44)
+                    .blendMode(.destinationOut)
+            }
+            .overlay(Capsule().stroke(.white.opacity(0.3), lineWidth: 1))
+            .compositingGroup()
+            .frame(width: w, height: height)
+            .shadow(color: .black.opacity(0.28), radius: 2.5, y: 1.5)
     }
 
     private func newGame(_ n: Int) {

@@ -111,14 +111,22 @@ final class SandFallModel {
         rollNext()
 
         let minRow = template.map(\.row).min() ?? 0
+        let maxRow = template.map(\.row).max() ?? 0
         let minCol = template.map(\.col).min() ?? 0
         let maxCol = template.map(\.col).max() ?? 0
         let width = maxCol - minCol + 1
-        let shiftRow = -1 - minRow                       // top row lands at -1
+        // Whole piece starts ABOVE row 0 (above the dashed line) — its lowest
+        // row sits at -1, so it's fully in the spawn band before it falls.
+        let shiftRow = -1 - maxRow
         let shiftCol = (cols - width) / 2 - minCol
         activeCells = template.map { (row: $0.row + shiftRow, col: $0.col + shiftCol) }
 
-        if !canPlace(activeCells) {
+        // Over if the pile has already reached the top of the board in any
+        // column this piece needs to enter through.
+        let occ = occupiedSet()
+        let pieceCols = Set(activeCells.map(\.col))
+        let blockedAtTop = pieceCols.contains { occ.contains(0 * cols + $0) }
+        if blockedAtTop {
             phase = .over
             overTick += 1
         } else {

@@ -149,7 +149,10 @@ private struct ColorTriDown: Shape {
 enum ColorSheets {
     // A handful of BIG, mostly non-overlapping regions per sheet — easy to hit
     // with a fingertip.
-    static let all: [[ColorRegion]] = [house, flower, sailboat, cat, car, rocket, icecream, butterfly, robot]
+    static let all: [[ColorRegion]] = [
+        house, flower, sailboat, cat, car, rocket, icecream, butterfly, robot,
+        fish, sun, tree, balloon, snowman, ghost, mushroom, crown, apple, planet,
+    ]
 
     private static func e(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> ColorRegion {
         ColorRegion(shape: AnyShape(Ellipse()), rect: CGRect(x: x, y: y, width: w, height: h))
@@ -266,5 +269,104 @@ enum ColorSheets {
         Self.rect(0.26, 0.48, 0.48, 0.32),  // body
         Self.rect(0.10, 0.50, 0.14, 0.24),  // left arm
         Self.rect(0.76, 0.50, 0.14, 0.24),  // right arm
+    ]
+
+    // A fish — 6 regions.
+    static let fish: [ColorRegion] = [
+        Self.rect(0, 0, 1, 1),              // water
+        Self.e(0.14, 0.34, 0.50, 0.34),     // body
+        Self.tri(0.58, 0.30, 0.24, 0.20),   // tail (upper)
+        Self.triDown(0.58, 0.50, 0.24, 0.20), // tail (lower)
+        Self.e(0.22, 0.42, 0.09, 0.09),     // eye
+        Self.e(0.28, 0.60, 0.18, 0.10),     // belly fin
+    ]
+
+    // A shining sun — 6 regions.
+    static let sun: [ColorRegion] = [
+        Self.rect(0, 0, 1, 1),              // sky
+        Self.e(0.30, 0.30, 0.40, 0.40),     // core
+        Self.tri(0.43, 0.03, 0.14, 0.16),   // top ray
+        Self.triDown(0.43, 0.81, 0.14, 0.16), // bottom ray
+        Self.tri(0.10, 0.12, 0.14, 0.14),   // upper-left ray
+        Self.triDown(0.76, 0.74, 0.14, 0.14), // lower-right ray
+    ]
+
+    // A leafy tree — 6 regions.
+    static let tree: [ColorRegion] = [
+        Self.rect(0, 0, 1, 0.72),           // sky
+        Self.rect(0, 0.70, 1, 0.30),        // ground
+        Self.rect(0.45, 0.42, 0.10, 0.34),  // trunk
+        Self.e(0.24, 0.18, 0.52, 0.34),     // crown (top)
+        Self.e(0.14, 0.32, 0.36, 0.28),     // crown (left)
+        Self.e(0.50, 0.32, 0.36, 0.28),     // crown (right)
+    ]
+
+    // A floating balloon — 5 regions.
+    static let balloon: [ColorRegion] = [
+        Self.rect(0, 0, 1, 1),              // sky
+        Self.e(0.28, 0.10, 0.44, 0.50),     // balloon
+        Self.triDown(0.44, 0.56, 0.12, 0.10), // knot
+        Self.rect(0.49, 0.64, 0.02, 0.30),  // string
+        Self.e(0.32, 0.20, 0.14, 0.16),     // highlight
+    ]
+
+    // A snowman — 7 regions.
+    static let snowman: [ColorRegion] = [
+        Self.rect(0, 0, 1, 0.62),           // sky
+        Self.rect(0, 0.60, 1, 0.40),        // snow ground
+        Self.e(0.30, 0.52, 0.40, 0.34),     // bottom ball
+        Self.e(0.34, 0.30, 0.32, 0.28),     // middle ball
+        Self.e(0.38, 0.12, 0.24, 0.22),     // head
+        Self.e(0.43, 0.18, 0.05, 0.05),     // left eye
+        Self.e(0.52, 0.18, 0.05, 0.05),     // right eye
+    ]
+
+    // A little ghost — 5 regions.
+    static let ghost: [ColorRegion] = [
+        Self.rect(0, 0, 1, 1),              // background
+        Self.e(0.24, 0.14, 0.52, 0.64),     // body
+        Self.e(0.36, 0.30, 0.10, 0.13),     // left eye
+        Self.e(0.54, 0.30, 0.10, 0.13),     // right eye
+        Self.e(0.44, 0.48, 0.12, 0.10),     // mouth
+    ]
+
+    // A toadstool — 6 regions.
+    static let mushroom: [ColorRegion] = [
+        Self.rect(0, 0, 1, 1),              // background
+        Self.e(0.16, 0.16, 0.68, 0.42),     // cap
+        Self.rect(0.38, 0.46, 0.24, 0.38),  // stem
+        Self.e(0.28, 0.24, 0.13, 0.11),     // spot (left)
+        Self.e(0.56, 0.30, 0.11, 0.09),     // spot (right)
+        Self.e(0.44, 0.19, 0.09, 0.08),     // spot (top)
+    ]
+
+    // A crown — 7 regions.
+    static let crown: [ColorRegion] = [
+        Self.rect(0, 0, 1, 1),              // background
+        Self.rect(0.18, 0.52, 0.64, 0.22),  // band
+        Self.tri(0.16, 0.28, 0.20, 0.28),   // left point
+        Self.tri(0.40, 0.20, 0.20, 0.36),   // middle point
+        Self.tri(0.64, 0.28, 0.20, 0.28),   // right point
+        Self.e(0.29, 0.56, 0.09, 0.09),     // left jewel
+        Self.e(0.62, 0.56, 0.09, 0.09),     // right jewel
+    ]
+
+    // An apple — 5 regions.
+    static let apple: [ColorRegion] = [
+        Self.rect(0, 0, 1, 1),              // background
+        Self.e(0.20, 0.28, 0.34, 0.50),     // left lobe
+        Self.e(0.46, 0.28, 0.34, 0.50),     // right lobe
+        Self.rect(0.48, 0.12, 0.04, 0.18),  // stem
+        Self.e(0.52, 0.12, 0.18, 0.11),     // leaf
+    ]
+
+    // A ringed planet — 6 regions.
+    static let planet: [ColorRegion] = [
+        Self.rect(0, 0, 1, 1),              // space
+        Self.e(0.08, 0.40, 0.84, 0.20),     // ring (behind)
+        Self.e(0.28, 0.28, 0.44, 0.44),     // planet
+        Self.e(0.36, 0.38, 0.12, 0.12),     // crater (left)
+        Self.e(0.54, 0.50, 0.10, 0.10),     // crater (right)
+        Self.e(0.14, 0.14, 0.06, 0.06),     // star
     ]
 }

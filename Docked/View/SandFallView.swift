@@ -29,6 +29,9 @@ struct SandFallView: View {
     /// Bumped on every hard-drop/lock so a stale slow-fall loop from an
     /// earlier piece can recognise it's obsolete and stop.
     @State private var fallGen = 0
+    /// The column span of a just-triggered hard drop, for the motion streak.
+    @State private var dropStreak: (lo: Int, hi: Int, gen: Int)? = nil
+    @State private var dropStreakGen = 0
 
     init(highScore: Int) {
         _model = State(initialValue: SandFallModel(best: highScore))
@@ -128,9 +131,9 @@ struct SandFallView: View {
         // band" — a dashed starting line, with new pieces entering from
         // above it and a tiny preview of the next one parked in the corner.
         let cellW = w / CGFloat(model.cols)
-        // ~2 rows' worth of height reserved at the top for the spawn band, so
-        // the dashed line sits a bit lower on the board (not right at the top).
-        let cellH = h / (CGFloat(model.rows) + 2)
+        // ~3 rows' worth of height reserved at the top for the spawn band, so
+        // the dashed line sits lower and a full piece fits above it.
+        let cellH = h / (CGFloat(model.rows) + 3)
         let bandH = h - CGFloat(model.rows) * cellH
         func y(_ row: Int) -> CGFloat { bandH + CGFloat(row) * cellH + cellH / 2 }
 
@@ -162,6 +165,20 @@ struct SandFallView: View {
                     .position(x: CGFloat(c.col) * cellW + cellW / 2, y: y(c.row))
             }
 
+            if let streak = dropStreak {
+                let x0 = CGFloat(streak.lo) * cellW
+                let x1 = CGFloat(streak.hi + 1) * cellW
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(LinearGradient(colors: [.white.opacity(0), .white.opacity(0.5)],
+                                         startPoint: .top, endPoint: .bottom))
+                    .frame(width: max(2, x1 - x0), height: h)
+                    .position(x: (x0 + x1) / 2, y: h / 2)
+                    .blendMode(.plusLighter)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+                    .id(streak.gen)
+            }
+
             let previewBox = min(bandH * 0.8, cellW * 2.6)
             nextPreview(box: previewBox)
                 .position(x: w - previewBox / 2 - 8, y: bandH * 0.5)
@@ -175,7 +192,9 @@ struct SandFallView: View {
 
     private var tapToRotateGesture: some Gesture {
         TapGesture().onEnded {
-            withAnimation(.easeOut(duration: 0.1)) { model.rotateActive() }
+            // Quick snap — a slower tween makes the four cells look like
+            // they're scattering to new spots rather than turning as one.
+            withAnimation(.easeOut(duration: 0.06)) { model.rotateActive() }
         }
     }
 
@@ -200,10 +219,10 @@ struct SandFallView: View {
         .frame(width: box, height: box)
     }
 
-    /// Free 1:1 horizontal dragging (not step swipes, and not animated —
-    /// animating every tiny step is what made dragging feel laggy) while the
-    /// piece is already falling on its own; swiping down speeds it up into
-    /// an instant hard drop.
+    /// Column-step dragging with a short glide per step (a hair of easing, so
+    /// it doesn't feel like the piece is teleporting) while it falls on its
+    /// own; a downward swipe speeds it into an instant hard drop with a quick
+    /// motion streak down the column.
     private func dragGesture(cellW: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 8)
             .onChanged { v in
@@ -211,7 +230,9 @@ struct SandFallView: View {
                 let wanted = Int((v.translation.width / cellW).rounded())
                 if wanted != dragAppliedCols {
                     let step = wanted > dragAppliedCols ? 1 : -1
-                    for _ in 0..<abs(wanted - dragAppliedCols) { model.moveActive(dCol: step) }
+                    withAnimation(.easeOut(duration: 0.09)) {
+                        for _ in 0..<abs(wanted - dragAppliedCols) { model.moveActive(dCol: step) }
+                    }
                     dragAppliedCols = wanted
                 }
             }
@@ -220,7 +241,15 @@ struct SandFallView: View {
                 dragAppliedCols = 0
                 if dy > 40, abs(dy) > abs(dx) * 1.2 {
                     fallGen += 1
-                    withAnimation(.easeIn(duration: 0.08)) { model.hardDrop() }
+                    let cols = model.activeCells.map(\.col)
+                    if let lo = cols.min(), let hi = cols.max() {
+                        dropStreakGen += 1
+                        dropStreak = (lo: lo, hi: hi, gen: dropStreakGen)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+                            withAnimation(.easeOut(duration: 0.3)) { dropStreak = nil }
+                        }
+                    }
+                    withAnimation(.easeIn(duration: 0.07)) { model.hardDrop() }
                 }
                 // Otherwise: nothing to do — the continuous slow fall is
                 // already running independently of this gesture.

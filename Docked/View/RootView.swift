@@ -31,6 +31,9 @@ struct RootView: View {
     @State private var hintDim = false
     @State private var stretchStart: CGFloat? = nil
     @State private var stretching = false
+    /// Remembers roughly where the activity grid was scrolled, so returning
+    /// from a game doesn't snap it back to the top.
+    @State private var gridScrollAnchor: ActivityModule? = nil
 
     var body: some View {
         GeometryReader { safeGeo in
@@ -162,8 +165,11 @@ struct RootView: View {
             // Centered on the bottom edge — clear of the back knob on the
             // left and the theme/settings pair on the right.
             Image(systemName: "arrow.up.and.down")
-                .font(.system(size: 11, weight: .black))
-                .foregroundStyle(app.tvTheme.palette.hi.opacity(stretching ? 0.95 : 0.42))
+                .font(.system(size: 14, weight: .black))
+                // Always the bright "in use" colour so the hint is actually
+                // legible, not just while you're dragging it.
+                .foregroundStyle(app.tvTheme.palette.hi.opacity(0.95))
+                .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
                 .padding(.bottom, 3)
         }
         .frame(width: s.console.width, height: zoneH)
@@ -241,7 +247,8 @@ struct RootView: View {
                 hasPlus: store.entitled,
                 favorites: app.favorites,
                 onPick: pick,
-                onToggleFav: { app.toggleFavorite($0) }
+                onToggleFav: { app.toggleFavorite($0) },
+                scrollAnchor: $gridScrollAnchor
             )
         }
     }

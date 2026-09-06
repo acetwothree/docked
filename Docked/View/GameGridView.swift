@@ -16,6 +16,10 @@ struct GameGridView: View {
     var favorites: [ActivityModule]
     var onPick: (ActivityModule) -> Void
     var onToggleFav: (ActivityModule) -> Void
+    /// Owned by RootView so it survives this view being torn down and rebuilt
+    /// when a game opens and closes — lets the grid come back where you left it
+    /// instead of jumping to the top.
+    @Binding var scrollAnchor: ActivityModule?
 
     @Environment(\.requestReview) private var requestReview
 
@@ -42,6 +46,7 @@ struct GameGridView: View {
                     )
                 }
             }
+            .scrollTargetLayout()
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: favorites)
             .padding(.horizontal, 2)
 
@@ -50,6 +55,7 @@ struct GameGridView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 18)
         }
+        .scrollPosition(id: $scrollAnchor, anchor: .top)
         .scrollIndicators(.hidden)
     }
 
@@ -117,8 +123,8 @@ private struct GameCard: View {
             .overlay(alignment: .topTrailing) {
                 Button(action: onToggleFav) {
                     Image(systemName: isFavorite ? "star.fill" : "star")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(isFavorite ? Theme.accent : Color.white.opacity(0.35))
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(isFavorite ? Theme.accent : Color.white.opacity(0.4))
                         .padding(10)
                         .contentShape(Rectangle())
                 }
@@ -396,30 +402,37 @@ private struct GamePreview: View {
     /// The actual arena mat + player block + a couple of enemies closing in
     /// along the lanes, with a slash toward one of them — closer to an
     /// actual moment of play than an abstract radiating burst.
+    /// Matches the real game: you're the amber block in the middle of a round
+    /// mat, dark enemy blocks close in from every side, and a swipe throws a
+    /// slash arc at one of them.
     private func brawl(_ s: CGFloat) -> some View {
-        let cy: CGFloat = 0.46
+        let c = CGPoint(x: s * 0.5, y: s * 0.5)
+        let ink = Color(hex: "2B2F38")
         return ZStack {
-            Circle().fill(Color(hex: "3ECF7A").opacity(0.08)).frame(width: s * 0.9, height: s * 0.9)
-                .position(x: s * 0.5, y: s * cy)
-            Circle().stroke(Color(hex: "3ECF7A").opacity(0.35), lineWidth: s * 0.02).frame(width: s * 0.9, height: s * 0.9)
-                .position(x: s * 0.5, y: s * cy)
+            Circle().fill(Theme.accent.opacity(0.07))
+                .frame(width: s * 0.92, height: s * 0.92).position(c)
+            Circle().stroke(Theme.accent.opacity(0.28), lineWidth: max(1, s * 0.018))
+                .frame(width: s * 0.92, height: s * 0.92).position(c)
 
-            PopBlock(Color(hex: "23262F"), width: s * 0.15, height: s * 0.15, corner: 3, shadow: false)
-                .position(x: s * 0.5, y: s * cy - s * 0.36)
-            PopBlock(Color(hex: "23262F"), width: s * 0.15, height: s * 0.15, corner: 3, shadow: false)
-                .position(x: s * 0.5 + s * 0.36, y: s * cy)
+            PopBlock(ink, width: s * 0.16, height: s * 0.16, corner: 3, shadow: false)
+                .position(x: c.x, y: c.y - s * 0.34)
+            PopBlock(ink, width: s * 0.15, height: s * 0.15, corner: 3, shadow: false)
+                .position(x: c.x + s * 0.33, y: c.y + s * 0.04)
+            PopBlock(ink, width: s * 0.14, height: s * 0.14, corner: 3, shadow: false)
+                .position(x: c.x - s * 0.31, y: c.y + s * 0.13)
+            PopBlock(ink, width: s * 0.13, height: s * 0.13, corner: 3, shadow: false)
+                .position(x: c.x + s * 0.10, y: c.y + s * 0.36)
 
-            // slash wedge toward the top enemy
             Path { p in
-                p.move(to: CGPoint(x: s * 0.5, y: s * cy))
-                p.addLine(to: CGPoint(x: s * 0.5 - s * 0.15, y: s * cy - s * 0.26))
-                p.addLine(to: CGPoint(x: s * 0.5 + s * 0.15, y: s * cy - s * 0.26))
-                p.closeSubpath()
+                p.addArc(center: c, radius: s * 0.27,
+                         startAngle: .degrees(-142), endAngle: .degrees(-38), clockwise: false)
             }
-            .fill(Color(hex: "3ECF7A").opacity(0.5))
+            .stroke(Theme.accent, style: StrokeStyle(lineWidth: s * 0.05, lineCap: .round))
 
-            PopBlock(Color(hex: "3ECF7A"), width: s * 0.3, height: s * 0.3)
-                .position(x: s * 0.5, y: s * cy)
+            Circle().fill(Theme.accent.opacity(0.22))
+                .frame(width: s * 0.42, height: s * 0.42).position(c).blur(radius: s * 0.05)
+            PopBlock(Theme.accent, width: s * 0.28, height: s * 0.28, corner: s * 0.06)
+                .position(c)
         }
     }
 

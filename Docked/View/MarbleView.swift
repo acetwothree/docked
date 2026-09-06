@@ -35,7 +35,16 @@ struct MarbleView: View {
     private static let tileDark = Color(hex: "5E6FA0")
     private static let wallTop = Color(hex: "23262F")
     private static let wallSide = Color(hex: "0B0C11")
-    private static let trailRed = Color(hex: "D93A3A")
+
+    /// A different paint colour every level, looping once the list runs out.
+    private static let trailColors: [Color] = [
+        Color(hex: "D93A3A"), Color(hex: "F2883C"), Color(hex: "F2C230"),
+        Color(hex: "3ECF7A"), Color(hex: "2FB6A8"), Color(hex: "3EA1E0"),
+        Color(hex: "5C7CFA"), Color(hex: "9D6FF2"), Color(hex: "E064B8"),
+        Color(hex: "F25C87"), Color(hex: "8BC34A"), Color(hex: "20C4CE"),
+        Color(hex: "FF7043"), Color(hex: "C0CA33"),
+    ]
+    private var trail: Color { Self.trailColors[(max(1, level) - 1) % Self.trailColors.count] }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -127,25 +136,46 @@ struct MarbleView: View {
         }
     }
 
-    /// Open tile — a lowkey trail: the red fill simply fades in as it's
-    /// painted, no extra marks or dots.
+    /// Open tile. The painted trail is a single continuous ribbon — a painted
+    /// cell grows by the gap toward every painted neighbour so the seams (and
+    /// the grid stroke under them) disappear. Unpainted tiles keep the faint
+    /// grid so the maze still reads.
     private func cellView(_ i: Int, cell: CGFloat, gap: CGFloat) -> some View {
         let c = i % cols, r = i / cols
         let cx = gap + cell / 2 + CGFloat(c) * (cell + gap)
         let cy = gap + cell / 2 + CGFloat(r) * (cell + gap)
         let painted = visited.contains(i)
+
+        func isPainted(_ cc: Int, _ rr: Int) -> Bool {
+            guard cc >= 0, cc < cols, rr >= 0, rr < rows else { return false }
+            return visited.contains(rr * cols + cc)
+        }
+        let up = painted && isPainted(c, r - 1)
+        let down = painted && isPainted(c, r + 1)
+        let left = painted && isPainted(c - 1, r)
+        let right = painted && isPainted(c + 1, r)
+        let bridge = gap + 1
+        let pw = cell + (left ? bridge : 0) + (right ? bridge : 0)
+        let ph = cell + (up ? bridge : 0) + (down ? bridge : 0)
+        let ox = (right ? bridge : 0) - (left ? bridge : 0)
+        let oy = (down ? bridge : 0) - (up ? bridge : 0)
+
         return ZStack {
             RoundedRectangle(cornerRadius: 5, style: .continuous)
                 .fill(LinearGradient(colors: [Self.tileLight, Self.tileDark],
                                      startPoint: .top, endPoint: .bottom))
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .fill(Self.trailRed)
-                .opacity(painted ? 1 : 0)
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .stroke(.white.opacity(painted ? 0.12 : 0.22), lineWidth: 1)
+                .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .stroke(.white.opacity(0.22), lineWidth: 1))
+                .frame(width: cell, height: cell)
+            if painted {
+                RoundedRectangle(cornerRadius: (up || down || left || right) ? 3 : 6, style: .continuous)
+                    .fill(trail)
+                    .frame(width: pw, height: ph)
+                    .offset(x: ox / 2, y: oy / 2)
+            }
         }
         .frame(width: cell, height: cell)
-        .animation(.easeOut(duration: 0.22), value: painted)
+        .animation(.easeOut(duration: 0.2), value: painted)
         .position(x: cx, y: cy)
     }
 
@@ -225,11 +255,13 @@ struct MarbleView: View {
 
     private func load(_ n: Int) {
         let lvl = max(1, n)
-        let cx = min(3, 2 + lvl / 8)
-        let cy = min(3, 2 + lvl / 12)
+        // Bigger grids sooner, and more braiding — braided cells are the
+        // extra openings that turn dead ends into real "which way?" choices.
+        let cx = min(4, 2 + lvl / 4)
+        let cy = min(4, 2 + lvl / 5)
         let mw = cx * 2 + 1
         let mh = cy * 2 + 1
-        let maxBraid = min(0.45, 0.06 * Double(lvl))
+        let maxBraid = min(0.62, 0.09 * Double(lvl))
 
         var chosen: [Bool] = []
         var bestClusterSize = Int.max

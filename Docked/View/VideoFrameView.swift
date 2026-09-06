@@ -43,8 +43,9 @@ struct VideoFrameView: View {
             Image(systemName: "tv.fill").font(.system(size: 20))
             Text("DRAG YOUR VIDEO HERE")
                 .font(.system(size: 11, weight: .heavy)).tracking(2.2)
-            Text("your video turns the screen on")
-                .font(.system(size: 9.5)).foregroundStyle(.secondary)
+            Text("Drag the bottom of the TV to fit it to your video")
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(Theme.accent.opacity(0.85))
         }
         .foregroundStyle(Theme.accent)
         .shadow(color: .black.opacity(0.6), radius: 3)

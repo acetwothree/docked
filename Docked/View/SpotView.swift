@@ -36,16 +36,17 @@ struct SpotView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            HStack {
+            HStack(spacing: 0) {
                 Text("ROUND \(round)").font(.system(size: 12, weight: .heavy))
                     .foregroundStyle(.secondary)
-                Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Text("SCORE \(score)").font(.system(size: 12, weight: .heavy)).monospacedDigit()
                     .foregroundStyle(.secondary)
-                Spacer()
+                    .frame(maxWidth: .infinity, alignment: .center)
                 Text(String(format: "%.0f", max(0, timeLeft)))
                     .font(.system(size: 13, weight: .black)).monospacedDigit()
                     .foregroundStyle(timeLeft < 5 ? Color.red : Color.primary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
             HStack(spacing: 8) {

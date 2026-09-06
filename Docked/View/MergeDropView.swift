@@ -20,9 +20,9 @@ struct MergeDropView: View {
     @AppStorage("docked.drop.over") private var savedOver = false
 
     private let cols = 5
-    private let rows = 5
+    private let rows = 4
 
-    @State private var grid: [Int] = Array(repeating: 0, count: 25)
+    @State private var grid: [Int] = Array(repeating: 0, count: 20)
     @State private var next = 1
     @State private var score = 0
     @State private var over = false
@@ -72,7 +72,9 @@ struct MergeDropView: View {
 
             GeometryReader { geo in
                 let cw = geo.size.width / CGFloat(cols)
-                let ch = min(cw, geo.size.height / CGFloat(rows))
+                // One extra row's worth of height kept clear above the grid so
+                // the hovering block always has empty space to sit in.
+                let ch = min(cw, geo.size.height / CGFloat(rows + 1))
                 let boardW = cw * CGFloat(cols)
                 let boardH = ch * CGFloat(rows)
                 ZStack(alignment: .topLeading) {
@@ -104,6 +106,9 @@ struct MergeDropView: View {
                 }
                 .frame(width: boardW, height: boardH)
                 .scaleEffect(pulse)
+                // Push the grid down by one cell, leaving the reserved band
+                // above it genuinely empty for the hovering / falling block.
+                .padding(.top, ch)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .contentShape(Rectangle())
                 .gesture(
