@@ -308,7 +308,8 @@ final class BlockTowerScene: SKScene {
 
         // Backstop: any settled piece beyond the base that ends up on the
         // ground (e.g. a slow slide-off) also ends the run.
-        if placed.count > 3, placed.dropFirst(3).contains({ $0.calculateAccumulatedFrame().minY < floorTopY + 4 }) {
+        if placed.count > 3,
+           placed.dropFirst(3).contains(where: { $0.calculateAccumulatedFrame().minY < floorTopY + 4 }) {
             endRun()
         }
     }
