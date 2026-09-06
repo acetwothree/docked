@@ -2,13 +2,13 @@
 //  SandFallModel.swift
 //  Docked
 //
-//  "Sand Fall" — coloured tetromino-shaped clusters fall down a grid; on
-//  landing they crumble into loose grains of sand that trickle and settle
-//  (straight down, or diagonally if blocked) instead of staying rigid. A
+//  "Cascade" — a coloured tetromino-shaped cluster appears at the top of the
+//  grid and waits there (no gravity). The player slides it, optionally
+//  rotates it, then hard-drops it; on landing it breaks into loose grains
+//  that trickle and settle (straight down, or diagonally if blocked). A
 //  colour clears once it forms one connected path of touching grains that
-//  spans every column from the left wall to the right wall — the path doesn't
-//  have to be a straight row, it can zigzag up and down. Lose when a new
-//  piece can't spawn.
+//  spans every column from the left wall to the right wall — the path can
+//  zigzag up and down. Lose when a new piece can't fit at the top.
 //
 //  Each grain keeps a stable identity (`Grain.id`) across settle passes so
 //  the view can animate it sliding to its new cell, rather than cells just
@@ -120,22 +120,21 @@ final class SandFallModel {
         lastColor = activeColor
         rollNext()
 
-        let maxRow = template.map(\.row).max() ?? 0
+        let minRow = template.map(\.row).min() ?? 0
         let minCol = template.map(\.col).min() ?? 0
         let maxCol = template.map(\.col).max() ?? 0
         let width = maxCol - minCol + 1
-        // Whole piece starts ABOVE row 0 (above the dashed line) — its lowest
-        // row sits at -1, so it's fully in the spawn band before it falls.
-        let shiftRow = -1 - maxRow
+        // No gravity: the piece just appears at the very top of the playfield
+        // (top row = row 0) and waits there for the player to slide it and
+        // swipe down. Nothing crosses the dashed line any more.
+        let shiftRow = -minRow
         let shiftCol = (cols - width) / 2 - minCol
         activeCells = template.map { (row: $0.row + shiftRow, col: $0.col + shiftCol) }
 
-        // Over if the pile has already reached the top of the board in any
-        // column this piece needs to enter through.
-        let occ = occupiedSet()
-        let pieceCols = Set(activeCells.map(\.col))
-        let blockedAtTop = pieceCols.contains { occ.contains(0 * cols + $0) }
-        if blockedAtTop {
+        // Over if the pile has already filled the top row where this piece
+        // needs to sit.
+        if !canPlace(activeCells) {
+            activeCells = []
             phase = .over
             overTick += 1
         } else {

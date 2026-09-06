@@ -146,14 +146,20 @@ struct RootView: View {
             // already on screen, so react to it here (not just in onAppear).
             if !done { showOnboarding = true }
         }
+        .onChange(of: openModule) { _, mod in
+            // Bank active-play time for the review prompt's 5-minute gate.
+            if mod == nil { review.playSessionEnded() } else { review.playSessionStarted() }
+        }
         .onChange(of: scenePhase) { old, phase in
             if phase != .active {
                 doodle.saveNow()
                 Analytics.shared.track(.appBackground)
                 Analytics.shared.sessionEnded()
+                if openModule != nil { review.playSessionEnded() }
             }
             if phase == .active {
                 Task { await store.refreshEntitlements() }
+                if openModule != nil { review.playSessionStarted() }
                 if old != .active {
                     Analytics.shared.track(.appForeground)
                     Analytics.shared.sessionBegan()

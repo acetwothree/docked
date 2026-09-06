@@ -27,9 +27,6 @@ struct SandFallView: View {
     /// finger movement only applies the DELTA each frame — the piece tracks
     /// relative to where it started (centred), never jumping to the finger.
     @State private var dragAppliedCols = 0
-    /// Bumped on every hard-drop/lock so a stale slow-fall loop from an
-    /// earlier piece can recognise it's obsolete and stop.
-    @State private var fallGen = 0
     /// The column span of a just-triggered hard drop, for the motion streak.
     private struct DropStreak: Equatable { var lo: Int; var hi: Int; var gen: Int }
     @State private var dropStreak: DropStreak? = nil
@@ -59,15 +56,13 @@ struct SandFallView: View {
                 board(w: geo.size.width, h: geo.size.height)
             }
 
-            Text(model.phase == .over ? "Sand piled up — resetting…" : "Drag to aim · tap to rotate · swipe down to drop")
+            Text(model.phase == .over ? "Sand piled up — resetting…" : "Slide to aim · tap to rotate · swipe down to drop")
                 .font(.system(size: 11, weight: .heavy))
                 .foregroundStyle(model.phase == .over ? Color.orange : Color.secondary)
                 .lineLimit(1).minimumScaleFactor(0.7)
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { startSlowFall() }
-        .onChange(of: model.spawnTick) { _, _ in startSlowFall() }
         .onChange(of: model.lockTick) { _, _ in settleLoop() }
         .onChange(of: model.overTick) { _, _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { model.resetRun() }
@@ -103,38 +98,15 @@ struct SandFallView: View {
         }
     }
 
-    // MARK: continuous slow fall
-
-    /// Kicked off the moment a piece spawns (and restarted after a hard drop
-    /// locks in, when the next piece's `spawnTick` fires) — steps continue
-    /// back-to-back with NO gap between them (each one is scheduled to fire
-    /// exactly when the previous step's animation finishes), which is what
-    /// reads as one smooth continuous descent instead of a jump-pause-jump.
-    private func startSlowFall() {
-        fallGen += 1
-        scheduleSlowFallStep(gen: fallGen, delay: 0.32)
-    }
-
-    private func scheduleSlowFallStep(gen: Int, delay: Double) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            guard gen == fallGen, model.phase == .play, !model.activeCells.isEmpty else { return }
-            let stepDuration = 0.26
-            withAnimation(.linear(duration: stepDuration)) { _ = model.stepDown() }
-            scheduleSlowFallStep(gen: gen, delay: stepDuration)
-        }
-    }
-
     // MARK: board
 
     private func board(w: CGFloat, h: CGFloat) -> some View {
         // Separate width/height per cell — fills the space exactly (no dead
         // margin on the shorter axis the way a single square cell size would).
-        // An extra reserved row's worth of height at the top is the "spawn
-        // band" — a dashed starting line, with new pieces entering from
-        // above it and a tiny preview of the next one parked in the corner.
+        // A reserved band at the top holds the dashed "ceiling" line and a
+        // small preview of the next piece, parked hard in the corner. The
+        // active piece sits just BELOW the line, so the two never overlap.
         let cellW = w / CGFloat(model.cols)
-        // ~2.5 rows reserved at the top for the spawn band, so the dashed
-        // line sits a little lower and a whole piece fits above it.
         let cellH = h / (CGFloat(model.rows) + 2.5)
         let bandH = h - CGFloat(model.rows) * cellH
         func y(_ row: Int) -> CGFloat { bandH + CGFloat(row) * cellH + cellH / 2 }
@@ -181,9 +153,9 @@ struct SandFallView: View {
                     .id(streak.gen)
             }
 
-            let previewBox = min(bandH * 0.78, cellW * 3.2)
+            let previewBox = min(bandH * 0.62, cellW * 2.4)
             nextPreview(box: previewBox)
-                .position(x: w - previewBox / 2 - 10, y: bandH * 0.5)
+                .position(x: w - previewBox / 2 - 8, y: bandH * 0.46)
         }
         .frame(width: w, height: h)
         .contentShape(Rectangle())
@@ -240,8 +212,9 @@ struct SandFallView: View {
             .onEnded { v in
                 let dx = v.translation.width, dy = v.translation.height
                 dragAppliedCols = 0
+                // A downward swipe drops the piece; anything else just leaves
+                // it parked where the slide left it.
                 if dy > 40, abs(dy) > abs(dx) * 1.2 {
-                    fallGen += 1
                     let cols = model.activeCells.map(\.col)
                     if let lo = cols.min(), let hi = cols.max() {
                         dropStreakGen += 1
@@ -252,8 +225,6 @@ struct SandFallView: View {
                     }
                     withAnimation(.easeIn(duration: 0.07)) { model.hardDrop() }
                 }
-                // Otherwise: nothing to do — the continuous slow fall is
-                // already running independently of this gesture.
             }
     }
 

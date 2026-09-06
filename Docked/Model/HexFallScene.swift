@@ -328,30 +328,31 @@ final class HexFallScene: SKScene {
         bricks.removeValue(forKey: id)
     }
 
-    /// A brick stays put only if it's near the generation frontier OR at least
-    /// HALF of the columns it occupies still have a supported brick directly
-    /// beneath their lowest cell. Pull a block out from under the middle of a
-    /// wide piece and it can no longer cantilever — it drops, and whatever it
-    /// was holding drops with it. That's what makes removal ORDER matter.
+    /// A brick stays put only if it's near the generation frontier OR the
+    /// column(s) under its CENTRE of mass still have a supported brick
+    /// directly beneath. Knock a block out from anywhere near the middle of
+    /// what a piece rests on and it can no longer balance — it drops, taking
+    /// whatever it was holding (and jostling the hexagon) with it. Every
+    /// brick is a potential keystone, so removal order is the whole game.
     private func dropUnsupported() {
         var supported = Set<Int>()
         var changed = true
         while changed {
             changed = false
             for (id, brick) in bricks where !supported.contains(id) {
-                // lowest cell in each column this brick spans
-                var lowestByCol: [Int: Int] = [:]
-                for cell in brick.cells {
-                    lowestByCol[cell.col] = max(lowestByCol[cell.col] ?? cell.row, cell.row)
-                }
-                let need = (lowestByCol.count + 1) / 2        // ceil(cols / 2)
-                var have = 0
+                let cs = brick.cells.map(\.col)
+                let centre = Double((cs.min() ?? 0) + (cs.max() ?? 0)) / 2
+                let centreCols = Set([Int(centre.rounded(.down)), Int(centre.rounded(.up))])
                 var atFrontier = false
-                for (col, row) in lowestByCol {
-                    if row >= deepestRow - 1 { atFrontier = true; break }
-                    if let below = occ[(row + 1) * 100 + col], supported.contains(below) { have += 1 }
+                var propped = false
+                for col in centreCols {
+                    // lowest cell this brick has in that centre column
+                    guard let botRow = brick.cells.filter({ $0.col == col }).map(\.row).max()
+                    else { continue }
+                    if botRow >= deepestRow - 1 { atFrontier = true; break }
+                    if let below = occ[(botRow + 1) * 100 + col], supported.contains(below) { propped = true }
                 }
-                if atFrontier || have >= need {
+                if atFrontier || propped {
                     supported.insert(id); changed = true
                 }
             }
@@ -360,8 +361,12 @@ final class HexFallScene: SKScene {
         for id in falling {
             guard let brick = bricks[id] else { continue }
             for cell in brick.cells { occ.removeValue(forKey: cell.row * 100 + cell.col) }
-            brick.node.physicsBody?.isDynamic = true
-            brick.node.physicsBody?.affectedByGravity = true
+            let body = brick.node.physicsBody
+            body?.isDynamic = true
+            body?.affectedByGravity = true
+            // a tumble + sideways nudge so it actually knocks things about
+            body?.angularVelocity = CGFloat.random(in: -2.6...2.6)
+            body?.velocity = CGVector(dx: CGFloat.random(in: -10...10), dy: 0)
             brick.node.name = "debris"
             debris.append(brick.node)
             bricks.removeValue(forKey: id)
@@ -378,8 +383,10 @@ final class HexFallScene: SKScene {
         cam.position.y = min(cam.position.y, smoothed)
 
         if losing {
+            // Reset as soon as the hexagon clears the bottom of the tower —
+            // no long plummet past the last brick.
             let lowest = bricks.values.map { worldY($0) }.min() ?? firstRowY
-            if hex.position.y < lowest - size.height * 0.6 || currentTime - loseClock > 3.5 {
+            if hex.position.y < lowest - size.height * 0.14 || currentTime - loseClock > 1.8 {
                 isOver = true
                 physicsWorld.speed = 0
                 onGameOver?()

@@ -90,7 +90,7 @@ final class AppModel {
 
     init() {
         let d = UserDefaults.standard
-        tvTheme = TVTheme(rawValue: d.string(forKey: K.tvTheme) ?? "") ?? .walnut
+        tvTheme = TVTheme(rawValue: d.string(forKey: K.tvTheme) ?? "") ?? .charcoal
         tvBadge = (d.object(forKey: K.tvBadge) as? Bool) ?? false
         tvStretch = CGFloat(d.double(forKey: K.tvStretch))   // 0 when unset
         favorites = (d.array(forKey: K.favorites) as? [String] ?? []).compactMap(ActivityModule.init(rawValue:))

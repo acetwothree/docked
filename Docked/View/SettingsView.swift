@@ -120,12 +120,16 @@ struct SettingsView: View {
                                 }
                                 divider
                                 VStack(spacing: 0) {
+                                    // Debug builds only — a free Plus bypass must never
+                                    // ship where a curious user could reach it.
+                                    #if DEBUG
                                     row(icon: "lock.open.fill", "Unlock Plus (testing)") {
                                         Toggle("", isOn: Binding(
                                             get: { store.devUnlock },
                                             set: { store.devUnlock = $0 })).labelsHidden()
                                     }
                                     divider
+                                    #endif
                                     row(icon: "tv", "Force \"Free iOS App\" on the TV (for ads)") {
                                         Toggle("", isOn: $app.tvBadge).labelsHidden()
                                     }

@@ -2,9 +2,10 @@
 //  BlockTowerView.swift
 //  Docked
 //
-//  SwiftUI shell around `BlockTowerScene`. Drag anywhere to slide the
-//  hovering piece; lift your finger to drop it. Real physics decides whether
-//  the stack holds.
+//  SwiftUI shell around `BlockTowerScene`. The hovering piece starts centred;
+//  drag to slide it by however far your finger moves, lift to drop. The NEXT
+//  piece is drawn small in the header, well clear of the play area. Real
+//  physics decides whether the stack holds.
 //
 
 import SwiftUI
@@ -19,6 +20,7 @@ struct BlockTowerView: View {
     @State private var landTick = 0
     @State private var lockTick = 0
     @State private var overTick = 0
+    @State private var nextShape: TetrominoShape = .o
     /// x the hovering piece sat at when the current drag began — the drag
     /// moves it relative to this, so it never teleports to the finger.
     @State private var dragAnchorX: CGFloat? = nil
@@ -33,6 +35,8 @@ struct BlockTowerView: View {
                 stat("HEIGHT", score)
                 Spacer()
                 stat("BEST", max(best, score))
+                Spacer()
+                nextPreview(nextShape)
                 Spacer()
                 Button { scene.reset() } label: {
                     Image(systemName: "arrow.counterclockwise")
@@ -70,6 +74,7 @@ struct BlockTowerView: View {
             scene.onScoreChange = { score = $0 }
             scene.onLand = { landTick += 1 }
             scene.onLock = { lockTick += 1 }
+            scene.onNextShapeChange = { nextShape = $0 }
             scene.onGameOver = {
                 if score > best {
                     best = score
@@ -103,5 +108,27 @@ struct BlockTowerView: View {
             Text(label).font(.system(size: 9, weight: .heavy)).tracking(1).foregroundStyle(.secondary)
             Text("\(v)").font(.system(size: 18, weight: .black)).monospacedDigit()
         }
+    }
+
+    /// The next piece, drawn small in the header so it's unmistakably a
+    /// preview and never overlaps the play area.
+    private func nextPreview(_ shape: TetrominoShape) -> some View {
+        let cells = shape.cells
+        let u: CGFloat = 6
+        let gap: CGFloat = 1
+        return VStack(spacing: 2) {
+            Text("NEXT").font(.system(size: 7, weight: .heavy)).tracking(1).foregroundStyle(.tertiary)
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(cells.enumerated()), id: \.offset) { _, rc in
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(Color(hex: "F2B90C"))
+                        .frame(width: u, height: u)
+                        .offset(x: CGFloat(rc.col) * (u + gap), y: CGFloat(rc.row) * (u + gap))
+                }
+            }
+            .frame(width: CGFloat(shape.colSpan) * (u + gap),
+                   height: CGFloat(shape.rowSpan) * (u + gap), alignment: .topLeading)
+        }
+        .frame(width: 42, height: 34)
     }
 }

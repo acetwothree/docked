@@ -20,8 +20,9 @@ import SpriteKit
 final class BlockTowerScene: SKScene {
     var onScoreChange: ((Int) -> Void)?
     var onGameOver: (() -> Void)?
-    var onLand: (() -> Void)?       // fired the instant a piece is dropped
-    var onLock: (() -> Void)?       // fired when a piece freezes into place
+    var onLand: (() -> Void)?                     // fired the instant a piece is dropped
+    var onLock: (() -> Void)?                     // fired when a piece freezes into place
+    var onNextShapeChange: ((TetrominoShape) -> Void)?   // the SwiftUI header draws the preview
 
     private(set) var score = 0
     private(set) var isOver = false
@@ -30,7 +31,6 @@ final class BlockTowerScene: SKScene {
     private var placed: [SKNode] = []
     private var floorTopY: CGFloat = 0
     private var cam: SKCameraNode!
-    private var previewNode: SKNode?
     private var nextShape: TetrominoShape = .o
 
     private var camTargetY: CGFloat = 0
@@ -38,6 +38,16 @@ final class BlockTowerScene: SKScene {
     private var settledFrames = 0
     private var awaitSince: TimeInterval = 0
     private var lastPieceY: CGFloat = .greatestFiniteMagnitude
+    private var spawnPending = false
+
+    /// Draw pool: the seven classic tetrominoes plus the oddballs at ~2×
+    /// weight, so the weird shapes are what you mostly get.
+    private static let spawnBag: [TetrominoShape] = {
+        let classic: [TetrominoShape] = [.i, .o, .t, .s, .z, .j, .l]
+        let odd: [TetrominoShape] = [.plus, .cup, .bigL, .stairs, .corner, .bar3, .hammer,
+                                     .pyramid, .zag, .chair, .notch]
+        return classic + odd + odd
+    }()
 
     private var milestoneDone = 0
     private var lastMarker = 0
@@ -69,8 +79,7 @@ final class BlockTowerScene: SKScene {
         guard cam != nil, size.width > 10, size.height > 10 else { return }
         removeAllChildren()
         addChild(cam)
-        cam.removeAllChildren()          // preview/flash nodes live on the camera — clear them too
-        previewNode = nil
+        cam.removeAllChildren()          // leftover flash nodes live on the camera
         placed = []
         markers = []
         current = nil
@@ -79,6 +88,7 @@ final class BlockTowerScene: SKScene {
         awaitingSettle = false
         settledFrames = 0
         awaitSince = 0
+        spawnPending = false
         milestoneDone = 0
         lastMarker = 0
         physicsWorld.speed = 1
@@ -87,9 +97,8 @@ final class BlockTowerScene: SKScene {
         camTargetY = size.height / 2
 
         buildGround()
-        buildPreview()
-        nextShape = TetrominoShape.allCases.randomElement()!
-        refreshPreview()
+        nextShape = Self.spawnBag.randomElement()!
+        onNextShapeChange?(nextShape)
         spawnPiece()
     }
 
@@ -190,62 +199,6 @@ final class BlockTowerScene: SKScene {
         }
     }
 
-    // MARK: preview
-
-    /// A little "NEXT" bubble pinned near the top-right of the viewport,
-    /// visibly separate from the play area so it never reads as a piece
-    /// that's actually in the game.
-    private func buildPreview() {
-        let node = SKNode()
-        node.zPosition = 400
-
-        let box = cellSize() * 3.4
-        let bubble = SKShapeNode(rectOf: CGSize(width: box, height: box), cornerRadius: box * 0.24)
-        bubble.fillColor = SKColor(red: 0.10, green: 0.12, blue: 0.17, alpha: 0.85)
-        bubble.strokeColor = SKColor.white.withAlphaComponent(0.28)
-        bubble.lineWidth = 1.5
-        bubble.name = "bubble"
-        node.addChild(bubble)
-
-        let tag = SKLabelNode(text: "NEXT")
-        tag.fontName = "AvenirNext-Bold"
-        tag.fontSize = cellSize() * 0.46
-        tag.fontColor = SKColor.white.withAlphaComponent(0.55)
-        tag.verticalAlignmentMode = .center
-        tag.position = CGPoint(x: 0, y: box * 0.32)
-        node.addChild(tag)
-
-        let holder = SKNode()
-        holder.name = "cells"
-        holder.position = CGPoint(x: 0, y: -box * 0.08)
-        node.addChild(holder)
-
-        cam.addChild(node)
-        // High and clear of the tower: near the top edge, tucked to the right.
-        node.position = CGPoint(x: size.width / 2 - box * 0.75,
-                                y: size.height / 2 - box * 0.85)
-        previewNode = node
-    }
-
-    private func refreshPreview() {
-        guard let node = previewNode,
-              let holder = node.childNode(withName: "cells") else { return }
-        holder.removeAllChildren()
-        let cell = cellSize() * 0.4
-        let cells = nextShape.cells
-        let rows = nextShape.rowSpan, cols = nextShape.colSpan
-        let ox = -CGFloat(cols) * cell / 2
-        let oy = CGFloat(rows) * cell / 2
-        for (r, c) in cells {
-            let sq = SKShapeNode(rectOf: CGSize(width: cell - 1, height: cell - 1), cornerRadius: 2)
-            sq.fillColor = TetrominoBuilder.palette[(score + 1) % TetrominoBuilder.palette.count]
-            sq.strokeColor = SKColor.white.withAlphaComponent(0.3)
-            sq.position = CGPoint(x: ox + CGFloat(c) * cell + cell / 2,
-                                  y: oy - CGFloat(r) * cell - cell / 2)
-            holder.addChild(sq)
-        }
-    }
-
     // MARK: pieces
 
     private func currentStackTopY() -> CGFloat {
@@ -254,10 +207,11 @@ final class BlockTowerScene: SKScene {
 
     private func spawnPiece() {
         guard !isOver else { return }
+        spawnPending = false
         let cell = cellSize()
         let shape = nextShape
-        nextShape = TetrominoShape.allCases.randomElement()!
-        refreshPreview()
+        nextShape = Self.spawnBag.randomElement()!
+        onNextShapeChange?(nextShape)
 
         let color = TetrominoBuilder.palette[score % TetrominoBuilder.palette.count]
         let node = TetrominoBuilder.makeNode(shape: shape, cell: cell, color: color)
@@ -305,16 +259,42 @@ final class BlockTowerScene: SKScene {
         guard !isOver, cam != nil else { return }
         cullMarkers()
 
+        // Safety net: if we somehow have no hovering piece and nothing is
+        // settling or queued, the run has stalled — get a piece back on screen.
+        if current == nil, !awaitingSettle, !spawnPending {
+            spawnPiece()
+        }
+
         if awaitingSettle, let piece = placed.last {
             if awaitSince == 0 { awaitSince = currentTime }
             let elapsed = currentTime - awaitSince
             let f = piece.calculateAccumulatedFrame()
 
-            // Fell clear off the side or back down to the ground → loss.
+            // Off the side or slid back down onto the base ledge → loss, but
+            // only once there's a real tower to lose (the first couple of
+            // pieces legitimately sit at ground level).
             let offSide = f.maxX < 4 || f.minX > size.width - 4
             let onGround = f.minY < floorTopY + 4
             if placed.count > 2, offSide || onGround {
                 endRun()
+                return
+            }
+
+            // Fell clear PAST the tower into the water — this piece is never
+            // settling. End the run if we have a tower; otherwise quietly
+            // swap in a fresh piece so the game can't freeze waiting on it.
+            let lost = f.maxY < floorTopY - size.height * 0.5
+                || f.minY < cam.position.y - size.height * 1.6
+            if lost {
+                if placed.count > 2 { endRun(); return }
+                piece.removeFromParent()
+                if !placed.isEmpty { placed.removeLast() }
+                score = max(0, score - 1)
+                onScoreChange?(score)
+                awaitingSettle = false
+                settledFrames = 0
+                awaitSince = 0
+                spawnPiece()
                 return
             }
 
@@ -346,6 +326,7 @@ final class BlockTowerScene: SKScene {
                 awaitingSettle = false
                 settledFrames = 0
                 awaitSince = 0
+                spawnPending = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { [weak self] in
                     guard let self, !self.isOver, self.current == nil else { return }
                     self.spawnPiece()
