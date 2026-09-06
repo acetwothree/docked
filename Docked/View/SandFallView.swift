@@ -41,6 +41,8 @@ struct SandFallView: View {
             HStack {
                 stat("SCORE", model.score)
                 Spacer()
+                nextChip()
+                Spacer()
                 stat("BEST", max(model.best, model.score))
                 Spacer()
                 Button { model.resetRun() } label: {
@@ -56,10 +58,17 @@ struct SandFallView: View {
                 board(w: geo.size.width, h: geo.size.height)
             }
 
-            Text(model.phase == .over ? "Sand piled up — resetting…" : "Slide to aim · tap to rotate · swipe down to drop")
-                .font(.system(size: 11, weight: .heavy))
-                .foregroundStyle(model.phase == .over ? Color.orange : Color.secondary)
-                .lineLimit(1).minimumScaleFactor(0.7)
+            VStack(spacing: 3) {
+                Text(model.phase == .over
+                     ? "Board full — resetting…"
+                     : "Connect one colour from the left wall to the right wall")
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundStyle(model.phase == .over ? Color.orange : Color.primary)
+                Text("Slide · tap to rotate · swipe down to drop")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1).minimumScaleFactor(0.65)
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -152,10 +161,6 @@ struct SandFallView: View {
                     .transition(.opacity)
                     .id(streak.gen)
             }
-
-            let previewBox = min(bandH * 0.62, cellW * 2.4)
-            nextPreview(box: previewBox)
-                .position(x: w - previewBox / 2 - 8, y: bandH * 0.46)
         }
         .frame(width: w, height: h)
         .contentShape(Rectangle())
@@ -172,27 +177,29 @@ struct SandFallView: View {
         }
     }
 
-    /// A tiny rendering of the next piece in its own colour — no frame around
-    /// it, and centred on its actual bounding box so it sits dead centre
-    /// whatever shape it is.
-    private func nextPreview(box: CGFloat) -> some View {
+    /// The next piece, drawn small in the header (beside SCORE) so it's clearly
+    /// a preview and never sits over the play area.
+    private func nextChip() -> some View {
         let cells = model.nextShape
         let rs = cells.map(\.row), cs = cells.map(\.col)
         let minR = rs.min() ?? 0, maxR = rs.max() ?? 0
         let minC = cs.min() ?? 0, maxC = cs.max() ?? 0
-        let spanC = CGFloat(maxC - minC + 1), spanR = CGFloat(maxR - minR + 1)
-        let unit = box / max(spanC, spanR)
-        let pieceW = spanC * unit, pieceH = spanR * unit
-        return ZStack {
-            ForEach(Array(cells.enumerated()), id: \.offset) { _, c in
-                RoundedRectangle(cornerRadius: max(1, unit * 0.16), style: .continuous)
-                    .fill(model.nextColor)
-                    .frame(width: max(1, unit - 1.5), height: max(1, unit - 1.5))
-                    .position(x: (CGFloat(c.col - minC) + 0.5) * unit,
-                              y: (CGFloat(c.row - minR) + 0.5) * unit)
+        let u: CGFloat = 6, gap: CGFloat = 1
+        return VStack(spacing: 2) {
+            Text("NEXT").font(.system(size: 7, weight: .heavy)).tracking(1).foregroundStyle(.tertiary)
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(cells.enumerated()), id: \.offset) { _, c in
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(model.nextColor)
+                        .frame(width: u, height: u)
+                        .offset(x: CGFloat(c.col - minC) * (u + gap),
+                                y: CGFloat(c.row - minR) * (u + gap))
+                }
             }
+            .frame(width: CGFloat(maxC - minC + 1) * (u + gap),
+                   height: CGFloat(maxR - minR + 1) * (u + gap), alignment: .topLeading)
         }
-        .frame(width: pieceW, height: pieceH)
+        .frame(width: 46, height: 34)
     }
 
     /// Relative slide: the piece starts centred and moves by whatever whole

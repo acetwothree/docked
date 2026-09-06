@@ -61,7 +61,11 @@ struct RootView: View {
                                consoleRect: s.consoleInFrame,
                                dimHint: hintDim,
                                palette: app.tvTheme.palette,
-                               consoleLabel: consoleLabel)
+                               consoleLabel: consoleLabel,
+                               onHelp: {
+                                   Analytics.shared.track(.pipHelpOpened)
+                                   withAnimation(.easeInOut(duration: 0.3)) { showOnboarding = true }
+                               })
                     .frame(width: s.video.width, height: s.video.height)
                     .position(x: s.video.midX, y: s.video.midY)
 

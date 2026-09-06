@@ -22,6 +22,9 @@ struct VideoFrameView: View {
     /// Engraved console text — the open game's name, or the app's own name
     /// when nothing's open (or when forced on for ad recordings).
     var consoleLabel: String = "DOCKED · FREE iOS APP"
+    /// Tapped from inside the screen when someone has no idea what this app is
+    /// — RootView re-opens the walkthrough.
+    var onHelp: (() -> Void)? = nil
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -33,8 +36,25 @@ struct VideoFrameView: View {
                 .opacity(dimHint ? 0.34 : 1)
                 .animation(.easeInOut(duration: 0.6), value: dimHint)
                 .allowsHitTesting(false)
+
+            if let onHelp {
+                Button(action: onHelp) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "questionmark.circle.fill").font(.system(size: 10, weight: .bold))
+                        Text("New here? How Docked works").font(.system(size: 9, weight: .heavy))
+                    }
+                    .padding(.horizontal, 9).padding(.vertical, 4)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay(Capsule().stroke(Theme.accent.opacity(0.5), lineWidth: 1))
+                    .foregroundStyle(Theme.accent)
+                }
+                .buttonStyle(.plain)
+                .position(x: hole.midX, y: hole.maxY - 16)
+                .opacity(dimHint ? 0.55 : 1)
+                .animation(.easeInOut(duration: 0.6), value: dimHint)
+            }
         }
-        .accessibilityElement()
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("Video drop zone")
     }
 

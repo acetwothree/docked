@@ -120,20 +120,22 @@ final class SandFallModel {
         lastColor = activeColor
         rollNext()
 
-        let minRow = template.map(\.row).min() ?? 0
+        let maxRow = template.map(\.row).max() ?? 0
         let minCol = template.map(\.col).min() ?? 0
         let maxCol = template.map(\.col).max() ?? 0
         let width = maxCol - minCol + 1
-        // No gravity: the piece just appears at the very top of the playfield
-        // (top row = row 0) and waits there for the player to slide it and
-        // swipe down. Nothing crosses the dashed line any more.
-        let shiftRow = -minRow
+        // No gravity: the piece appears ABOVE the dashed line (its lowest cell
+        // at row -1) and just waits there. The player slides it, rotates it,
+        // then swipes down to drop it.
+        let shiftRow = -1 - maxRow
         let shiftCol = (cols - width) / 2 - minCol
         activeCells = template.map { (row: $0.row + shiftRow, col: $0.col + shiftCol) }
 
-        // Over if the pile has already filled the top row where this piece
-        // needs to sit.
-        if !canPlace(activeCells) {
+        // Over only when the board is genuinely full — a grain sitting in the
+        // top row of every column (grains settle downward, so that means every
+        // column is packed to the ceiling).
+        let occ = occupiedSet()
+        if (0..<cols).allSatisfy({ occ.contains($0) }) {
             activeCells = []
             phase = .over
             overTick += 1
@@ -207,10 +209,13 @@ final class SandFallModel {
         if canPlace(moved) {
             activeCells = moved
             return true
-        } else {
-            lock()
-            return false
         }
+        // Blocked while the whole piece is still above the board (the column
+        // it was aimed at is packed to the top) — don't lock it into nothing,
+        // just leave it parked so the player can slide somewhere with room.
+        if activeCells.allSatisfy({ $0.row < 0 }) { return false }
+        lock()
+        return false
     }
 
     func hardDrop() {
