@@ -82,6 +82,7 @@ struct RootView: View {
                             app.hasOnboarded = true
                             showOnboarding = false
                         }
+                        Analytics.shared.track(.onboardingCompleted)
                     }
                     .zIndex(20)
                 }
@@ -120,16 +121,28 @@ struct RootView: View {
             hintDim = true
         }
         .task { await store.start() }
-        .onAppear { showOnboarding = !app.hasOnboarded }
+        .onAppear {
+            showOnboarding = !app.hasOnboarded
+            Analytics.shared.sessionBegan()
+            if showOnboarding { Analytics.shared.track(.onboardingShown) }
+        }
         .onChange(of: app.hasOnboarded) { _, done in
             // "Replay onboarding" from Settings flips this while RootView is
             // already on screen, so react to it here (not just in onAppear).
             if !done { showOnboarding = true }
         }
-        .onChange(of: scenePhase) { _, phase in
-            if phase != .active { doodle.saveNow() }
+        .onChange(of: scenePhase) { old, phase in
+            if phase != .active {
+                doodle.saveNow()
+                Analytics.shared.track(.appBackground)
+                Analytics.shared.sessionEnded()
+            }
             if phase == .active {
                 Task { await store.refreshEntitlements() }
+                if old != .active {
+                    Analytics.shared.track(.appForeground)
+                    Analytics.shared.sessionBegan()
+                }
             }
         }
     }
@@ -183,6 +196,7 @@ struct RootView: View {
                 .onEnded { _ in
                     stretchStart = nil
                     withAnimation(.easeOut(duration: 0.2)) { stretching = false }
+                    Analytics.shared.track(.tvStretched, ["amount": Int(app.tvStretch)])
                 }
         )
         .accessibilityLabel("Drag to stretch the TV screen to fit your video")
@@ -201,6 +215,7 @@ struct RootView: View {
             // it reads as "press this" on its own — no separate hint needed.
             TVKnob(icon: "chevron.left", palette: pal, enabled: openModule != nil, highlight: openModule != nil) {
                 endEditing()
+                if let m = openModule { Analytics.shared.gameClosed(m.rawValue) }
                 withAnimation(.snappy(duration: 0.22)) { openModule = nil }
             }
             .position(knobs.back)
@@ -208,10 +223,12 @@ struct RootView: View {
             TVKnob(icon: "paintpalette.fill", palette: pal) {
                 if store.entitled {
                     withAnimation(.easeInOut(duration: 0.25)) { app.tvTheme = app.tvTheme.next }
+                    Analytics.shared.track(.tvThemeChanged, ["theme": "\(app.tvTheme)"])
                 } else {
                     endEditing()
                     plusContext = "This knob switches the TV between colour themes."
                     showPlus = true
+                    Analytics.shared.track(.paywallShown, ["from": "themeKnob"])
                 }
             }
             .position(knobs.theme)
@@ -229,15 +246,21 @@ struct RootView: View {
     @ViewBuilder
     private func contentHost(solved s: SolvedLayout) -> some View {
         ZStack {
-            // The grid stays mounted underneath an open game — that's what
-            // keeps its scroll position, so leaving a game drops you back
-            // exactly where you were in the list rather than at the top.
+            // The grid stays mounted underneath an open game (keeps its scroll
+            // position) but is hidden while a game is up — that way closing a
+            // game reveals it instantly instead of cross-fading past a frame
+            // of the game still sitting behind it.
             GameGridView(
                 hasPlus: store.entitled,
                 favorites: app.favorites,
                 onPick: pick,
-                onToggleFav: { app.toggleFavorite($0) }
+                onToggleFav: {
+                    let wasFav = app.favorites.contains($0)
+                    app.toggleFavorite($0)
+                    Analytics.shared.track(wasFav ? .favoriteRemoved : .favoriteAdded, ["game": $0.rawValue])
+                }
             )
+            .opacity(openModule == nil ? 1 : 0)
 
             if let mod = openModule {
                 Group {
@@ -250,9 +273,10 @@ struct RootView: View {
                     }
                 }
                 .background(Theme.backdrop)
-                .transition(.opacity)
             }
         }
+        // Swap grid <-> game instantly; no cross-fade past a stale frame.
+        .animation(nil, value: openModule)
     }
 
     private func pick(_ picked: ActivityModule) {
@@ -260,10 +284,12 @@ struct RootView: View {
             plusContext = "\(picked.title) — \(picked.blurb)"
             pendingModuleAfterPlus = picked
             showPlus = true
+            Analytics.shared.track(.paywallShown, ["from": picked.rawValue])
         } else {
             endEditing()
             app.module = picked
             withAnimation(.snappy(duration: 0.24)) { openModule = picked }
+            Analytics.shared.gameOpened(picked.rawValue)
         }
     }
 

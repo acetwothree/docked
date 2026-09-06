@@ -238,13 +238,13 @@ final class SandFallModel {
             let leftCol = g.col - 1, rightCol = g.col + 1
             let canLeft = leftCol >= 0 && !occ.contains((g.row + 1) * cols + leftCol)
             let canRight = rightCol < cols && !occ.contains((g.row + 1) * cols + rightCol)
-            guard canLeft || canRight else { continue }
-            // Deterministic tie-break (was a coin flip) — same board, same
-            // spread, every time, so where a pile ends up reads as
-            // predictable instead of a new shuffle on every drop.
-            let goLeft = canLeft && (!canRight || (g.row + g.col).isMultiple(of: 2))
+            // Only slide diagonally down a REAL one-sided slope. If both
+            // diagonals are open the grain just stays put and piles up —
+            // that's what stops a straight drop from fanning out into both
+            // corners.
+            guard canLeft != canRight else { continue }
             occ.remove(g.row * cols + g.col)
-            grains[i].col = goLeft ? leftCol : rightCol
+            grains[i].col = canLeft ? leftCol : rightCol
             grains[i].row += 1
             occ.insert(grains[i].row * cols + grains[i].col)
             moved = true

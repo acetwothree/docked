@@ -19,6 +19,7 @@ struct SettingsView: View {
 
     @State private var confirmWipe = false
     @State private var showDev = false
+    @State private var showAnalytics = false
 
     // The developer tools stay hidden in normal use — tap the version number
     // seven times to reveal them. The flag sticks so it's a one-time reveal.
@@ -133,6 +134,8 @@ struct SettingsView: View {
                                         Toggle("", isOn: $app.debugOverlay).labelsHidden()
                                     }
                                     divider
+                                    devButton("Analytics", "chart.bar.xaxis") { showAnalytics = true }
+                                    divider
                                     devButton("Hide developer tools", "eye.slash") {
                                         devToolsUnlocked = false
                                         versionTaps = 0
@@ -175,6 +178,7 @@ struct SettingsView: View {
             } message: {
                 Text("Notes, doodle, scores and preferences reset, and onboarding shows again.")
             }
+            .sheet(isPresented: $showAnalytics) { AnalyticsDebugView() }
         }
     }
 
@@ -219,5 +223,43 @@ struct SettingsView: View {
                 .foregroundStyle(destructive ? Color.red : Color.primary)
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Read-only dump of everything Analytics has collected on-device, plus a
+/// full JSON export you can share out.
+private struct AnalyticsDebugView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = Analytics.shared.snapshot()
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                Text(text)
+                    .font(.system(size: 11, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+                    .padding(14)
+            }
+            .background(Theme.backdrop.ignoresSafeArea())
+            .navigationTitle("Analytics")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Reset", role: .destructive) {
+                        Analytics.shared.reset()
+                        text = Analytics.shared.snapshot()
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    ShareLink(item: Analytics.shared.exportJSON()) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }

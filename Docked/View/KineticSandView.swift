@@ -51,7 +51,7 @@ struct KineticSandView: View {
             Button {
                 smoothOver()
             } label: {
-                Label("Smooth", systemImage: "wind")
+                Label("Clear", systemImage: "wind")
                     .font(.system(size: 12, weight: .heavy))
                     .padding(.horizontal, 12).padding(.vertical, 8)
                     .background(.ultraThinMaterial, in: Capsule())

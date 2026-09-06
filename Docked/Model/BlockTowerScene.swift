@@ -2,20 +2,20 @@
 //  BlockTowerScene.swift
 //  Docked
 //
-//  "Block Tower" — a real tetromino piece hovers high above the top of the
-//  tower you're building; drag to slide it (two faint vertical guide lines
-//  show where it'll come down), lift to drop it. Real SpriteKit physics —
-//  slow and very forgiving — decides whether the stack holds.
+//  "Block Tower" — a tetromino hovers well above the top of the tower; drag
+//  to slide it (a faint vertical guide line on EACH side shows where it comes
+//  down), lift to drop. Real SpriteKit physics decides the fall, but the
+//  moment a piece lands and stops it FREEZES solid — the built tower can
+//  never topple afterwards, only the piece currently in the air can still go
+//  wrong. Very forgiving, tuned for "satisfying to stack".
 //
-//  There's a visible stone platform on a pedestal in the water near the
-//  bottom: that's "the ground". The first couple of pieces get a free pass
-//  while the base forms; after that, a run ends only when a piece actually
-//  falls back down and touches that platform. A wobble that resettles up
-//  the pile is fine.
+//  A stone platform on a pedestal in the water is "the ground". After the
+//  first couple of pieces, a run ends only when a piece actually falls all
+//  the way back down and touches that platform.
 //
-//  The camera does NOT move while a piece is falling — it only eases up a
-//  little once the piece has landed and come to rest, and it keeps a good
-//  stretch of the tower below the top piece in view. It only ever rises.
+//  The camera holds completely still while a piece falls; once it has
+//  settled the view eases up so the next piece drops from high with a real
+//  gap, and still shows a good stretch of tower below the top.
 //
 
 import SpriteKit
@@ -36,19 +36,17 @@ final class BlockTowerScene: SKScene {
     private var cam: SKCameraNode!
 
     private var camTargetY: CGFloat = 0
-    /// True from the moment a piece is dropped until it has settled — the
-    /// camera target is frozen for that whole span.
     private var awaitingSettle = false
     private var settledFrames = 0
+    private var awaitSince: TimeInterval = 0
 
-    /// How high above the tower top a fresh piece hovers — small enough that
-    /// the whole piece stays on screen.
-    private var hoverGap: CGFloat { size.height * 0.14 }
+    /// Big gap between the tower top and where a fresh piece hovers.
+    private var hoverGap: CGFloat { size.height * 0.30 }
 
     override func didMove(to view: SKView) {
         backgroundColor = .clear
         scaleMode = .resizeFill
-        physicsWorld.gravity = CGVector(dx: 0, dy: -4.2)   // slow + forgiving
+        physicsWorld.gravity = CGVector(dx: 0, dy: -3.4)   // gentle
         let camera = SKCameraNode()
         self.camera = camera
         cam = camera
@@ -67,13 +65,14 @@ final class BlockTowerScene: SKScene {
     func reset() {
         guard cam != nil, size.width > 10, size.height > 10 else { return }
         removeAllChildren()
-        addChild(cam)                       // removeAllChildren took the camera too
+        addChild(cam)
         placed = []
         current = nil
         score = 0
         isOver = false
         awaitingSettle = false
         settledFrames = 0
+        awaitSince = 0
         physicsWorld.speed = 1
         onScoreChange?(0)
         cam.position = CGPoint(x: size.width / 2, y: size.height / 2)
@@ -114,8 +113,6 @@ final class BlockTowerScene: SKScene {
         platform.lineWidth = 1
         platform.position = CGPoint(x: size.width / 2, y: floorTopY - platH / 2)
         platform.zPosition = 1
-        // Collider matches the VISIBLE ledge — a block that misses it drops
-        // past into the water instead of landing on thin air.
         platform.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: platW, height: platH))
         platform.physicsBody?.isDynamic = false
         platform.physicsBody?.friction = 1
@@ -125,16 +122,15 @@ final class BlockTowerScene: SKScene {
     private func buildGuides() {
         for _ in 0..<2 {
             let g = SKShapeNode()
-            g.strokeColor = SKColor.white.withAlphaComponent(0.22)
+            g.strokeColor = SKColor.white.withAlphaComponent(0.28)
             g.lineWidth = 2
-            g.zPosition = 5
+            g.zPosition = 300           // above every piece so both sides show
             g.isHidden = true
             addChild(g)
             if guideLeft == nil { guideLeft = g } else { guideRight = g }
         }
     }
 
-    /// Bigger blocks — easier to see and to place with intent.
     private func cellSize() -> CGFloat { min(42, size.width * 0.17) }
 
     private func currentStackTopY() -> CGFloat {
@@ -156,14 +152,13 @@ final class BlockTowerScene: SKScene {
         node.physicsBody?.isDynamic = false
         node.physicsBody?.friction = 1.0
         node.physicsBody?.restitution = 0
-        node.physicsBody?.angularDamping = 0.95
-        node.physicsBody?.linearDamping = 0.5
+        node.physicsBody?.angularDamping = 0.98
+        node.physicsBody?.linearDamping = 0.6
         addChild(node)
         current = node
         updateGuides()
     }
 
-    /// Called continuously while dragging — the piece just follows x.
     func moveCurrent(toX x: CGFloat) {
         guard let node = current, !isOver else { return }
         let half = node.calculateAccumulatedFrame().width / 2
@@ -196,44 +191,44 @@ final class BlockTowerScene: SKScene {
         guideRight?.isHidden = true
         node.physicsBody?.isDynamic = true
         node.name = "placed"
+        node.zPosition = 10
         placed.append(node)
         score += 1
         onScoreChange?(score)
         onLand?()
-        awaitingSettle = true            // freeze the camera target until it rests
+        awaitingSettle = true
         settledFrames = 0
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
-            guard let self, !self.isOver else { return }
-            self.spawnPiece()
-        }
+        awaitSince = 0
     }
 
     override func update(_ currentTime: TimeInterval) {
         guard !isOver, cam != nil else { return }
 
-        // Only re-aim the camera once the piece that just dropped has been
-        // fully still for a moment. While it's still moving even slightly,
-        // the target — and the camera — hold completely still.
         if awaitingSettle {
+            if awaitSince == 0 { awaitSince = currentTime }
             let still: Bool = {
                 guard let b = placed.last?.physicsBody else { return true }
                 let v = b.velocity
                 return (v.dx * v.dx + v.dy * v.dy) < 16 && abs(b.angularVelocity) < 0.05
             }()
             settledFrames = still ? settledFrames + 1 : 0
-            if settledFrames >= 12 {
-                // Keep the tower top a bit above centre so the piece you're
-                // dropping fits fully on screen with room below to see the
-                // tower. Cap the per-landing jump so one flung piece can't
-                // wrench the camera way up.
-                let want = currentStackTopY() - size.height * 0.06
-                camTargetY = max(camTargetY, min(want, camTargetY + cellSize() * 3.5))
+            if settledFrames >= 12 || currentTime - awaitSince > 3.5 {
+                // Lock the piece that just landed — the tower can no longer
+                // shift underneath the next drops.
+                placed.last?.physicsBody?.isDynamic = false
+                let want = currentStackTopY() + size.height * 0.05
+                camTargetY = max(camTargetY, min(want, camTargetY + cellSize() * 4))
                 awaitingSettle = false
                 settledFrames = 0
+                awaitSince = 0
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                    guard let self, !self.isOver, self.current == nil else { return }
+                    self.spawnPiece()
+                }
             }
         }
         camTargetY = max(camTargetY, size.height / 2)
-        let stepped = cam.position.y + (camTargetY - cam.position.y) * 0.11
+        let stepped = cam.position.y + (camTargetY - cam.position.y) * 0.12
         cam.position.y = max(cam.position.y, stepped)
 
         // Loss: a piece past the first couple falls back to the platform.
@@ -248,7 +243,6 @@ final class BlockTowerScene: SKScene {
         }
     }
 
-    /// A quick red flash + camera shake instead of the screen just freezing.
     private func runLoseAnimation() {
         let flash = SKShapeNode(rectOf: CGSize(width: size.width * 2.4, height: size.height * 2.4))
         flash.fillColor = SKColor.red

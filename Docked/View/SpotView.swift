@@ -3,8 +3,8 @@
 //  Docked
 //
 //  "Spot" (premium) — one creature is shown as the target; find its exact
-//  match in the crowd before the timer runs out. Each round adds more
-//  look-alikes. Wrong taps cost you time.
+//  match in the crowd. No clock: each correct pick is a level up and the
+//  crowd grows. Three wrong picks ends the run.
 //
 //  Original mechanic, original art. No third-party assets.
 //
@@ -13,20 +13,17 @@ import SwiftUI
 
 struct SpotView: View {
     @Environment(AppModel.self) private var app
-    @AppStorage("docked.spot.best") private var best = 0
+    @AppStorage("docked.spot.bestlevel") private var bestLevel = 1
 
     private struct Creature: Equatable { var hue: Int; var shape: Int; var hat: Int }
 
     @State private var target = Creature(hue: 0, shape: 0, hat: 0)
     @State private var crowd: [Creature] = []
     @State private var answer = 0
-    @State private var round = 1
-    @State private var score = 0
-    @State private var timeLeft: Double = 20
+    @State private var level = 1
+    @State private var lives = 3
     @State private var running = false
     @State private var wrongIdx: Int? = nil
-    /// Index of the creature just correctly picked — a brief pulse + ring
-    /// plays on it before the crowd refreshes for the next round.
     @State private var celebrateIdx: Int? = nil
     @State private var hitTick = 0
     @State private var missTick = 0
@@ -37,16 +34,20 @@ struct SpotView: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 0) {
-                Text("ROUND \(round)").font(.system(size: 12, weight: .heavy))
+                Text("LEVEL \(level)").font(.system(size: 12, weight: .heavy))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text("SCORE \(score)").font(.system(size: 12, weight: .heavy)).monospacedDigit()
+                Text("BEST \(max(bestLevel, level))").font(.system(size: 12, weight: .heavy)).monospacedDigit()
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
-                Text(String(format: "%.0f", max(0, timeLeft)))
-                    .font(.system(size: 13, weight: .black)).monospacedDigit()
-                    .foregroundStyle(timeLeft < 5 ? Color.red : Color.primary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                HStack(spacing: 3) {
+                    ForEach(0..<3, id: \.self) { k in
+                        Image(systemName: k < lives ? "heart.fill" : "heart")
+                            .font(.system(size: 12))
+                            .foregroundStyle(k < lives ? Color.red : Color.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
             HStack(spacing: 8) {
@@ -85,7 +86,7 @@ struct SpotView: View {
             }
 
             if !running {
-                Text(score > 0 ? "Time! Tap to play again" : "Tap to start")
+                Text(level > 1 ? "Reached level \(level) — tap to play again" : "Tap to start")
                     .font(.system(size: 13, weight: .heavy)).foregroundStyle(.secondary)
             }
         }
@@ -97,14 +98,6 @@ struct SpotView: View {
         .sensoryFeedback(.error, trigger: missTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: overTick) { _, _ in app.haptics }
         .onAppear { if crowd.isEmpty { deal() } }
-        .task(id: running) {
-            guard running else { return }
-            while running, timeLeft > 0, !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(100))
-                timeLeft -= 0.1
-            }
-            if timeLeft <= 0, running { endGame() }
-        }
     }
 
     private func creatureView(_ c: Creature, side: CGFloat) -> some View {
@@ -118,13 +111,11 @@ struct SpotView: View {
                 }
             }
             .frame(width: side * 0.82, height: side * 0.82)
-            // eyes
             HStack(spacing: side * 0.16) {
                 Circle().fill(.white).frame(width: side * 0.14, height: side * 0.14)
                 Circle().fill(.white).frame(width: side * 0.14, height: side * 0.14)
             }
             .offset(y: side * 0.04)
-            // hat
             Group {
                 switch c.hat {
                 case 1: Circle().fill(Theme.ink).frame(width: side * 0.18, height: side * 0.18)
@@ -146,7 +137,7 @@ struct SpotView: View {
 
     private func deal() {
         target = randomCreature()
-        let count = min(28, 8 + round * 3)
+        let count = min(28, 6 + level * 3)
         var list: [Creature] = []
         while list.count < count - 1 {
             let c = randomCreature()
@@ -159,7 +150,8 @@ struct SpotView: View {
     }
 
     private func start() {
-        round = 1; score = 0; timeLeft = 15
+        level = 1
+        lives = 3
         deal()
         running = true
     }
@@ -167,29 +159,26 @@ struct SpotView: View {
     private func pick(_ i: Int) {
         guard running else { return }
         if i == answer {
-            score += round * 10
             hitTick += 1
             celebrateIdx = i
-            let nextRound = round + 1
-            let nextTime = min(timeLeft + 2.5, 22)
+            let nextLevel = level + 1
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
                 guard running else { return }
-                round = nextRound
-                timeLeft = nextTime
+                level = nextLevel
                 deal()
                 celebrateIdx = nil
             }
         } else {
-            timeLeft -= 4
+            lives -= 1
             missTick += 1
             wrongIdx = i
-            if timeLeft <= 0 { endGame() }
+            if lives <= 0 { endGame() }
         }
     }
 
     private func endGame() {
         running = false
-        if score > best { best = score }
+        bestLevel = max(bestLevel, level)
         overTick += 1
     }
 }

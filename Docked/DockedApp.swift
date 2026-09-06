@@ -22,6 +22,8 @@ struct DockedApp: App {
     @State private var doodle = DoodleStore()
     @State private var store = StoreManager()
 
+    init() { Analytics.shared.start() }
+
     var body: some Scene {
         WindowGroup {
             RootView()

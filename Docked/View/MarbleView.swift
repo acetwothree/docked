@@ -29,14 +29,13 @@ struct MarbleView: View {
     @State private var moveTick = 0
     @State private var hitTick = 0
     @State private var winTick = 0
-    /// True briefly while the marble is being slid back to the start because
-    /// the last unpainted tiles are no longer reachable from where it is.
-    @State private var repositioning = false
 
     private static let boardBG = Color(hex: "12141C")
-    private static let tileOpen = Color(hex: "7486B4")
-    private static let wallTop = Color(hex: "23262F")
-    private static let wallSide = Color(hex: "0B0C11")
+    private static let tileOpen = Color(hex: "6E80B0")
+    // Walls sit just a shade off the board so they read as raised blocks
+    // without a hard cut-out look.
+    private static let wallTop = Color(hex: "191C24")
+    private static let wallSide = Color(hex: "0E1015")
 
     /// A different paint colour every level, looping once the list runs out.
     private static let trailColors: [Color] = [
@@ -86,12 +85,9 @@ struct MarbleView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
-            Text(cleared ? "Cleared!"
-                 : repositioning ? "No path back — sliding you home"
-                 : "Swipe to roll · paint every tile")
+            Text(cleared ? "Cleared!" : "Swipe to roll · paint every tile")
                 .font(.system(size: 12, weight: .heavy))
-                .foregroundStyle(cleared ? Color.green
-                                 : repositioning ? Color.orange : Color.secondary)
+                .foregroundStyle(cleared ? Color.green : Color.secondary)
                 .lineLimit(1).minimumScaleFactor(0.8)
         }
         .padding(14)
@@ -159,15 +155,16 @@ struct MarbleView: View {
     }
 
     /// Flat, square wall tiles that butt together into clean rectilinear
-    /// blobs — no per-cell rounding, so touching walls never leave odd
-    /// rounded nubs in the inner corners.
+    /// blobs. One flat fill, barely darker than the board, with a hairline
+    /// bottom-right edge for the faintest sense of a raised block — no drop
+    /// shadow, so it never looks like it's floating off the background.
     private func wallCellView(_ i: Int, cell: CGFloat) -> some View {
         let c = i % cols, r = i / cols
         let cx = cell / 2 + CGFloat(c) * cell
         let cy = cell / 2 + CGFloat(r) * cell
         return ZStack {
             Rectangle().fill(Self.wallSide)
-                .frame(width: cell + 1, height: cell + 1).offset(x: 1, y: 2)
+                .frame(width: cell + 1, height: cell + 1).offset(x: 0.5, y: 0.5)
             Rectangle().fill(Self.wallTop)
                 .frame(width: cell + 1, height: cell + 1)
         }
@@ -203,24 +200,9 @@ struct MarbleView: View {
                 level = next
                 load(next)
             }
-            return
         }
-
-        // Never let the player get stranded: if the tiles still unpainted
-        // can't all be reached from where the marble now sits, slide it back
-        // to the start (keeping everything already painted) — the maze is
-        // always finishable from the start, so this can't loop forever.
-        let ok = Self.paintableBySliding(mw: cols, mh: rows,
-                                         isOpen: { openCells.contains($0) },
-                                         start: pos, covered: visited)
-        if !ok {
-            repositioning = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
-                withAnimation(.easeOut(duration: 0.18)) { pos = 0 }
-                visited.insert(0)
-                repositioning = false
-            }
-        }
+        // No stuck-state handling needed — every level is generated so it
+        // can be finished from any rest position.
     }
 
     /// Resets the marble to the start of the SAME maze — no new layout is
@@ -243,20 +225,18 @@ struct MarbleView: View {
         let mh = cy * 2 + 1
         let maxBraid = min(0.62, 0.09 * Double(lvl))
 
-        var chosen: [Bool] = []
+        // Only accept a layout you can finish from ANY rest position, not
+        // just the start — so there is never a spot where a wrong turn
+        // strands you and forces a restart. Search from heavy braiding
+        // (denser openings = more reachability) toward lighter, keeping the
+        // most fragmented one that still passes.
+        var chosen: [Bool] = [Bool](repeating: true, count: mw * mh)   // fully-open safety net
         var bestClusterSize = Int.max
-        // Try a batch of layouts (later ones braid less, so a plain
-        // always-solvable maze is the guaranteed fallback), keep every
-        // solvable one, and pick whichever splits its walls into the
-        // smallest largest cluster — the more fragmented the obstacles, the
-        // harder the level reads without ever risking an unsolvable board.
-        for attempt in 0..<22 {
-            let braid = attempt < 20 ? maxBraid * (1 - Double(attempt) / 20) : 0
+        for attempt in 0..<36 {
+            let t = Double(attempt) / 35
+            let braid = max(0.35, min(0.9, maxBraid + 0.35)) * (1 - t) + 0.25 * t
             let grid = Self.generate(mw: mw, mh: mh, braid: braid)
-            guard Self.paintableBySliding(mw: mw, mh: mh, isOpen: { grid[$0] }, start: 0, covered: []) else {
-                if chosen.isEmpty { chosen = grid }   // last-resort fallback if nothing solvable is found
-                continue
-            }
+            guard Self.stronglyPaintable(mw: mw, mh: mh, isOpen: { grid[$0] }) else { continue }
             let cluster = Self.maxWallClusterSize(grid, mw: mw, mh: mh)
             if cluster < bestClusterSize {
                 bestClusterSize = cluster
@@ -364,6 +344,17 @@ struct MarbleView: View {
         }
         for i in 0..<(mw * mh) where isOpen(i) {
             if !covered.contains(i) { return false }
+        }
+        return true
+    }
+
+    /// True only if the whole board is paintable starting from EVERY open
+    /// cell — i.e. there is no rest position from which you can get stuck.
+    private static func stronglyPaintable(mw: Int, mh: Int, isOpen: (Int) -> Bool) -> Bool {
+        for p in 0..<(mw * mh) where isOpen(p) {
+            if !paintableBySliding(mw: mw, mh: mh, isOpen: isOpen, start: p, covered: []) {
+                return false
+            }
         }
         return true
     }

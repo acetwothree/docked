@@ -100,7 +100,7 @@ final class HexFallScene: SKScene {
         physicsWorld.speed = 1
         onScoreChange?(0)
 
-        towerW = size.width * 0.70
+        towerW = size.width * 0.60          // narrower — easier to roll off
         towerX0 = (size.width - towerW) / 2
         cellW = towerW / CGFloat(cols)
         rowH = cellW
@@ -118,44 +118,57 @@ final class HexFallScene: SKScene {
 
     // MARK: tower generation
 
-    private func bandPieces() -> [[(Int, Int)]] {
-        // Full-width 3-piece tilings of a 6×2 block — every one gapless.
-        // (O/I/L/J only; S/Z/T can't tile a 2-row band without leaving a hole.)
-        let fullWidth: [[[(Int, Int)]]] = [
-            // O O O
-            [[(0,0),(0,1),(1,0),(1,1)], [(0,2),(0,3),(1,2),(1,3)], [(0,4),(0,5),(1,4),(1,5)]],
-            // I over I, then O
-            [[(0,0),(0,1),(0,2),(0,3)], [(1,0),(1,1),(1,2),(1,3)], [(0,4),(0,5),(1,4),(1,5)]],
-            // O, then I over I
-            [[(0,0),(0,1),(1,0),(1,1)], [(0,2),(0,3),(0,4),(0,5)], [(1,2),(1,3),(1,4),(1,5)]],
-            // J, horizontal I, L
-            [[(0,0),(1,0),(1,1),(1,2)], [(0,1),(0,2),(0,3),(0,4)], [(1,3),(1,4),(1,5),(0,5)]],
-            // vertical mirror of the above
-            [[(1,0),(0,0),(0,1),(0,2)], [(1,1),(1,2),(1,3),(1,4)], [(0,3),(0,4),(0,5),(1,5)]],
-            // L J, then O
-            [[(0,0),(1,0),(1,1),(1,2)], [(0,1),(0,2),(0,3),(1,3)], [(0,4),(0,5),(1,4),(1,5)]],
-            // O, then L J
-            [[(0,0),(0,1),(1,0),(1,1)], [(0,2),(1,2),(1,3),(1,4)], [(0,3),(0,4),(0,5),(1,5)]],
-        ]
-        return fullWidth.randomElement()!
-    }
+    /// Every distinct tetromino orientation, normalised so the min row and
+    /// min col are 0 (I×2, O×1, T×4, S×2, Z×2, L×4, J×4).
+    private static let orientations: [[(Int, Int)]] = [
+        [(0,0),(0,1),(0,2),(0,3)], [(0,0),(1,0),(2,0),(3,0)],                       // I
+        [(0,0),(0,1),(1,0),(1,1)],                                                  // O
+        [(0,0),(0,1),(0,2),(1,1)], [(0,1),(1,0),(1,1),(2,1)],                       // T
+        [(1,0),(0,0),(0,1),(1,1)], [(0,0),(1,0),(1,1),(2,1)],
+        [(0,1),(0,2),(1,0),(1,1)], [(0,0),(1,0),(1,1),(2,1)],                       // S
+        [(0,0),(0,1),(1,1),(1,2)], [(0,1),(1,0),(1,1),(2,0)],                       // Z
+        [(0,0),(0,1),(0,2),(1,0)], [(0,0),(0,1),(1,1),(2,1)],                       // L
+        [(1,0),(1,1),(1,2),(0,2)], [(0,0),(1,0),(2,0),(2,1)],
+        [(0,0),(0,1),(0,2),(1,2)], [(0,0),(0,1),(1,0),(2,0)],                       // J
+        [(1,0),(1,1),(1,2),(0,0)], [(0,0),(0,1),(1,1),(2,1)],
+    ]
 
+    /// Fill a `bandRows`-tall band greedily with random tetromino
+    /// orientations — imperfectly packed, so it leaves the odd gap and gives
+    /// the hexagon uneven, tippy surfaces to sit on.
     private func addBand() {
         let topRow = nextBandRow
-        for piece in bandPieces() {
-            let id = nextBrickID; nextBrickID += 1
-            let color = Self.palette.randomElement()!
-            var cells: [GridCell] = []
-            for (lr, lc) in piece {
-                cells.append(GridCell(row: topRow + lr, col: lc))
-                occ[(topRow + lr) * 100 + lc] = id
+        let bandRows = 4
+        var filled = [Bool](repeating: false, count: cols * bandRows)
+
+        for r in 0..<bandRows {
+            for c in 0..<cols where !filled[r * cols + c] {
+                for shape in Self.orientations.shuffled() {
+                    // Anchor the shape's topmost-then-leftmost cell at (r,c).
+                    let a = shape.min { $0.0 != $1.0 ? $0.0 < $1.0 : $0.1 < $1.1 }!
+                    let cells = shape.map { (r + $0.0 - a.0, c + $0.1 - a.1) }
+                    let ok = cells.allSatisfy {
+                        $0.0 >= 0 && $0.0 < bandRows && $0.1 >= 0 && $0.1 < cols
+                            && !filled[$0.0 * cols + $0.1]
+                    }
+                    guard ok else { continue }
+                    let id = nextBrickID; nextBrickID += 1
+                    let color = Self.palette.randomElement()!
+                    var g: [GridCell] = []
+                    for cc in cells {
+                        filled[cc.0 * cols + cc.1] = true
+                        g.append(GridCell(row: topRow + cc.0, col: cc.1))
+                        occ[(topRow + cc.0) * 100 + cc.1] = id
+                    }
+                    let node = makePieceNode(cells: g, color: color)
+                    addChild(node)
+                    bricks[id] = Brick(id: id, cells: g, node: node)
+                    deepestRow = max(deepestRow, g.map(\.row).max() ?? topRow)
+                    break
+                }
             }
-            let node = makePieceNode(cells: cells, color: color)
-            addChild(node)
-            bricks[id] = Brick(id: id, cells: cells, node: node)
-            deepestRow = max(deepestRow, cells.map(\.row).max() ?? topRow)
         }
-        nextBandRow += 2
+        nextBandRow += bandRows
     }
 
     /// One connected shape for the whole tetromino (fill = union of its
@@ -236,7 +249,7 @@ final class HexFallScene: SKScene {
     }
 
     private func placeHexagon(atY y: CGFloat) {
-        let radius = cellW * 0.85
+        let radius = cellW * 0.78          // a touch smaller — sits less snugly
         let path = TetrominoBuilder.polygonPath(sides: 6, radius: radius)
         let hex = SKShapeNode(path: path)
         hex.fillColor = SKColor(red: 0.26, green: 0.64, blue: 0.90, alpha: 1)

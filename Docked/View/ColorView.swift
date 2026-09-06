@@ -65,30 +65,15 @@ struct ColorView: View {
                     }
             }
 
-            HStack(spacing: 6) {
-                ForEach(activeNumbers, id: \.self) { n in
-                    let left = remaining(n)
-                    Button { picked = n } label: {
-                        ZStack {
-                            Circle().fill(palette[n - 1])
-                            if left == 0 {
-                                Image(systemName: "checkmark").font(.system(size: 11, weight: .black))
-                                    .foregroundStyle(.white)
-                            } else {
-                                Text("\(n)").font(.system(size: 12, weight: .black))
-                                    .foregroundStyle(n == 7 || n == 3 ? Color.black.opacity(0.7) : Color.white)
-                            }
-                        }
-                        .frame(width: 30, height: 30)
-                        .overlay(Circle().strokeBorder(.primary.opacity(picked == n ? 0.95 : 0.12),
-                                                       lineWidth: picked == n ? 3 : 2))
-                        .opacity(left == 0 ? 0.45 : 1)
-                        .frame(maxWidth: .infinity)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(activeNumbers, id: \.self) { n in
+                        swatch(n)
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 4)
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, 12)
 
             HStack(spacing: 14) {
                 Button { fills = [:] } label: {
@@ -137,6 +122,40 @@ struct ColorView: View {
     private static let paper = Color(hex: "F2EEE1")
     private static let lineDark = Color(hex: "2B2620")
 
+    /// A big, obvious palette key: number over its colour, a bold ring +
+    /// lift when selected, faded with a tick once that colour's done.
+    private func swatch(_ n: Int) -> some View {
+        let left = remaining(n)
+        let selected = picked == n
+        let lightChip = n == 3 || n == 7          // yellow / cream need dark text
+        return Button { withAnimation(.easeOut(duration: 0.15)) { picked = n } } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    Circle().fill(palette[n - 1])
+                        .frame(width: selected ? 46 : 40, height: selected ? 46 : 40)
+                        .overlay(Circle().strokeBorder(selected ? Color.primary : Color.primary.opacity(0.15),
+                                                       lineWidth: selected ? 3 : 1.5))
+                        .shadow(color: .black.opacity(selected ? 0.28 : 0), radius: 4, y: 2)
+                    if left == 0 {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 15, weight: .black))
+                            .foregroundStyle(lightChip ? Color.black.opacity(0.6) : Color.white)
+                    } else {
+                        Text("\(n)")
+                            .font(.system(size: 17, weight: .black, design: .rounded))
+                            .foregroundStyle(lightChip ? Color.black.opacity(0.75) : Color.white)
+                    }
+                }
+                .frame(height: 48)
+                Text(left == 0 ? "done" : "\(left)")
+                    .font(.system(size: 9, weight: .heavy))
+                    .foregroundStyle(.secondary)
+            }
+            .opacity(left == 0 ? 0.5 : 1)
+        }
+        .buttonStyle(.plain)
+    }
+
     private func artwork(side: CGFloat) -> some View {
         ZStack {
             ForEach(regions.indices, id: \.self) { i in
@@ -154,26 +173,32 @@ struct ColorView: View {
         let fillColor: Color = done ? palette[region.n - 1] : Self.paper
         let w = region.rect.width * side
         let h = region.rect.height * side
-        let labelSize = max(9, min(w, h) * 0.32)
+        // Chip in a corner for big background regions so it doesn't sit
+        // under the subject; centred for normal-size regions.
+        let big = region.rect.width * region.rect.height > 0.3
+        let chipAlign: Alignment = big ? .topLeading : .center
 
         region.shape
             .fill(fillColor)
             .overlay(region.shape.stroke(Color.white.opacity(0.55), lineWidth: 3.5))
             .overlay(region.shape.stroke(Self.lineDark.opacity(0.85), lineWidth: 1.6))
-            .overlay(numberLabel(done ? nil : region.n, size: labelSize))
+            .overlay(alignment: chipAlign) {
+                if !done { numberChip(region.n).padding(big ? 8 : 0) }
+            }
             .frame(width: w, height: h)
             .position(x: region.rect.midX * side, y: region.rect.midY * side)
             .onTapGesture { tap(i, region) }
     }
 
-    @ViewBuilder
-    private func numberLabel(_ n: Int?, size: CGFloat) -> some View {
-        if let n {
-            Text("\(n)")
-                .font(.system(size: size, weight: .heavy))
-                .foregroundStyle(Self.lineDark.opacity(0.5))
-                .minimumScaleFactor(0.4)
-        }
+    /// A small fixed-size pill so numbers stay readable and never balloon
+    /// over a neighbouring region.
+    private func numberChip(_ n: Int) -> some View {
+        Text("\(n)")
+            .font(.system(size: 12, weight: .black, design: .rounded))
+            .foregroundStyle(Self.lineDark.opacity(0.75))
+            .frame(width: 20, height: 20)
+            .background(Color.white.opacity(0.82), in: Circle())
+            .overlay(Circle().stroke(Self.lineDark.opacity(0.18), lineWidth: 1))
     }
 
     private func tap(_ i: Int, _ region: ColorRegion) {

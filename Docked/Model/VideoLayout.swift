@@ -46,7 +46,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         switch self {
         case .doodle: "Doodle"
         case .notes: "Notes"
-        case .color: "Color"
+        case .color: "Color by Number"
         case .zen: "Color Blocks"
         case .merge: "2048"
         case .drop: "Number Merge"
@@ -99,7 +99,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         switch self {
         case .doodle: "A freehand sketch pad."
         case .notes: "A quick scratch notepad."
-        case .color: "Tap-to-fill colouring scenes."
+        case .color: "Colour-by-number picture scenes."
         case .zen: "A block-drop line-clear puzzle."
         case .merge: "Swipe to slide and merge matching number tiles."
         case .drop: "Drop numbered pieces into columns; equal ones merge."

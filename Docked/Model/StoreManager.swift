@@ -97,6 +97,7 @@ final class StoreManager {
         }
         purchasing = true
         defer { purchasing = false }
+        Analytics.shared.track(.purchaseStarted)
         do {
             let result = try await product.purchase()
             switch result {
@@ -104,16 +105,19 @@ final class StoreManager {
                 if let transaction = verified(verification) {
                     await transaction.finish()
                     await refreshEntitlements()
+                    Analytics.shared.track(.purchaseCompleted, ["product": product.id])
                 }
             case .userCancelled:
-                break
+                Analytics.shared.track(.paywallDismissed, ["reason": "cancelled"])
             case .pending:
                 errorMessage = "Your purchase is pending approval and will unlock once it's approved."
+                Analytics.shared.track(.purchaseFailed, ["reason": "pending"])
             @unknown default:
                 break
             }
         } catch {
             errorMessage = "The purchase didn't go through. You haven't been charged — please try again."
+            Analytics.shared.track(.purchaseFailed, ["reason": "error"])
         }
     }
 
