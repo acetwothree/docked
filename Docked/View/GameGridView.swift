@@ -538,6 +538,8 @@ private struct GamePreview: View {
                             PopCapsule(color: Color(hex: "F2B90C"), width: s * 0.30, height: base)
                             PopCapsule(color: Color(hex: "E0473E"), width: s * 0.38, height: base)
                         }
+                    } else {
+                        PopCapsule(color: Color(hex: "3EA1E0"), width: s * 0.34, height: base)
                     }
                 }
                 .frame(maxWidth: .infinity)

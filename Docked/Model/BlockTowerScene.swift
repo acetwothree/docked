@@ -36,6 +36,7 @@ final class BlockTowerScene: SKScene {
     private var awaitingSettle = false
     private var settledFrames = 0
     private var awaitSince: TimeInterval = 0
+    private var lastPieceY: CGFloat = .greatestFiniteMagnitude
 
     private var milestoneDone = 0
     private var nextMarkerY: CGFloat = 0
@@ -48,7 +49,7 @@ final class BlockTowerScene: SKScene {
     override func didMove(to view: SKView) {
         backgroundColor = .clear
         scaleMode = .resizeFill
-        physicsWorld.gravity = CGVector(dx: 0, dy: -4.4)
+        physicsWorld.gravity = CGVector(dx: 0, dy: -11)
         let camera = SKCameraNode()
         self.camera = camera
         cam = camera
@@ -240,7 +241,7 @@ final class BlockTowerScene: SKScene {
         node.physicsBody?.friction = 1.0
         node.physicsBody?.restitution = 0
         node.physicsBody?.angularDamping = 0.55       // tips more readily
-        node.physicsBody?.linearDamping = 0.35
+        node.physicsBody?.linearDamping = 0.02        // barely any air drag — it must fall
         addChild(node)
         current = node
     }
@@ -264,6 +265,7 @@ final class BlockTowerScene: SKScene {
         awaitingSettle = true
         settledFrames = 0
         awaitSince = 0
+        lastPieceY = .greatestFiniteMagnitude
     }
 
     override func update(_ currentTime: TimeInterval) {
@@ -272,10 +274,8 @@ final class BlockTowerScene: SKScene {
 
         if awaitingSettle, let piece = placed.last {
             if awaitSince == 0 { awaitSince = currentTime }
+            let elapsed = currentTime - awaitSince
             let f = piece.calculateAccumulatedFrame()
-            let b = piece.physicsBody
-            let v = b?.velocity ?? .zero
-            let still = (v.dx * v.dx + v.dy * v.dy) < 14 && abs(b?.angularVelocity ?? 0) < 0.05
 
             // Fell clear off the side or back down to the ground → loss.
             let offSide = f.maxX < 4 || f.minX > size.width - 4
@@ -284,7 +284,20 @@ final class BlockTowerScene: SKScene {
                 endRun()
                 return
             }
-            if still || currentTime - awaitSince > 3.0 {
+
+            // Settle by vertical travel between frames, NOT raw velocity — a
+            // freshly-dropped piece reads ~0 velocity on its first frame before
+            // gravity takes hold, which used to freeze it in mid-air.
+            let movedY = lastPieceY == .greatestFiniteMagnitude
+                ? CGFloat.greatestFiniteMagnitude
+                : abs(f.midY - lastPieceY)
+            lastPieceY = f.midY
+            let spin = abs(piece.physicsBody?.angularVelocity ?? 0)
+            let creeping = movedY < 0.25 && spin < 0.06
+            settledFrames = creeping ? settledFrames + 1 : 0
+
+            // Never lock in the first ~0.45s: the piece has to be allowed to fall.
+            if elapsed > 0.45, settledFrames >= 8 || elapsed > 3.5 {
                 lockPiece(piece)
                 let m = (score / 10) * 10
                 if m > milestoneDone {

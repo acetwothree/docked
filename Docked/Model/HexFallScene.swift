@@ -69,7 +69,7 @@ final class HexFallScene: SKScene {
     override func didMove(to view: SKView) {
         backgroundColor = .clear
         scaleMode = .resizeFill
-        physicsWorld.gravity = CGVector(dx: 0, dy: -11)
+        physicsWorld.gravity = CGVector(dx: 0, dy: -7.5)
         let camera = SKCameraNode()
         self.camera = camera
         cam = camera

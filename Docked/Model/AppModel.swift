@@ -156,5 +156,19 @@ final class AppModel {
         pinnedModules = AppModel.defaultPinned
         debugOverlay = false
         hasOnboarded = false
+
+        // Per-game progress lives in each view's own @AppStorage keys — wipe
+        // them so levels/best truly go back to 1 (and analytics counters clear).
+        let d = UserDefaults.standard
+        let progressKeys = [
+            "docked.marble.level",
+            "docked.rings.level",
+            "docked.spot.bestlevel",
+            "docked.merge.best", "docked.merge.grid", "docked.merge.score", "docked.merge.over",
+            "docked.drop.best", "docked.drop.grid", "docked.drop.score", "docked.drop.next", "docked.drop.over",
+            "docked.brawl.best",
+        ]
+        for key in progressKeys { d.removeObject(forKey: key) }
+        Analytics.shared.reset()
     }
 }
