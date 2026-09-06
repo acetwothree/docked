@@ -69,7 +69,7 @@ final class HexFallScene: SKScene {
     override func didMove(to view: SKView) {
         backgroundColor = .clear
         scaleMode = .resizeFill
-        physicsWorld.gravity = CGVector(dx: 0, dy: -16)
+        physicsWorld.gravity = CGVector(dx: 0, dy: -11)
         let camera = SKCameraNode()
         self.camera = camera
         cam = camera
@@ -134,37 +134,51 @@ final class HexFallScene: SKScene {
     ]
 
     /// Fill a `bandRows`-tall band greedily with random tetromino
-    /// orientations — imperfectly packed, so it leaves the odd gap and gives
-    /// the hexagon uneven, tippy surfaces to sit on.
+    /// orientations, then any cell the greedy pass couldn't reach is capped
+    /// with a small 1- or 2-cell filler — so the platform is completely
+    /// gapless but still made of visibly different interlocking shapes.
     private func addBand() {
         let topRow = nextBandRow
         let bandRows = 4
         var filled = [Bool](repeating: false, count: cols * bandRows)
 
+        func place(_ cells: [(Int, Int)]) {
+            let id = nextBrickID; nextBrickID += 1
+            let color = Self.palette.randomElement()!
+            var g: [GridCell] = []
+            for cc in cells {
+                filled[cc.0 * cols + cc.1] = true
+                g.append(GridCell(row: topRow + cc.0, col: cc.1))
+                occ[(topRow + cc.0) * 100 + cc.1] = id
+            }
+            let node = makePieceNode(cells: g, color: color)
+            addChild(node)
+            bricks[id] = Brick(id: id, cells: g, node: node)
+            deepestRow = max(deepestRow, g.map(\.row).max() ?? topRow)
+        }
+
         for r in 0..<bandRows {
             for c in 0..<cols where !filled[r * cols + c] {
                 for shape in Self.orientations.shuffled() {
-                    // Anchor the shape's topmost-then-leftmost cell at (r,c).
                     let a = shape.min { $0.0 != $1.0 ? $0.0 < $1.0 : $0.1 < $1.1 }!
                     let cells = shape.map { (r + $0.0 - a.0, c + $0.1 - a.1) }
                     let ok = cells.allSatisfy {
                         $0.0 >= 0 && $0.0 < bandRows && $0.1 >= 0 && $0.1 < cols
                             && !filled[$0.0 * cols + $0.1]
                     }
-                    guard ok else { continue }
-                    let id = nextBrickID; nextBrickID += 1
-                    let color = Self.palette.randomElement()!
-                    var g: [GridCell] = []
-                    for cc in cells {
-                        filled[cc.0 * cols + cc.1] = true
-                        g.append(GridCell(row: topRow + cc.0, col: cc.1))
-                        occ[(topRow + cc.0) * 100 + cc.1] = id
-                    }
-                    let node = makePieceNode(cells: g, color: color)
-                    addChild(node)
-                    bricks[id] = Brick(id: id, cells: g, node: node)
-                    deepestRow = max(deepestRow, g.map(\.row).max() ?? topRow)
-                    break
+                    if ok { place(cells); break }
+                }
+            }
+        }
+        // cap every remaining gap
+        for r in 0..<bandRows {
+            for c in 0..<cols where !filled[r * cols + c] {
+                if c + 1 < cols, !filled[r * cols + c + 1] {
+                    place([(r, c), (r, c + 1)])          // 2-cell domino
+                } else if r + 1 < bandRows, !filled[(r + 1) * cols + c] {
+                    place([(r, c), (r + 1, c)])
+                } else {
+                    place([(r, c)])                       // lone filler cell
                 }
             }
         }

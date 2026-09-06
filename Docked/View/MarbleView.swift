@@ -215,39 +215,66 @@ struct MarbleView: View {
 
     // MARK: maze generation (recursive backtracker)
 
+    //  ── level generation ──────────────────────────────────────────────
+    //
+    //  Base layout: a lattice of single pillars at even/even interior cells
+    //  (the classic ice-slide grid) — from any tile you can always slide
+    //  and stop somewhere useful, and you can always loop back, so you can
+    //  NEVER get stranded. Then, for higher tiers, extra scattered blocks
+    //  are added one at a time and only KEPT if the board still validates
+    //  as "never stuck" (every open tile paintable AND every reachable rest
+    //  position can slide back to the start). Movement + win logic untouched.
+    //
     private func load(_ n: Int) {
         let lvl = max(1, n)
-        // Bigger grids sooner, and more braiding — braided cells are the
-        // extra openings that turn dead ends into real "which way?" choices.
-        let cx = min(4, 2 + lvl / 4)
-        let cy = min(4, 2 + lvl / 5)
-        let mw = cx * 2 + 1
-        let mh = cy * 2 + 1
-        let maxBraid = min(0.62, 0.09 * Double(lvl))
+        let tier = min(5, 1 + (lvl - 1) / 4)
+        let dim = min(11, 6 + tier)                 // 7 … 11
+        let mw = dim, mh = dim
+        cols = mw; rows = mh
+        let count = mw * mh
 
-        // Only accept a layout you can finish from ANY rest position, not
-        // just the start — so there is never a spot where a wrong turn
-        // strands you and forces a restart. Search from heavy braiding
-        // (denser openings = more reachability) toward lighter, keeping the
-        // most fragmented one that still passes.
-        var chosen: [Bool] = [Bool](repeating: true, count: mw * mh)   // fully-open safety net
-        var bestClusterSize = Int.max
-        for attempt in 0..<36 {
-            let t = Double(attempt) / 35
-            let braid = max(0.35, min(0.9, maxBraid + 0.35)) * (1 - t) + 0.25 * t
-            let grid = Self.generate(mw: mw, mh: mh, braid: braid)
-            guard Self.stronglyPaintable(mw: mw, mh: mh, isOpen: { grid[$0] }) else { continue }
-            let cluster = Self.maxWallClusterSize(grid, mw: mw, mh: mh)
-            if cluster < bestClusterSize {
-                bestClusterSize = cluster
-                chosen = grid
+        func idx(_ x: Int, _ y: Int) -> Int { y * mw + x }
+        var wall = [Bool](repeating: false, count: count)
+        func isOpen(_ i: Int) -> Bool { !wall[i] }
+
+        // 1. pillar lattice (denser at higher tiers)
+        let step = tier >= 4 ? 2 : (tier >= 2 ? 2 : 3)
+        for y in stride(from: 2, to: mh - 1, by: step) {
+            for x in stride(from: 2, to: mw - 1, by: step) {
+                if idx(x, y) != 0 { wall[idx(x, y)] = true }
+            }
+        }
+        if !Self.isNeverStuck(mw: mw, mh: mh, isOpen: isOpen) {
+            wall = [Bool](repeating: false, count: count)   // (tiny grid) fall back to sparser
+            for y in stride(from: 2, to: mh - 1, by: 3) {
+                for x in stride(from: 2, to: mw - 1, by: 3) where idx(x, y) != 0 {
+                    wall[idx(x, y)] = true
+                }
             }
         }
 
-        cols = mw
-        rows = mh
+        // 2. extra scattered obstacles for tier ≥ 2
+        let target = wall.filter { $0 }.count + Int(Double(count) * [0, 0.05, 0.10, 0.16, 0.22, 0.28][tier])
+        let shapes: [[(Int, Int)]] = tier <= 2
+            ? [[(0, 0)]]
+            : [[(0, 0)], [(0, 0), (1, 0)], [(0, 0), (0, 1)], [(0, 0), (1, 0), (1, 1)]]
+        var attempts = 0
+        while wall.filter({ $0 }).count < target, attempts < 400 {
+            attempts += 1
+            let shape = shapes.randomElement()!
+            let bx = Int.random(in: 1..<(mw - 1)), by = Int.random(in: 1..<(mh - 1))
+            let cells = shape.map { (bx + $0.0, by + $0.1) }
+            guard cells.allSatisfy({ (x, y) in
+                x >= 1 && x < mw - 1 && y >= 1 && y < mh - 1 && idx(x, y) != 0 && !wall[idx(x, y)]
+            }) else { continue }
+            for (x, y) in cells { wall[idx(x, y)] = true }
+            if !Self.isNeverStuck(mw: mw, mh: mh, isOpen: isOpen) {
+                for (x, y) in cells { wall[idx(x, y)] = false }   // revert
+            }
+        }
+
         var w = Set<Int>(); var o = Set<Int>()
-        for i in 0..<(mw * mh) { if chosen[i] { o.insert(i) } else { w.insert(i) } }
+        for i in 0..<count { if wall[i] { w.insert(i) } else { o.insert(i) } }
         walls = w
         openCells = o
         pos = 0
@@ -255,51 +282,51 @@ struct MarbleView: View {
         cleared = false
     }
 
-    /// Recursive-backtracker carve from (0,0), then optional braiding.
-    private static func generate(mw: Int, mh: Int, braid: Double) -> [Bool] {
-        var isOpen = [Bool](repeating: false, count: mw * mh)
-        func idx(_ x: Int, _ y: Int) -> Int { y * mw + x }
-
-        var stack: [(Int, Int)] = [(0, 0)]
-        isOpen[idx(0, 0)] = true
-        let dirs = [(2, 0), (-2, 0), (0, 2), (0, -2)]
-        while let top = stack.last {
-            let (x, y) = top
-            let options = dirs.compactMap { d -> (Int, Int)? in
-                let nx = x + d.0, ny = y + d.1
-                guard nx >= 0, nx < mw, ny >= 0, ny < mh, !isOpen[idx(nx, ny)] else { return nil }
-                return (nx, ny)
+    /// Valid iff every open tile is paintable from the start AND every rest
+    /// position reachable from the start can slide back to the start (so you
+    /// can always loop around — no dead ends, no forced restart).
+    static func isNeverStuck(mw: Int, mh: Int, isOpen: (Int) -> Bool) -> Bool {
+        guard isOpen(0) else { return false }
+        let dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        func slide(_ from: Int, _ dx: Int, _ dy: Int) -> (Int, [Int]) {
+            var x = from % mw, y = from / mw
+            var path: [Int] = []
+            while true {
+                let nx = x + dx, ny = y + dy
+                if nx < 0 || nx >= mw || ny < 0 || ny >= mh || !isOpen(ny * mw + nx) { break }
+                x = nx; y = ny; path.append(y * mw + x)
             }
-            if options.isEmpty { stack.removeLast(); continue }
-            let (nx, ny) = options.randomElement()!
-            isOpen[idx((x + nx) / 2, (y + ny) / 2)] = true
-            isOpen[idx(nx, ny)] = true
-            stack.append((nx, ny))
+            return (y * mw + x, path)
         }
-
-        if braid > 0 {
-            let ortho = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-            func openAt(_ x: Int, _ y: Int) -> Bool {
-                x >= 0 && x < mw && y >= 0 && y < mh && isOpen[idx(x, y)]
-            }
-            func wouldMake2x2(_ x: Int, _ y: Int) -> Bool {
-                for (ox, oy) in [(0, 0), (-1, 0), (0, -1), (-1, -1)] {
-                    let cells = [(x + ox, y + oy), (x + ox + 1, y + oy),
-                                 (x + ox, y + oy + 1), (x + ox + 1, y + oy + 1)]
-                    if cells.allSatisfy({ (a, b) in (a == x && b == y) || openAt(a, b) }) { return true }
-                }
-                return false
-            }
-            for y in 1..<(mh - 1) {
-                for x in 1..<(mw - 1) where !isOpen[idx(x, y)] {
-                    guard Double.random(in: 0..<1) < braid else { continue }
-                    let openNbrs = ortho.filter { openAt(x + $0.0, y + $0.1) }.count
-                    guard openNbrs >= 2, !wouldMake2x2(x, y) else { continue }
-                    isOpen[idx(x, y)] = true
-                }
+        // forward BFS over rest positions; record every cell covered
+        var rests: Set<Int> = [0]
+        var edges: [Int: [Int]] = [:]           // rest -> rests it can slide to
+        var covered: Set<Int> = [0]
+        var q = [0], qi = 0
+        while qi < q.count {
+            let cur = q[qi]; qi += 1
+            for (dx, dy) in dirs {
+                let (dest, path) = slide(cur, dx, dy)
+                covered.formUnion(path)
+                guard dest != cur else { continue }
+                edges[cur, default: []].append(dest)
+                if !rests.contains(dest) { rests.insert(dest); q.append(dest) }
             }
         }
-        return isOpen
+        // A: every open tile painted by some slide
+        for i in 0..<(mw * mh) where isOpen(i) && !covered.contains(i) { return false }
+        // B: reverse-reachability — can every rest get back to 0?
+        var back: [Int: [Int]] = [:]
+        for (a, outs) in edges { for b in outs { back[b, default: []].append(a) } }
+        var canReturn: Set<Int> = [0]
+        var q2 = [0], q2i = 0
+        while q2i < q2.count {
+            let cur = q2[q2i]; q2i += 1
+            for prev in back[cur, default: []] where !canReturn.contains(prev) {
+                canReturn.insert(prev); q2.append(prev)
+            }
+        }
+        return rests.isSubset(of: canReturn)
     }
 
     /// True if, sliding from `start` (treating `covered` as already painted),
@@ -348,20 +375,7 @@ struct MarbleView: View {
         return true
     }
 
-    /// True only if the whole board is paintable starting from EVERY open
-    /// cell — i.e. there is no rest position from which you can get stuck.
-    private static func stronglyPaintable(mw: Int, mh: Int, isOpen: (Int) -> Bool) -> Bool {
-        for p in 0..<(mw * mh) where isOpen(p) {
-            if !paintableBySliding(mw: mw, mh: mh, isOpen: isOpen, start: p, covered: []) {
-                return false
-            }
-        }
-        return true
-    }
-
-    /// Size of the biggest 4-connected group of wall cells — the smaller
-    /// this is, the more the obstacles read as scattered pieces rather than
-    /// one or two big blocks.
+    /// (retained for future validators) size of the biggest 4-connected wall blob.
     private static func maxWallClusterSize(_ isOpen: [Bool], mw: Int, mh: Int) -> Int {
         var seen = Set<Int>()
         var best = 0

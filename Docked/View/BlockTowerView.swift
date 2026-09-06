@@ -17,6 +17,7 @@ struct BlockTowerView: View {
     @State private var best: Int
     @State private var over = false
     @State private var landTick = 0
+    @State private var lockTick = 0
     @State private var overTick = 0
 
     init(highScore: Int) {
@@ -59,10 +60,12 @@ struct BlockTowerView: View {
         .onAppear {
             scene.onScoreChange = { score = $0 }
             scene.onLand = { landTick += 1 }
+            scene.onLock = { lockTick += 1 }
             scene.onGameOver = {
                 if score > best { best = score }
                 over = true
                 overTick += 1
+                Analytics.shared.gameOver("blocktower", score: score)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
                     over = false
                     scene.reset()
@@ -71,6 +74,7 @@ struct BlockTowerView: View {
         }
         .onChange(of: best) { _, v in app.towerHighScore = v }
         .sensoryFeedback(.impact(weight: .light), trigger: landTick) { _, _ in app.haptics }
+        .sensoryFeedback(.impact(flexibility: .rigid, intensity: 0.9), trigger: lockTick) { _, _ in app.haptics }
         .sensoryFeedback(.error, trigger: overTick) { _, _ in app.haptics }
     }
 

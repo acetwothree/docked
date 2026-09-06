@@ -158,12 +158,43 @@ struct ColorView: View {
 
     private func artwork(side: CGFloat) -> some View {
         ZStack {
+            // pass 1: the shapes
             ForEach(regions.indices, id: \.self) { i in
                 regionCell(i, side: side)
+            }
+            // pass 2: every number chip on its OWN top layer, anchored at a
+            // point of the region that no later region covers — so a chip is
+            // never hidden behind the piece painted on top of it.
+            ForEach(regions.indices, id: \.self) { i in
+                if fills[i] != regions[i].n {
+                    let a = chipAnchor(i)
+                    numberChip(regions[i].n)
+                        .position(x: a.x * side, y: a.y * side)
+                        .allowsHitTesting(false)
+                }
             }
         }
         .frame(width: side, height: side)
         .background(Self.paper)
+    }
+
+    /// A visible spot for region `i`'s number: its centre if nothing painted
+    /// later sits there, otherwise the first clear point on a small search
+    /// grid inside its rect.
+    private func chipAnchor(_ i: Int) -> CGPoint {
+        let r = regions[i].rect
+        let later = regions.indices.filter { $0 > i }.map { regions[$0].rect }
+        func covered(_ p: CGPoint) -> Bool { later.contains { $0.contains(p) } }
+        let centre = CGPoint(x: r.midX, y: r.midY)
+        if !covered(centre) { return centre }
+        let fracs: [CGFloat] = [0.25, 0.5, 0.75]
+        for fy in fracs {
+            for fx in fracs where !(fx == 0.5 && fy == 0.5) {
+                let p = CGPoint(x: r.minX + r.width * fx, y: r.minY + r.height * fy)
+                if !covered(p) { return p }
+            }
+        }
+        return centre
     }
 
     @ViewBuilder
@@ -173,18 +204,11 @@ struct ColorView: View {
         let fillColor: Color = done ? palette[region.n - 1] : Self.paper
         let w = region.rect.width * side
         let h = region.rect.height * side
-        // Chip in a corner for big background regions so it doesn't sit
-        // under the subject; centred for normal-size regions.
-        let big = region.rect.width * region.rect.height > 0.3
-        let chipAlign: Alignment = big ? .topLeading : .center
 
         region.shape
             .fill(fillColor)
             .overlay(region.shape.stroke(Color.white.opacity(0.55), lineWidth: 3.5))
             .overlay(region.shape.stroke(Self.lineDark.opacity(0.85), lineWidth: 1.6))
-            .overlay(alignment: chipAlign) {
-                if !done { numberChip(region.n).padding(big ? 8 : 0) }
-            }
             .frame(width: w, height: h)
             .position(x: region.rect.midX * side, y: region.rect.midY * side)
             .onTapGesture { tap(i, region) }

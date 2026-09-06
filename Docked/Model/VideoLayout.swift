@@ -46,7 +46,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         switch self {
         case .doodle: "Doodle"
         case .notes: "Notes"
-        case .color: "Color by Number"
+        case .color: "Color Numbers"
         case .zen: "Color Blocks"
         case .merge: "2048"
         case .drop: "Number Merge"

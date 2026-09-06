@@ -521,18 +521,29 @@ private struct GamePreview: View {
 
     /// A peg with rings actually stacked around it, big on the bottom —
     /// the classic tower puzzle, not three free-floating bars.
+    /// Two pegs: the left one stacked biggest-to-smallest with three rings,
+    /// the right one empty — the "move the stack across" puzzle.
     private func rings(_ s: CGFloat) -> some View {
-        ZStack(alignment: .bottom) {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(Color.white.opacity(0.25))
-                .frame(width: s * 0.05, height: s * 0.66)
-            VStack(spacing: s * 0.04) {
-                PopCapsule(color: Color(hex: "E0473E"), width: s * 0.7, height: s * 0.15)
-                PopCapsule(color: Color(hex: "F2B90C"), width: s * 0.5, height: s * 0.15)
-                PopCapsule(color: Color(hex: "3ECF7A"), width: s * 0.3, height: s * 0.15)
+        let peg: CGFloat = s * 0.05
+        let base: CGFloat = s * 0.14
+        return HStack(spacing: s * 0.14) {
+            ForEach(0..<2, id: \.self) { p in
+                ZStack(alignment: .bottom) {
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(Color.white.opacity(0.28))
+                        .frame(width: peg, height: s * 0.6)
+                    if p == 0 {
+                        VStack(spacing: s * 0.03) {
+                            PopCapsule(color: Color(hex: "3ECF7A"), width: s * 0.22, height: base)
+                            PopCapsule(color: Color(hex: "F2B90C"), width: s * 0.30, height: base)
+                            PopCapsule(color: Color(hex: "E0473E"), width: s * 0.38, height: base)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
             }
         }
-        .offset(y: -s * 0.06)
+        .offset(y: -s * 0.04)
     }
 
     /// A falling piece above a mounded pile of colourful sand — not a flat row.
