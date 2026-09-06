@@ -129,7 +129,7 @@ struct RingsView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .sensoryFeedback(.impact(weight: .light), trigger: liftTick) { _, _ in app.haptics }
+        .sensoryFeedback(.impact(weight: .medium, intensity: 0.9), trigger: liftTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: dropTick) { _, _ in app.haptics }
         .sensoryFeedback(.error, trigger: nopeTick) { _, _ in app.haptics }
         .sensoryFeedback(.success, trigger: winTick) { _, _ in app.haptics }
@@ -183,6 +183,7 @@ struct RingsView: View {
             if p == h.peg {
                 pegs[p].append(h.size)   // put it back
                 held = nil
+                liftTick += 1            // soft "set back down"
                 return
             }
             if let top = pegs[p].last, top < h.size {
@@ -199,7 +200,10 @@ struct RingsView: View {
             }
         } else {
             // lifting
-            guard let top = pegs[p].popLast() else { return }
+            guard let top = pegs[p].popLast() else {
+                nopeTick += 1            // tapped an empty peg — nothing to grab
+                return
+            }
             held = (peg: p, size: top)
             liftTick += 1
         }

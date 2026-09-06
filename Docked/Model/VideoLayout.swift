@@ -27,7 +27,7 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
 }
 
 // Declaration order is also the order the home grid shows them in: doodle,
-// Color Blocks, Color, Maze Paint, Number Merge and Crumble Drop lead ahead
+// Color Blocks, Color, Maze Paint, Number Merge and Sand Bridge lead ahead
 // of Pop (the most-used free activities), then the rest of the free set,
 // then every Plus activity last.
 enum ActivityModule: String, CaseIterable, Identifiable {
@@ -57,7 +57,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .click: "Clicker"
         case .ksand: "Kinetic Sand"
         case .rings: "Rings"
-        case .crumble: "Crumble Drop"
+        case .crumble: "Sand Bridge"
         case .hexfall: "Hex Fall"
         case .blocktower: "Block Tower"
         }
@@ -110,7 +110,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .click: "A tally clicker with a satisfying tick."
         case .ksand: "Rake patterns into a zen sand tray."
         case .rings: "Stack the rings smallest-on-top — the classic tower puzzle."
-        case .crumble: "Falling pieces crumble into sand — connect one colour wall to wall."
+        case .crumble: "Falling pieces melt into sand — bridge one colour wall to wall."
         case .hexfall: "Tap blocks off a tower without tipping the hexagon on top."
         case .blocktower: "Stack falling pieces as high as you can without toppling."
         }

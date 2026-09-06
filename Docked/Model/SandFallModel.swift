@@ -22,6 +22,10 @@ struct Grain: Identifiable {
     var row: Int
     var col: Int
     let color: Color
+    /// How many diagonal slides this grain has taken since it last locked or
+    /// a clear reshuffled the pile — capped so one grain can't ski the whole
+    /// length of a slope and land columns away from where it fell.
+    var slides = 0
 }
 
 @Observable
@@ -156,6 +160,28 @@ final class SandFallModel {
         if canPlace(moved) { activeCells = moved }
     }
 
+    /// Slide the active piece so its horizontal centre lands on `targetCol`,
+    /// clamped to the walls. If the full shift is blocked by the pile, step
+    /// toward the target as far as the piece can actually go.
+    func moveActiveCenter(toCol targetCol: Int) {
+        guard phase == .play, !activeCells.isEmpty else { return }
+        let cs = activeCells.map(\.col)
+        let lo = cs.min()!, hi = cs.max()!
+        let curCenter = (lo + hi) / 2
+        var delta = targetCol - curCenter
+        if lo + delta < 0 { delta = -lo }
+        if hi + delta > cols - 1 { delta = (cols - 1) - hi }
+        guard delta != 0 else { return }
+        let whole = activeCells.map { (row: $0.row, col: $0.col + delta) }
+        if canPlace(whole) { activeCells = whole; return }
+        let dir = delta > 0 ? 1 : -1
+        var applied = 0
+        while applied != delta {
+            let next = activeCells.map { (row: $0.row, col: $0.col + dir) }
+            if canPlace(next) { activeCells = next; applied += dir } else { break }
+        }
+    }
+
     /// Quarter-turn clockwise about the piece's bounding-box, nudged back
     /// inside the walls if the turn would poke it out. No-op if the rotated
     /// shape can't fit where it is.
@@ -243,9 +269,13 @@ final class SandFallModel {
             // that's what stops a straight drop from fanning out into both
             // corners.
             guard canLeft != canRight else { continue }
+            // …and only a couple of steps, so a grain can't ski a long slope
+            // and skip several columns from where it landed.
+            guard grains[i].slides < 2 else { continue }
             occ.remove(g.row * cols + g.col)
             grains[i].col = canLeft ? leftCol : rightCol
             grains[i].row += 1
+            grains[i].slides += 1
             occ.insert(grains[i].row * cols + grains[i].col)
             moved = true
         }
@@ -304,6 +334,9 @@ final class SandFallModel {
         guard !clearingCells.isEmpty else { return }
         let n = clearingCells.count
         grains.removeAll { clearingCells.contains($0.row * cols + $0.col) }
+        // The pile just changed shape — let every survivor take a fresh
+        // couple of slide steps as it re-settles into the gap.
+        for i in grains.indices { grains[i].slides = 0 }
         score += n * 12
         best = max(best, score)
         clearingCells = []

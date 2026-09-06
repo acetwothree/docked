@@ -2,14 +2,15 @@
 //  SandFallView.swift
 //  Docked
 //
-//  "Crumble Drop" — coloured tetromino pieces spawn just above a dashed
+//  "Sand Bridge" — coloured tetromino pieces spawn just above a dashed
 //  starting line and immediately begin a slow, steady, continuous descent —
-//  no pauses between steps. Drag left/right to slide the falling piece over
-//  (it follows your finger 1:1); tap to rotate it a quarter-turn; swipe
-//  down to speed it up into an instant hard drop. A preview square above
-//  the line always shows the next piece. On landing it crumbles into loose
-//  sand that trickles into gaps. A colour clears once a connected patch of
-//  it spans every column from the left wall to the right wall.
+//  no pauses between steps. Drag anywhere along the board and the falling
+//  piece tracks straight to your finger's column (absolute, not relative);
+//  tap to rotate it a quarter-turn; swipe down to speed it up into an
+//  instant hard drop. A preview square above the line always shows the next
+//  piece. On landing it melts into loose sand that trickles into gaps. A
+//  colour clears once a connected patch of it spans every column from the
+//  left wall to the right wall.
 //
 //  Settled grains keep a stable identity (`Grain.id`) across the model's
 //  settle passes, so `ForEach(model.grains)` animates each one sliding to its
@@ -23,9 +24,6 @@ struct SandFallView: View {
     @Environment(AppModel.self) private var app
     @State private var model: SandFallModel
 
-    /// Net columns already applied for the drag in progress, so continued
-    /// finger movement only applies the DELTA each time (free 1:1 tracking).
-    @State private var dragAppliedCols = 0
     /// Bumped on every hard-drop/lock so a stale slow-fall loop from an
     /// earlier piece can recognise it's obsolete and stop.
     @State private var fallGen = 0
@@ -58,7 +56,7 @@ struct SandFallView: View {
                 board(w: geo.size.width, h: geo.size.height)
             }
 
-            Text(model.phase == .over ? "Sand piled up — resetting…" : "Drag to slide · tap to rotate · swipe down to drop")
+            Text(model.phase == .over ? "Sand piled up — resetting…" : "Drag to aim · tap to rotate · swipe down to drop")
                 .font(.system(size: 11, weight: .heavy))
                 .foregroundStyle(model.phase == .over ? Color.orange : Color.secondary)
                 .lineLimit(1).minimumScaleFactor(0.7)
@@ -222,26 +220,20 @@ struct SandFallView: View {
         .frame(width: pieceW, height: pieceH)
     }
 
-    /// Column-step dragging with a short glide per step (a hair of easing, so
-    /// it doesn't feel like the piece is teleporting) while it falls on its
-    /// own; a downward swipe speeds it into an instant hard drop with a quick
-    /// motion streak down the column.
+    /// Absolute aim: wherever your finger is along the board, the piece glides
+    /// so its centre sits over that column — no relative accumulation, no
+    /// per-step threshold, so it never feels like it's lagging your finger. A
+    /// downward swipe speeds it into an instant hard drop with a quick motion
+    /// streak down the column.
     private func dragGesture(cellW: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 8)
             .onChanged { v in
-                guard cellW > 0 else { return }
-                let wanted = Int((v.translation.width / cellW).rounded())
-                if wanted != dragAppliedCols {
-                    let step = wanted > dragAppliedCols ? 1 : -1
-                    withAnimation(.easeOut(duration: 0.09)) {
-                        for _ in 0..<abs(wanted - dragAppliedCols) { model.moveActive(dCol: step) }
-                    }
-                    dragAppliedCols = wanted
-                }
+                guard cellW > 0, model.phase == .play else { return }
+                let target = max(0, min(model.cols - 1, Int((v.location.x / cellW).rounded(.down))))
+                withAnimation(.easeOut(duration: 0.08)) { model.moveActiveCenter(toCol: target) }
             }
             .onEnded { v in
                 let dx = v.translation.width, dy = v.translation.height
-                dragAppliedCols = 0
                 if dy > 40, abs(dy) > abs(dx) * 1.2 {
                     fallGen += 1
                     let cols = model.activeCells.map(\.col)

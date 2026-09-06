@@ -31,43 +31,73 @@ struct BrawlView: View {
     private let ticker = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                canvas(size: geo.size, tick: lastTick, hitFlash: hitFlash, blastAt: blastAt)
-                hud
-                overlay
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { game.tap() }
-            .gesture(
-                DragGesture(minimumDistance: 16)
-                    .onEnded { v in
-                        guard game.phase == .running else { game.tap(); return }
-                        let dx = v.translation.width, dy = v.translation.height
-                        let dir = abs(dx) > abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0)
-                        slashDir = dir
-                        slashAt = Date()
-                        swipeTick += 1
-                        if game.strike(dir) { hitTick += 1 }
+        VStack(spacing: 10) {
+            HStack {
+                stat("SCORE", game.score)
+                Spacer()
+                HStack(spacing: 3) {
+                    ForEach(0..<3, id: \.self) { i in
+                        Image(systemName: i < game.lives ? "heart.fill" : "heart")
+                            .font(.system(size: 13))
+                            .foregroundStyle(i < game.lives ? Color.red : Color.secondary)
                     }
-            )
-            .onReceive(ticker) { _ in
-                let now = Date()
-                let dt = CGFloat(now.timeIntervalSince(lastTick))
-                lastTick = now
-                let livesBefore = game.lives
-                game.step(dt: dt)
-                if game.lives < livesBefore {
-                    hurtTick += 1
-                    hitFlash = 1
                 }
-                // Decayed by hand, in step with the same 60Hz tick that
-                // drives the rest of this Canvas — SwiftUI's implicit
-                // animation system doesn't interpolate a value read straight
-                // inside a Canvas closure, so this is what actually fades it.
-                if hitFlash > 0 { hitFlash = max(0, hitFlash - dt / 0.4) }
+                Spacer()
+                stat("BEST", max(best, game.score))
+                Spacer()
+                Button { game.restart() } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 34, height: 30)
+                }
+                .buttonStyle(.plain)
             }
+
+            GeometryReader { geo in
+                ZStack {
+                    canvas(size: geo.size, tick: lastTick, hitFlash: hitFlash, blastAt: blastAt)
+                    overlay
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { game.tap() }
+                .gesture(
+                    DragGesture(minimumDistance: 16)
+                        .onEnded { v in
+                            guard game.phase == .running else { game.tap(); return }
+                            let dx = v.translation.width, dy = v.translation.height
+                            let dir = abs(dx) > abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0)
+                            slashDir = dir
+                            slashAt = Date()
+                            swipeTick += 1
+                            if game.strike(dir) { hitTick += 1 }
+                        }
+                )
+                .onReceive(ticker) { _ in
+                    let now = Date()
+                    let dt = CGFloat(now.timeIntervalSince(lastTick))
+                    lastTick = now
+                    let livesBefore = game.lives
+                    game.step(dt: dt)
+                    if game.lives < livesBefore {
+                        hurtTick += 1
+                        hitFlash = 1
+                    }
+                    // Decayed by hand, in step with the same 60Hz tick that
+                    // drives the rest of this Canvas — SwiftUI's implicit
+                    // animation system doesn't interpolate a value read straight
+                    // inside a Canvas closure, so this is what actually fades it.
+                    if hitFlash > 0 { hitFlash = max(0, hitFlash - dt / 0.4) }
+                }
+            }
+
+            Text(brawlHint)
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundStyle(game.phase == .over ? Color.orange : Color.secondary)
+                .lineLimit(1).minimumScaleFactor(0.75)
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onChange(of: game.phase) { _, p in
             if p == .over, game.score > best { best = game.score }
         }
@@ -76,6 +106,20 @@ struct BrawlView: View {
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: hitTick) { _, _ in app.haptics }
         .sensoryFeedback(.error, trigger: hurtTick) { _, _ in app.haptics }
         .sensoryFeedback(.success, trigger: game.blastTick) { _, _ in app.haptics }
+    }
+
+    private var brawlHint: String {
+        switch game.phase {
+        case .ready, .running: return "Swipe toward an enemy in the ring to strike"
+        case .over:            return "Down! — tap to fight again"
+        }
+    }
+
+    private func stat(_ label: String, _ v: Int) -> some View {
+        VStack(spacing: 1) {
+            Text(label).font(.system(size: 9, weight: .heavy)).tracking(1).foregroundStyle(.secondary)
+            Text("\(v)").font(.system(size: 18, weight: .black)).monospacedDigit()
+        }
     }
 
     private func canvas(size: CGSize, tick: Date, hitFlash: CGFloat, blastAt: Date?) -> some View {
@@ -168,50 +212,22 @@ struct BrawlView: View {
         }
     }
 
-    private var hud: some View {
-        VStack {
-            HStack {
-                Text("\(game.score)").font(.headline.monospacedDigit()).foregroundStyle(Theme.ink)
-                Spacer()
-                HStack(spacing: 3) {
-                    ForEach(0..<3, id: \.self) { i in
-                        Image(systemName: i < game.lives ? "heart.fill" : "heart")
-                            .font(.system(size: 13))
-                            .foregroundStyle(i < game.lives ? Color.red : Color.secondary)
-                    }
-                }
-            }
-            .padding(10)
-            Spacer()
-        }
-    }
-
     @ViewBuilder private var overlay: some View {
         switch game.phase {
-        case .ready:
-            prompt("Tap to fight", "Swipe toward an enemy in the ring to hit it")
-        case .over:
-            prompt("Down!", "Score \(game.score) · tap to retry")
-        case .running:
-            EmptyView()
+        case .ready:   prompt("Tap to fight")
+        case .over:    prompt("Down! · tap to fight again")
+        case .running: EmptyView()
         }
     }
 
-    /// Sits at the bottom, not the middle — so it reads as a hint rather than
-    /// a dialog blocking the arena from view before you've even started.
-    private func prompt(_ t: String, _ s: String) -> some View {
-        VStack {
-            Spacer(minLength: 0)
-            VStack(spacing: 6) {
-                Text(t).font(.title3.bold())
-                Text(s).font(.footnote).foregroundStyle(.secondary)
-            }
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 22).padding(.vertical, 14)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    /// A single quiet call-to-action in the centre of the arena — no heavy
+    /// dialog, in keeping with the other games' bare presentation.
+    private func prompt(_ t: String) -> some View {
+        Text(t)
+            .font(.system(size: 14, weight: .heavy))
             .foregroundStyle(Theme.ink)
-        }
-        .padding(.bottom, 12)
+            .padding(.horizontal, 18).padding(.vertical, 9)
+            .background(.ultraThinMaterial, in: Capsule())
     }
 }
 
@@ -240,17 +256,22 @@ final class BrawlModel {
 
     func tap() {
         switch phase {
-        case .ready, .over:
-            enemies.removeAll(); score = 0; lives = 3
-            spawnCountdown = 0.22; speed = 0.30; elapsed = 0; freezeTimeLeft = 0
-            // Three enemies already on the board so it's a fight from the first tap.
-            for d in Array(0..<4).shuffled().prefix(3) {
-                enemies.append(Enemy(dir: d, dist: CGFloat.random(in: 0.7...1.0)))
-            }
-            phase = .running
-        case .running:
-            break
+        case .ready, .over: startRun()
+        case .running:      break
         }
+    }
+
+    /// Force a fresh run from any phase — used by the header reset button.
+    func restart() { startRun() }
+
+    private func startRun() {
+        enemies.removeAll(); score = 0; lives = 3
+        spawnCountdown = 0.22; speed = 0.30; elapsed = 0; freezeTimeLeft = 0
+        // Three enemies already on the board so it's a fight from the first tap.
+        for d in Array(0..<4).shuffled().prefix(3) {
+            enemies.append(Enemy(dir: d, dist: CGFloat.random(in: 0.7...1.0)))
+        }
+        phase = .running
     }
 
     /// A little slack so an enemy whose edge is just touching the ring still

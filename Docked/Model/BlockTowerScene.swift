@@ -8,10 +8,11 @@
 //  that, only the piece in the air can still go wrong. Drop a piece clear
 //  off the side and it's a loss.
 //
-//  Every 10 pieces a free flat platform locks onto the current tip to give
-//  you a fresh surface. Faint height markers scroll by in the background.
-//  A stone platform in the water is "the ground"; a piece that falls back to
-//  it after the first couple ends the run.
+//  Every 10 of HEIGHT a free flat platform locks flush onto the current tip
+//  to give you a fresh surface, and a faint numbered marker is dropped at the
+//  tip every 5 — both pinned to the HEIGHT score, not to screen distance, so
+//  they always read true. A stone platform in the water is "the ground"; a
+//  piece that falls back to it after the first couple ends the run.
 //
 
 import SpriteKit
@@ -39,8 +40,7 @@ final class BlockTowerScene: SKScene {
     private var lastPieceY: CGFloat = .greatestFiniteMagnitude
 
     private var milestoneDone = 0
-    private var nextMarkerY: CGFloat = 0
-    private var markerFloor = 0
+    private var lastMarker = 0
     private var markers: [SKNode] = []
 
     private var hoverGap: CGFloat { size.height * 0.30 }
@@ -69,6 +69,8 @@ final class BlockTowerScene: SKScene {
         guard cam != nil, size.width > 10, size.height > 10 else { return }
         removeAllChildren()
         addChild(cam)
+        cam.removeAllChildren()          // preview/flash nodes live on the camera — clear them too
+        previewNode = nil
         placed = []
         markers = []
         current = nil
@@ -78,21 +80,18 @@ final class BlockTowerScene: SKScene {
         settledFrames = 0
         awaitSince = 0
         milestoneDone = 0
+        lastMarker = 0
         physicsWorld.speed = 1
         onScoreChange?(0)
         cam.position = CGPoint(x: size.width / 2, y: size.height / 2)
         camTargetY = size.height / 2
 
         buildGround()
-        nextMarkerY = floorTopY + markerSpacing
-        markerFloor = 10
         buildPreview()
         nextShape = TetrominoShape.allCases.randomElement()!
         refreshPreview()
         spawnPiece()
     }
-
-    private var markerSpacing: CGFloat { cellSize() * 10 }
 
     // MARK: scenery
 
@@ -129,16 +128,20 @@ final class BlockTowerScene: SKScene {
         addChild(platform)
     }
 
-    /// A free, permanently-locked flat bar on top of the current tip.
-    private func addMilestonePlatform(atY y: CGFloat, label: Int) {
+    /// A free, permanently-locked flat bar sitting flush ON TOP of `tipY` (its
+    /// underside touches the tower's highest point). Static, so weight never
+    /// shifts it.
+    private func addMilestonePlatform(onTipY tipY: CGFloat, label: Int) {
         let w = cellSize() * 5.5
-        let bar = SKShapeNode(rectOf: CGSize(width: w, height: cellSize() * 0.6), cornerRadius: 3)
+        let barH = cellSize() * 0.6
+        let y = tipY + barH / 2
+        let bar = SKShapeNode(rectOf: CGSize(width: w, height: barH), cornerRadius: 3)
         bar.fillColor = SKColor(red: 0.36, green: 0.40, blue: 0.47, alpha: 1)
         bar.strokeColor = SKColor(red: 0.95, green: 0.78, blue: 0.35, alpha: 0.9)
         bar.lineWidth = 2
         bar.position = CGPoint(x: size.width / 2, y: y)
         bar.zPosition = 8
-        bar.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: w, height: cellSize() * 0.6))
+        bar.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: w, height: barH))
         bar.physicsBody?.isDynamic = false
         bar.physicsBody?.friction = 1
         addChild(bar)
@@ -156,32 +159,31 @@ final class BlockTowerScene: SKScene {
 
     // MARK: height markers
 
-    private func extendMarkers() {
-        let ceiling = cam.position.y + size.height
-        var guardN = 0
-        while nextMarkerY < ceiling && guardN < 20 {
-            guardN += 1
-            let line = SKShapeNode(rectOf: CGSize(width: size.width * 1.6, height: 1))
-            line.fillColor = SKColor.white.withAlphaComponent(0.06)
-            line.strokeColor = .clear
-            line.position = CGPoint(x: size.width / 2, y: nextMarkerY)
-            line.zPosition = -5
-            addChild(line)
+    /// A faint full-width line + number dropped at the tower tip whenever
+    /// HEIGHT passes another multiple of 5 — so a marker labelled "15" really
+    /// is where the 15th piece settled.
+    private func addHeightMarker(atY y: CGFloat, value: Int) {
+        let line = SKShapeNode(rectOf: CGSize(width: size.width * 1.6, height: 1))
+        line.fillColor = SKColor.white.withAlphaComponent(0.06)
+        line.strokeColor = .clear
+        line.position = CGPoint(x: size.width / 2, y: y)
+        line.zPosition = -5
+        addChild(line)
 
-            let n = SKLabelNode(text: "\(markerFloor)")
-            n.fontName = "AvenirNext-Bold"
-            n.fontSize = cellSize() * 0.55
-            n.fontColor = SKColor.white.withAlphaComponent(0.12)
-            n.verticalAlignmentMode = .center
-            n.position = CGPoint(x: cellSize() * 1.2, y: nextMarkerY)
-            n.zPosition = -5
-            addChild(n)
+        let n = SKLabelNode(text: "\(value)")
+        n.fontName = "AvenirNext-Bold"
+        n.fontSize = cellSize() * 0.55
+        n.fontColor = SKColor.white.withAlphaComponent(0.12)
+        n.verticalAlignmentMode = .center
+        n.position = CGPoint(x: cellSize() * 1.2, y: y)
+        n.zPosition = -5
+        addChild(n)
 
-            markers.append(line); markers.append(n)
-            nextMarkerY += markerSpacing
-            markerFloor += 10
-        }
-        let floorCull = cam.position.y - size.height * 1.5
+        markers.append(line); markers.append(n)
+    }
+
+    private func cullMarkers() {
+        let floorCull = cam.position.y - size.height * 1.6
         markers.removeAll { m in
             if m.position.y < floorCull { m.removeFromParent(); return true }
             return false
@@ -270,7 +272,7 @@ final class BlockTowerScene: SKScene {
 
     override func update(_ currentTime: TimeInterval) {
         guard !isOver, cam != nil else { return }
-        extendMarkers()
+        cullMarkers()
 
         if awaitingSettle, let piece = placed.last {
             if awaitSince == 0 { awaitSince = currentTime }
@@ -299,10 +301,14 @@ final class BlockTowerScene: SKScene {
             // Never lock in the first ~0.45s: the piece has to be allowed to fall.
             if elapsed > 0.45, settledFrames >= 8 || elapsed > 3.5 {
                 lockPiece(piece)
-                let m = (score / 10) * 10
-                if m > milestoneDone {
-                    addMilestonePlatform(atY: currentStackTopY() + cellSize() * 1.2, label: m)
-                    milestoneDone = m
+                let tip = currentStackTopY()
+                if score % 5 == 0, score > lastMarker {
+                    addHeightMarker(atY: tip, value: score)
+                    lastMarker = score
+                }
+                if score % 10 == 0, score > milestoneDone {
+                    addMilestonePlatform(onTipY: tip, label: score)
+                    milestoneDone = score
                 }
                 camTargetY = max(camTargetY,
                                  min(currentStackTopY() + size.height * 0.05, camTargetY + cellSize() * 4))
@@ -330,14 +336,18 @@ final class BlockTowerScene: SKScene {
     private func lockPiece(_ piece: SKNode) {
         piece.physicsBody?.isDynamic = false
         onLock?()
-        let pulse = SKShapeNode(rect: piece.calculateAccumulatedFrame().insetBy(dx: -3, dy: -3), cornerRadius: 4)
-        pulse.strokeColor = SKColor.white
-        pulse.lineWidth = 3
-        pulse.fillColor = .clear
-        pulse.zPosition = 20
-        pulse.alpha = 0.9
-        addChild(pulse)
-        pulse.run(.sequence([.fadeOut(withDuration: 0.35), .removeFromParent()]))
+        // Flash the block ITSELF white for a beat, then snap it back to colour.
+        for case let sq as SKShapeNode in piece.children {
+            let baseFill = sq.fillColor
+            sq.removeAction(forKey: "lockFlash")
+            sq.fillColor = .white
+            sq.strokeColor = .white
+            let restore = SKAction.run {
+                sq.fillColor = baseFill
+                sq.strokeColor = SKColor.white.withAlphaComponent(0.25)
+            }
+            sq.run(.sequence([.wait(forDuration: 0.11), restore]), withKey: "lockFlash")
+        }
     }
 
     private func endRun() {

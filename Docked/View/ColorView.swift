@@ -36,6 +36,7 @@ struct ColorView: View {
     @State private var fillTick = 0
     @State private var wrongTick = 0
     @State private var doneTick = 0
+    @State private var pickTick = 0
     @State private var celebrating = false
     @State private var exportImage: Image?
 
@@ -110,7 +111,8 @@ struct ColorView: View {
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.spring(response: 0.4, dampingFraction: 0.6), value: celebrating)
-        .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: fillTick) { _, _ in app.haptics }
+        .sensoryFeedback(.selection, trigger: pickTick) { _, _ in app.haptics }
+        .sensoryFeedback(.impact(weight: .light), trigger: fillTick) { _, _ in app.haptics }
         .sensoryFeedback(.warning, trigger: wrongTick) { _, _ in app.haptics }
         .sensoryFeedback(.success, trigger: doneTick) { _, _ in app.haptics }
         .onAppear {
@@ -128,7 +130,7 @@ struct ColorView: View {
         let left = remaining(n)
         let selected = picked == n
         let lightChip = n == 3 || n == 7          // yellow / cream need dark text
-        return Button { withAnimation(.easeOut(duration: 0.15)) { picked = n } } label: {
+        return Button { pickTick += 1; withAnimation(.easeOut(duration: 0.15)) { picked = n } } label: {
             VStack(spacing: 4) {
                 ZStack {
                     Circle().fill(palette[n - 1])

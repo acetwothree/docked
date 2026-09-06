@@ -69,7 +69,7 @@ final class HexFallScene: SKScene {
     override func didMove(to view: SKView) {
         backgroundColor = .clear
         scaleMode = .resizeFill
-        physicsWorld.gravity = CGVector(dx: 0, dy: -7.5)
+        physicsWorld.gravity = CGVector(dx: 0, dy: -6)
         let camera = SKCameraNode()
         self.camera = camera
         cam = camera
@@ -263,7 +263,7 @@ final class HexFallScene: SKScene {
     }
 
     private func placeHexagon(atY y: CGFloat) {
-        let radius = cellW * 0.78          // a touch smaller — sits less snugly
+        let radius = cellW * 0.72          // perches on fewer cells — easier to unbalance
         let path = TetrominoBuilder.polygonPath(sides: 6, radius: radius)
         let hex = SKShapeNode(path: path)
         hex.fillColor = SKColor(red: 0.26, green: 0.64, blue: 0.90, alpha: 1)
@@ -271,11 +271,11 @@ final class HexFallScene: SKScene {
         hex.lineWidth = 2
         hex.position = CGPoint(x: size.width / 2, y: y)
         hex.zPosition = 50
-        // Real hexagon collider with almost no angular damping and modest
-        // friction — as soon as its support goes uneven, gravity's torque
-        // tips it and it rolls, instead of sitting flat like a rock.
+        // Real hexagon collider with no angular damping and low friction — as
+        // soon as its support goes uneven, gravity's torque tips it and it
+        // commits to a roll, instead of sitting flat like a rock.
         let body = SKPhysicsBody(polygonFrom: path)
-        body.friction = 0.45
+        body.friction = 0.38
         body.restitution = 0.0
         body.density = 1.0
         body.angularDamping = 0.0
@@ -328,19 +328,31 @@ final class HexFallScene: SKScene {
         bricks.removeValue(forKey: id)
     }
 
-    /// Any piece no longer connected down to the generation frontier through
-    /// filled cells stops being static and just falls.
+    /// A brick stays put only if it's near the generation frontier OR at least
+    /// HALF of the columns it occupies still have a supported brick directly
+    /// beneath their lowest cell. Pull a block out from under the middle of a
+    /// wide piece and it can no longer cantilever — it drops, and whatever it
+    /// was holding drops with it. That's what makes removal ORDER matter.
     private func dropUnsupported() {
         var supported = Set<Int>()
         var changed = true
         while changed {
             changed = false
             for (id, brick) in bricks where !supported.contains(id) {
+                // lowest cell in each column this brick spans
+                var lowestByCol: [Int: Int] = [:]
                 for cell in brick.cells {
-                    if cell.row >= deepestRow - 1 { supported.insert(id); changed = true; break }
-                    if let below = occ[(cell.row + 1) * 100 + cell.col], supported.contains(below) {
-                        supported.insert(id); changed = true; break
-                    }
+                    lowestByCol[cell.col] = max(lowestByCol[cell.col] ?? cell.row, cell.row)
+                }
+                let need = (lowestByCol.count + 1) / 2        // ceil(cols / 2)
+                var have = 0
+                var atFrontier = false
+                for (col, row) in lowestByCol {
+                    if row >= deepestRow - 1 { atFrontier = true; break }
+                    if let below = occ[(row + 1) * 100 + col], supported.contains(below) { have += 1 }
+                }
+                if atFrontier || have >= need {
+                    supported.insert(id); changed = true
                 }
             }
         }

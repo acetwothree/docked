@@ -28,6 +28,7 @@ struct MarbleView: View {
     @State private var moveTick = 0
     @State private var hitTick = 0
     @State private var winTick = 0
+    @State private var swipeTick = 0
 
     private static let boardBG = Color(hex: "12141C")
     private static let tileOpen = Color(hex: "6E80B0")
@@ -100,6 +101,7 @@ struct MarbleView: View {
                     else { roll(0, dy > 0 ? 1 : -1) }
                 }
         )
+        .sensoryFeedback(.selection, trigger: swipeTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(weight: .light), trigger: moveTick) { _, _ in app.haptics }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: hitTick) { _, _ in app.haptics }
         .sensoryFeedback(.success, trigger: winTick) { _, _ in app.haptics }
@@ -120,35 +122,39 @@ struct MarbleView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Self.boardBG)
 
-            // one flat sheet for every open tile — seamless
-            ForEach(Array(openCells).sorted(), id: \.self) { i in
-                Rectangle().fill(Self.tileOpen)
-                    .frame(width: cell + 0.5, height: cell + 0.5)
-                    .position(center(i))
+            // Whole board — open tiles (painted or not) and walls — drawn in
+            // ONE Canvas pass. Hundreds of individually-positioned Rectangles
+            // inside a 3D-rotated ZStack was the source of the swipe lag;
+            // Canvas has nothing to diff, so a move just repaints once.
+            Canvas { ctx, _ in
+                for i in openCells {
+                    let c = center(i)
+                    let r = CGRect(x: c.x - cell / 2, y: c.y - cell / 2,
+                                   width: cell + 0.5, height: cell + 0.5)
+                    ctx.fill(Path(r), with: .color(visited.contains(i) ? trail : Self.tileOpen))
+                }
+                for i in walls {
+                    let c = center(i)
+                    let base = CGRect(x: c.x - cell / 2 - 0.5, y: c.y - cell / 2 - 0.5,
+                                      width: cell + 1, height: cell + 1)
+                    ctx.fill(Path(base.offsetBy(dx: 0.5, dy: 0.5)), with: .color(Self.wallSide))
+                    ctx.fill(Path(base), with: .color(Self.wallTop))
+                }
             }
-            // the painted ribbon — same trick, one flat block per painted tile
-            ForEach(Array(visited).sorted(), id: \.self) { i in
-                Rectangle().fill(trail)
-                    .frame(width: cell + 0.5, height: cell + 0.5)
-                    .position(center(i))
-            }
-            // walls fused into blobs
-            ForEach(Array(walls).sorted(), id: \.self) { i in
-                wallCellView(i, cell: cell)
-            }
+            .frame(width: side, height: side)
 
             Ellipse()
                 .fill(Color.black.opacity(0.28))
                 .frame(width: cell * 0.6, height: cell * 0.18)
                 .position(x: mpos.x, y: mpos.y + cell * 0.32)
-                .animation(.easeOut(duration: 0.16), value: pos)
+                .animation(.easeOut(duration: 0.12), value: pos)
             Circle()
                 .fill(RadialGradient(colors: [.white, Color(hex: "C7CCD6")],
                                      center: UnitPoint(x: 0.35, y: 0.3), startRadius: 1, endRadius: cell * 0.5))
                 .frame(width: cell * 0.72, height: cell * 0.72)
                 .overlay(Circle().stroke(.black.opacity(0.08), lineWidth: 1))
                 .position(mpos)
-                .animation(.easeOut(duration: 0.16), value: pos)
+                .animation(.easeOut(duration: 0.12), value: pos)
         }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
@@ -174,6 +180,7 @@ struct MarbleView: View {
 
     private func roll(_ dc: Int, _ dr: Int) {
         guard !cleared else { return }
+        swipeTick += 1                       // every swipe gets a tick, moved or not
         var c = pos % cols
         var r = pos / cols
         var moved = false
