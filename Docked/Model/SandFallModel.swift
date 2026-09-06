@@ -116,7 +116,6 @@ final class SandFallModel {
         lastColor = activeColor
         rollNext()
 
-        let minRow = template.map(\.row).min() ?? 0
         let maxRow = template.map(\.row).max() ?? 0
         let minCol = template.map(\.col).min() ?? 0
         let maxCol = template.map(\.col).max() ?? 0

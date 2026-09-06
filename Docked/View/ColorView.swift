@@ -139,30 +139,41 @@ struct ColorView: View {
 
     private func artwork(side: CGFloat) -> some View {
         ZStack {
-            ForEach(Array(regions.enumerated()), id: \.offset) { pair in
-                let i = pair.offset
-                let region = pair.element
-                let done = fills[i] == region.n
-                region.shape
-                    .fill(done ? palette[region.n - 1] : Self.paper)
-                    .overlay(region.shape.stroke(.white.opacity(0.55), lineWidth: 3.5))
-                    .overlay(region.shape.stroke(Self.lineDark.opacity(0.85), lineWidth: 1.6))
-                    .overlay {
-                        if !done {
-                            Text("\(region.n)")
-                                .font(.system(size: max(9, min(pair.element.rect.width, pair.element.rect.height) * side * 0.3),
-                                              weight: .heavy))
-                                .foregroundStyle(Self.lineDark.opacity(0.5))
-                                .minimumScaleFactor(0.4)
-                        }
-                    }
-                    .frame(width: region.rect.width * side, height: region.rect.height * side)
-                    .position(x: region.rect.midX * side, y: region.rect.midY * side)
-                    .onTapGesture { tap(i, region) }
+            ForEach(regions.indices, id: \.self) { i in
+                regionCell(i, side: side)
             }
         }
         .frame(width: side, height: side)
         .background(Self.paper)
+    }
+
+    @ViewBuilder
+    private func regionCell(_ i: Int, side: CGFloat) -> some View {
+        let region = regions[i]
+        let done = fills[i] == region.n
+        let fillColor: Color = done ? palette[region.n - 1] : Self.paper
+        let w = region.rect.width * side
+        let h = region.rect.height * side
+        let labelSize = max(9, min(w, h) * 0.32)
+
+        region.shape
+            .fill(fillColor)
+            .overlay(region.shape.stroke(Color.white.opacity(0.55), lineWidth: 3.5))
+            .overlay(region.shape.stroke(Self.lineDark.opacity(0.85), lineWidth: 1.6))
+            .overlay(numberLabel(done ? nil : region.n, size: labelSize))
+            .frame(width: w, height: h)
+            .position(x: region.rect.midX * side, y: region.rect.midY * side)
+            .onTapGesture { tap(i, region) }
+    }
+
+    @ViewBuilder
+    private func numberLabel(_ n: Int?, size: CGFloat) -> some View {
+        if let n {
+            Text("\(n)")
+                .font(.system(size: size, weight: .heavy))
+                .foregroundStyle(Self.lineDark.opacity(0.5))
+                .minimumScaleFactor(0.4)
+        }
     }
 
     private func tap(_ i: Int, _ region: ColorRegion) {
