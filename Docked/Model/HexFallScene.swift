@@ -122,12 +122,13 @@ final class HexFallScene: SKScene {
     /// Three tetromino pieces (O, I, L or J) that tile a cols×2 block exactly.
     /// Each piece is a list of (localRow, localCol) with localRow in 0...1.
     private func bandPieces() -> [[(Int, Int)]] {
-        // Tilings of a 2×4 sub-block.
-        let sub: [[[(Int, Int)]]] = [
+        // Each entry is one full tiling of a 2×4 sub-block into two tetrominoes.
+        let tilings: [[[(Int, Int)]]] = [
             [[(0, 0), (0, 1), (1, 0), (1, 1)], [(0, 2), (0, 3), (1, 2), (1, 3)]],   // O + O
             [[(0, 0), (0, 1), (0, 2), (0, 3)], [(1, 0), (1, 1), (1, 2), (1, 3)]],   // I + I
             [[(0, 0), (1, 0), (1, 1), (1, 2)], [(0, 1), (0, 2), (0, 3), (1, 3)]],   // L + J
-        ].randomElement()!
+        ]
+        let sub = tilings.randomElement()!                               // [[(Int, Int)]]
         let o: [(Int, Int)] = [(0, 0), (0, 1), (1, 0), (1, 1)]
         if Bool.random() {
             return sub + [o.map { ($0.0, $0.1 + 4) }]                    // 2×4 left, O right

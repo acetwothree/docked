@@ -209,9 +209,11 @@ final class BlockTowerScene: SKScene {
         // rest (or after a safety timeout). While it's still moving, the
         // target — and therefore the camera — holds completely still.
         if awaitingSettle {
-            let settled = placed.last.flatMap { $0.physicsBody }.map { b in
-                hypot(b.velocity.dx, b.velocity.dy) < 9 && abs(b.angularVelocity) < 0.12
-            } ?? true
+            let settled: Bool = {
+                guard let b = placed.last?.physicsBody else { return true }
+                let v = b.velocity
+                return (v.dx * v.dx + v.dy * v.dy) < 90 && abs(b.angularVelocity) < 0.12
+            }()
             if settled {
                 // Camera sits a little ABOVE the tower top, so most of the
                 // screen shows the tower BELOW the newest piece, not sky.

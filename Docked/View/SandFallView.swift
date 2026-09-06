@@ -30,7 +30,8 @@ struct SandFallView: View {
     /// earlier piece can recognise it's obsolete and stop.
     @State private var fallGen = 0
     /// The column span of a just-triggered hard drop, for the motion streak.
-    @State private var dropStreak: (lo: Int, hi: Int, gen: Int)? = nil
+    private struct DropStreak: Equatable { var lo: Int; var hi: Int; var gen: Int }
+    @State private var dropStreak: DropStreak? = nil
     @State private var dropStreakGen = 0
 
     init(highScore: Int) {
@@ -244,7 +245,7 @@ struct SandFallView: View {
                     let cols = model.activeCells.map(\.col)
                     if let lo = cols.min(), let hi = cols.max() {
                         dropStreakGen += 1
-                        dropStreak = (lo: lo, hi: hi, gen: dropStreakGen)
+                        dropStreak = DropStreak(lo: lo, hi: hi, gen: dropStreakGen)
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
                             withAnimation(.easeOut(duration: 0.3)) { dropStreak = nil }
                         }
