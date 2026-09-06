@@ -197,6 +197,7 @@ struct RingsView: View {
             if pegs[2].count == ringCount {
                 solved = true
                 winTick += 1
+                ReviewPrompt.shared.recordDelight()
             }
         } else {
             // lifting

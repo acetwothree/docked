@@ -160,25 +160,14 @@ final class SandFallModel {
         if canPlace(moved) { activeCells = moved }
     }
 
-    /// Slide the active piece so its horizontal centre lands on `targetCol`,
-    /// clamped to the walls. If the full shift is blocked by the pile, step
-    /// toward the target as far as the piece can actually go.
-    func moveActiveCenter(toCol targetCol: Int) {
-        guard phase == .play, !activeCells.isEmpty else { return }
-        let cs = activeCells.map(\.col)
-        let lo = cs.min()!, hi = cs.max()!
-        let curCenter = (lo + hi) / 2
-        var delta = targetCol - curCenter
-        if lo + delta < 0 { delta = -lo }
-        if hi + delta > cols - 1 { delta = (cols - 1) - hi }
-        guard delta != 0 else { return }
-        let whole = activeCells.map { (row: $0.row, col: $0.col + delta) }
-        if canPlace(whole) { activeCells = whole; return }
-        let dir = delta > 0 ? 1 : -1
-        var applied = 0
-        while applied != delta {
+    /// Shift the active piece `n` columns (sign = direction), one step at a
+    /// time so a partial move still applies when the pile blocks the rest.
+    func nudgeActive(byCols n: Int) {
+        guard phase == .play, !activeCells.isEmpty, n != 0 else { return }
+        let dir = n > 0 ? 1 : -1
+        for _ in 0..<abs(n) {
             let next = activeCells.map { (row: $0.row, col: $0.col + dir) }
-            if canPlace(next) { activeCells = next; applied += dir } else { break }
+            if canPlace(next) { activeCells = next } else { break }
         }
     }
 

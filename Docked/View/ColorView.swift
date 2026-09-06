@@ -240,6 +240,7 @@ struct ColorView: View {
     private func finishSheet() {
         celebrating = true
         doneTick += 1
+        ReviewPrompt.shared.recordDelight()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { advance() }
     }
 
@@ -324,14 +325,17 @@ enum ColorSheets {
     // 1 blue · 2 green · 3 yellow · 4 red · 5 orange · 6 brown · 7 cream
     // 8 pink · 9 purple · 10 grey · 11 teal · 12 dark
 
+    // A cottage: blue sky over green grass, a yellow sun top-right, a red
+    // triangular roof on a cream square wall, one blue window, a brown door
+    // centred on the ground line.
     static let house: [ColorRegion] = [
         Self.rect(1, 0, 0, 1, 0.62),
         Self.rect(2, 0, 0.60, 1, 0.40),
         Self.e(3, 0.70, 0.05, 0.20, 0.20),
-        Self.tri(4, 0.15, 0.20, 0.70, 0.24),
+        Self.tri(4, 0.14, 0.20, 0.72, 0.24),
         Self.rect(7, 0.22, 0.42, 0.56, 0.34),
-        Self.rect(1, 0.30, 0.48, 0.13, 0.13),
-        Self.rect(6, 0.45, 0.56, 0.16, 0.20),
+        Self.rect(1, 0.28, 0.50, 0.14, 0.14),
+        Self.rect(6, 0.44, 0.54, 0.16, 0.22),
     ]
 
     static let flower: [ColorRegion] = {
@@ -352,12 +356,16 @@ enum ColorSheets {
         return r
     }()
 
+    // A sailboat: sky over teal water, a yellow sun top-right, a brown hull
+    // on the waterline, a dark mast, and a big cream triangular sail centred
+    // on the mast.
     static let sailboat: [ColorRegion] = [
-        Self.rect(1, 0, 0, 1, 0.56),
-        Self.e(3, 0.08, 0.06, 0.22, 0.22),
-        Self.rect(11, 0, 0.56, 1, 0.44),
-        Self.rect(6, 0.30, 0.56, 0.40, 0.10),
-        Self.tri(7, 0.46, 0.28, 0.22, 0.30),
+        Self.rect(1, 0, 0, 1, 0.60),
+        Self.e(3, 0.72, 0.06, 0.20, 0.20),
+        Self.rect(11, 0, 0.60, 1, 0.40),
+        Self.rect(6, 0.26, 0.60, 0.48, 0.10),
+        Self.tri(7, 0.38, 0.24, 0.24, 0.36),
+        Self.rect(12, 0.485, 0.24, 0.03, 0.40),
     ]
 
     static let cat: [ColorRegion] = [
@@ -407,15 +415,20 @@ enum ColorSheets {
         Self.e(8, 0.53, 0.46, 0.29, 0.26),
     ]
 
+    // A robot: grey head with two yellow eyes and a small yellow antenna
+    // bulb on a stalk, a grey body, and a grey arm out each side. Blue over
+    // green behind.
     static let robot: [ColorRegion] = [
         Self.rect(1, 0, 0, 1, 0.6),
         Self.rect(2, 0, 0.58, 1, 0.42),
-        Self.rect(10, 0.30, 0.20, 0.40, 0.26),
-        Self.e(3, 0.38, 0.28, 0.09, 0.09),
-        Self.e(3, 0.53, 0.28, 0.09, 0.09),
-        Self.rect(10, 0.26, 0.48, 0.48, 0.32),
-        Self.rect(10, 0.10, 0.50, 0.14, 0.24),
-        Self.rect(10, 0.76, 0.50, 0.14, 0.24),
+        Self.rect(10, 0.47, 0.09, 0.06, 0.07),
+        Self.e(3, 0.45, 0.03, 0.10, 0.09),
+        Self.rect(10, 0.30, 0.16, 0.40, 0.26),
+        Self.e(3, 0.38, 0.24, 0.09, 0.09),
+        Self.e(3, 0.53, 0.24, 0.09, 0.09),
+        Self.rect(10, 0.26, 0.44, 0.48, 0.32),
+        Self.rect(10, 0.10, 0.46, 0.14, 0.24),
+        Self.rect(10, 0.76, 0.46, 0.14, 0.24),
     ]
 
     static let fish: [ColorRegion] = [
@@ -427,13 +440,15 @@ enum ColorSheets {
         Self.e(3, 0.28, 0.60, 0.18, 0.10),
     ]
 
+    // A sun: a yellow disc dead centre on blue sky with four orange rays —
+    // a triangle above and below, a stubby bar left and right.
     static let sun: [ColorRegion] = [
         Self.rect(1, 0, 0, 1, 1),
-        Self.e(3, 0.30, 0.30, 0.40, 0.40),
-        Self.tri(5, 0.43, 0.03, 0.14, 0.16),
-        Self.triDown(5, 0.43, 0.81, 0.14, 0.16),
-        Self.tri(5, 0.10, 0.12, 0.14, 0.14),
-        Self.triDown(5, 0.76, 0.74, 0.14, 0.14),
+        Self.tri(5, 0.42, 0.03, 0.16, 0.32),
+        Self.triDown(5, 0.42, 0.65, 0.16, 0.32),
+        Self.rect(5, 0.03, 0.43, 0.34, 0.14),
+        Self.rect(5, 0.63, 0.43, 0.34, 0.14),
+        Self.e(3, 0.28, 0.28, 0.44, 0.44),
     ]
 
     static let tree: [ColorRegion] = [
@@ -453,14 +468,20 @@ enum ColorSheets {
         Self.e(7, 0.32, 0.20, 0.14, 0.16),
     ]
 
+    // A snowman: blue sky over grey snowy ground so the cream body reads;
+    // three stacked cream balls, two dark coal eyes, an orange triangle
+    // nose, two dark coal buttons.
     static let snowman: [ColorRegion] = [
-        Self.rect(1, 0, 0, 1, 0.62),
-        Self.rect(7, 0, 0.60, 1, 0.40),
-        Self.e(7, 0.30, 0.52, 0.40, 0.34),
-        Self.e(7, 0.34, 0.30, 0.32, 0.28),
-        Self.e(7, 0.38, 0.12, 0.24, 0.22),
-        Self.e(12, 0.43, 0.18, 0.05, 0.05),
-        Self.e(12, 0.52, 0.18, 0.05, 0.05),
+        Self.rect(1, 0, 0, 1, 0.66),
+        Self.rect(10, 0, 0.64, 1, 0.36),
+        Self.e(7, 0.28, 0.54, 0.44, 0.34),
+        Self.e(7, 0.33, 0.33, 0.34, 0.27),
+        Self.e(7, 0.37, 0.13, 0.26, 0.24),
+        Self.e(12, 0.44, 0.20, 0.045, 0.045),
+        Self.e(12, 0.515, 0.20, 0.045, 0.045),
+        Self.triDown(5, 0.47, 0.24, 0.07, 0.05),
+        Self.e(12, 0.475, 0.36, 0.05, 0.05),
+        Self.e(12, 0.475, 0.45, 0.05, 0.05),
     ]
 
     static let ghost: [ColorRegion] = [

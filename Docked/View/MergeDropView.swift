@@ -34,8 +34,11 @@ struct MergeDropView: View {
     /// Whole-board squeeze when a merge resolves.
     @State private var pulse: CGFloat = 1
 
-    /// Column currently under the finger while aiming.
+    /// Column currently highlighted while aiming.
     @State private var hoverCol: Int? = nil
+    /// Column the aim started on when the current drag began (always the
+    /// centre) — the drag moves relative to this, never jumping to the finger.
+    @State private var dragAnchorCol: Int? = nil
     /// The block mid-fall — no taps accepted until it lands.
     @State private var falling: FallingPiece? = nil
 
@@ -114,13 +117,16 @@ struct MergeDropView: View {
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { v in
-                            guard !over, falling == nil else { return }
-                            hoverCol = clampCol(Int(v.location.x / cw))
+                            guard !over, falling == nil, cw > 0 else { return }
+                            if dragAnchorCol == nil { dragAnchorCol = cols / 2 }
+                            let base = dragAnchorCol ?? cols / 2
+                            hoverCol = clampCol(base + Int((v.translation.width / cw).rounded()))
                         }
                         .onEnded { v in
-                            defer { hoverCol = nil }
-                            guard !over, falling == nil else { return }
-                            drop(clampCol(Int(v.location.x / cw)), ch: ch)
+                            let base = dragAnchorCol ?? cols / 2
+                            defer { hoverCol = nil; dragAnchorCol = nil }
+                            guard !over, falling == nil, cw > 0 else { return }
+                            drop(clampCol(base + Int((v.translation.width / cw).rounded())), ch: ch)
                         }
                 )
             }

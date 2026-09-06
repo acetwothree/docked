@@ -44,7 +44,7 @@ final class BlockTowerScene: SKScene {
     private var markers: [SKNode] = []
 
     private var hoverGap: CGFloat { size.height * 0.30 }
-    private func cellSize() -> CGFloat { min(30, size.width * 0.125) }
+    private func cellSize() -> CGFloat { min(36, size.width * 0.15) }
 
     override func didMove(to view: SKView) {
         backgroundColor = .clear
@@ -192,17 +192,46 @@ final class BlockTowerScene: SKScene {
 
     // MARK: preview
 
+    /// A little "NEXT" bubble pinned near the top-right of the viewport,
+    /// visibly separate from the play area so it never reads as a piece
+    /// that's actually in the game.
     private func buildPreview() {
         let node = SKNode()
         node.zPosition = 400
+
+        let box = cellSize() * 3.4
+        let bubble = SKShapeNode(rectOf: CGSize(width: box, height: box), cornerRadius: box * 0.24)
+        bubble.fillColor = SKColor(red: 0.10, green: 0.12, blue: 0.17, alpha: 0.85)
+        bubble.strokeColor = SKColor.white.withAlphaComponent(0.28)
+        bubble.lineWidth = 1.5
+        bubble.name = "bubble"
+        node.addChild(bubble)
+
+        let tag = SKLabelNode(text: "NEXT")
+        tag.fontName = "AvenirNext-Bold"
+        tag.fontSize = cellSize() * 0.46
+        tag.fontColor = SKColor.white.withAlphaComponent(0.55)
+        tag.verticalAlignmentMode = .center
+        tag.position = CGPoint(x: 0, y: box * 0.32)
+        node.addChild(tag)
+
+        let holder = SKNode()
+        holder.name = "cells"
+        holder.position = CGPoint(x: 0, y: -box * 0.08)
+        node.addChild(holder)
+
         cam.addChild(node)
+        // High and clear of the tower: near the top edge, tucked to the right.
+        node.position = CGPoint(x: size.width / 2 - box * 0.75,
+                                y: size.height / 2 - box * 0.85)
         previewNode = node
     }
 
     private func refreshPreview() {
-        guard let node = previewNode else { return }
-        node.removeAllChildren()
-        let cell = cellSize() * 0.42
+        guard let node = previewNode,
+              let holder = node.childNode(withName: "cells") else { return }
+        holder.removeAllChildren()
+        let cell = cellSize() * 0.4
         let cells = nextShape.cells
         let rows = nextShape.rowSpan, cols = nextShape.colSpan
         let ox = -CGFloat(cols) * cell / 2
@@ -213,11 +242,8 @@ final class BlockTowerScene: SKScene {
             sq.strokeColor = SKColor.white.withAlphaComponent(0.3)
             sq.position = CGPoint(x: ox + CGFloat(c) * cell + cell / 2,
                                   y: oy - CGFloat(r) * cell - cell / 2)
-            node.addChild(sq)
+            holder.addChild(sq)
         }
-        // top-right of the viewport
-        node.position = CGPoint(x: size.width / 2 - cellSize() * 2.2,
-                                y: size.height / 2 - cellSize() * 2.2)
     }
 
     // MARK: pieces
@@ -247,6 +273,11 @@ final class BlockTowerScene: SKScene {
         addChild(node)
         current = node
     }
+
+    /// The hovering piece's current x — the view anchors a drag to this so the
+    /// piece tracks finger movement relative to where it already is (centred),
+    /// instead of snapping to wherever the finger first lands.
+    var currentPieceX: CGFloat { current?.position.x ?? size.width / 2 }
 
     func moveCurrent(toX x: CGFloat) {
         guard let node = current, !isOver else { return }

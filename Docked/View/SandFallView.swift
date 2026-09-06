@@ -2,15 +2,14 @@
 //  SandFallView.swift
 //  Docked
 //
-//  "Sand Bridge" — coloured tetromino pieces spawn just above a dashed
+//  "Cascade" — coloured tetromino pieces spawn just above a dashed
 //  starting line and immediately begin a slow, steady, continuous descent —
-//  no pauses between steps. Drag anywhere along the board and the falling
-//  piece tracks straight to your finger's column (absolute, not relative);
-//  tap to rotate it a quarter-turn; swipe down to speed it up into an
-//  instant hard drop. A preview square above the line always shows the next
-//  piece. On landing it melts into loose sand that trickles into gaps. A
-//  colour clears once a connected patch of it spans every column from the
-//  left wall to the right wall.
+//  no pauses between steps. The piece always starts centred where the
+//  preview shows it; drag and it slides left/right by however far your
+//  finger has moved (relative, never a jump to the finger). Tap to rotate a
+//  quarter-turn; swipe down for an instant hard drop. On landing it
+//  scatters into loose grains that trickle into gaps. A colour clears once a
+//  connected patch of it spans every column from the left wall to the right.
 //
 //  Settled grains keep a stable identity (`Grain.id`) across the model's
 //  settle passes, so `ForEach(model.grains)` animates each one sliding to its
@@ -24,6 +23,10 @@ struct SandFallView: View {
     @Environment(AppModel.self) private var app
     @State private var model: SandFallModel
 
+    /// Net columns already applied for the drag in progress, so continued
+    /// finger movement only applies the DELTA each frame — the piece tracks
+    /// relative to where it started (centred), never jumping to the finger.
+    @State private var dragAppliedCols = 0
     /// Bumped on every hard-drop/lock so a stale slow-fall loop from an
     /// earlier piece can recognise it's obsolete and stop.
     @State private var fallGen = 0
@@ -220,20 +223,23 @@ struct SandFallView: View {
         .frame(width: pieceW, height: pieceH)
     }
 
-    /// Absolute aim: wherever your finger is along the board, the piece glides
-    /// so its centre sits over that column — no relative accumulation, no
-    /// per-step threshold, so it never feels like it's lagging your finger. A
-    /// downward swipe speeds it into an instant hard drop with a quick motion
-    /// streak down the column.
+    /// Relative slide: the piece starts centred and moves by whatever whole
+    /// number of columns your finger has travelled since the drag began —
+    /// touching down off to one side never yanks it over there. A downward
+    /// swipe speeds it into an instant hard drop with a quick motion streak.
     private func dragGesture(cellW: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 8)
             .onChanged { v in
                 guard cellW > 0, model.phase == .play else { return }
-                let target = max(0, min(model.cols - 1, Int((v.location.x / cellW).rounded(.down))))
-                withAnimation(.easeOut(duration: 0.08)) { model.moveActiveCenter(toCol: target) }
+                let wanted = Int((v.translation.width / cellW).rounded())
+                if wanted != dragAppliedCols {
+                    model.nudgeActive(byCols: wanted - dragAppliedCols)
+                    dragAppliedCols = wanted
+                }
             }
             .onEnded { v in
                 let dx = v.translation.width, dy = v.translation.height
+                dragAppliedCols = 0
                 if dy > 40, abs(dy) > abs(dx) * 1.2 {
                     fallGen += 1
                     let cols = model.activeCells.map(\.col)

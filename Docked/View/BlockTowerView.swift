@@ -19,6 +19,9 @@ struct BlockTowerView: View {
     @State private var landTick = 0
     @State private var lockTick = 0
     @State private var overTick = 0
+    /// x the hovering piece sat at when the current drag began — the drag
+    /// moves it relative to this, so it never teleports to the finger.
+    @State private var dragAnchorX: CGFloat? = nil
 
     init(highScore: Int) {
         _best = State(initialValue: highScore)
@@ -46,8 +49,14 @@ struct BlockTowerView: View {
                     .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 0)
-                            .onChanged { v in scene.moveCurrent(toX: v.location.x) }
-                            .onEnded { _ in scene.dropCurrent() }
+                            .onChanged { v in
+                                if dragAnchorX == nil { dragAnchorX = scene.currentPieceX }
+                                scene.moveCurrent(toX: (dragAnchorX ?? 0) + v.translation.width)
+                            }
+                            .onEnded { _ in
+                                dragAnchorX = nil
+                                scene.dropCurrent()
+                            }
                     )
             }
 
@@ -62,7 +71,10 @@ struct BlockTowerView: View {
             scene.onLand = { landTick += 1 }
             scene.onLock = { lockTick += 1 }
             scene.onGameOver = {
-                if score > best { best = score }
+                if score > best {
+                    best = score
+                    if score >= 6 { ReviewPrompt.shared.recordDelight() }
+                }
                 over = true
                 overTick += 1
                 Analytics.shared.gameOver("blocktower", score: score)

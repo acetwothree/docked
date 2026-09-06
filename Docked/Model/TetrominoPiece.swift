@@ -11,12 +11,13 @@
 import SpriteKit
 
 enum TetrominoShape: CaseIterable {
-    // The seven true tetrominoes, plus a handful of oddball polyominoes that
+    // The seven true tetrominoes, plus a bunch of oddball polyominoes that
     // make Block Tower genuinely awkward to balance: a cross, a cup, big
-    // 5-cell L and staircase, a 3-cell corner, a tippy vertical bar and a
-    // long-stemmed hammer.
+    // 5-cell L and staircase, a 3-cell corner, a tippy vertical bar, a
+    // long-stemmed hammer, a pyramid, a long zig, a chair and a notched bar.
     case i, o, t, s, z, j, l
     case plus, cup, bigL, stairs, corner, bar3, hammer
+    case pyramid, zag, chair, notch
 
     /// Cells as (row, col) offsets, row 0 at the top.
     var cells: [(row: Int, col: Int)] {
@@ -35,6 +36,10 @@ enum TetrominoShape: CaseIterable {
         case .corner: [(0, 0), (1, 0), (1, 1)]
         case .bar3:   [(0, 0), (1, 0), (2, 0)]
         case .hammer: [(0, 0), (0, 1), (0, 2), (1, 1), (2, 1)]
+        case .pyramid:[(0, 1), (1, 0), (1, 1), (1, 2)]
+        case .zag:    [(0, 0), (0, 1), (1, 1), (1, 2), (2, 2)]
+        case .chair:  [(0, 1), (1, 0), (1, 1), (2, 0), (2, 1)]
+        case .notch:  [(0, 0), (0, 1), (0, 2), (1, 0), (1, 2)]
         }
     }
 

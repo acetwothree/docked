@@ -27,7 +27,7 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
 }
 
 // Declaration order is also the order the home grid shows them in: doodle,
-// Color Blocks, Color, Maze Paint, Number Merge and Sand Bridge lead ahead
+// Color Blocks, Color In, Maze Paint, Number Merge and Cascade lead ahead
 // of Pop (the most-used free activities), then the rest of the free set,
 // then every Plus activity last.
 enum ActivityModule: String, CaseIterable, Identifiable {
@@ -46,7 +46,7 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         switch self {
         case .doodle: "Doodle"
         case .notes: "Notes"
-        case .color: "Color Numbers"
+        case .color: "Color In"
         case .zen: "Color Blocks"
         case .merge: "2048"
         case .drop: "Number Merge"
@@ -57,8 +57,8 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .click: "Clicker"
         case .ksand: "Kinetic Sand"
         case .rings: "Rings"
-        case .crumble: "Sand Bridge"
-        case .hexfall: "Hex Fall"
+        case .crumble: "Cascade"
+        case .hexfall: "Hex Drop"
         case .blocktower: "Block Tower"
         }
     }
@@ -110,8 +110,8 @@ enum ActivityModule: String, CaseIterable, Identifiable {
         case .click: "A tally clicker with a satisfying tick."
         case .ksand: "Rake patterns into a zen sand tray."
         case .rings: "Stack the rings smallest-on-top — the classic tower puzzle."
-        case .crumble: "Falling pieces melt into sand — bridge one colour wall to wall."
-        case .hexfall: "Tap blocks off a tower without tipping the hexagon on top."
+        case .crumble: "Falling blocks scatter into grains — link one colour wall to wall."
+        case .hexfall: "Tap blocks out from under the hexagon without dropping it."
         case .blocktower: "Stack falling pieces as high as you can without toppling."
         }
     }

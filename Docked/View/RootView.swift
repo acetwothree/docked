@@ -17,6 +17,9 @@ struct RootView: View {
     @Environment(DoodleStore.self) private var doodle
     @Environment(StoreManager.self) private var store
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.requestReview) private var requestReview
+
+    @State private var review = ReviewPrompt.shared
 
     @State private var showSettings = false
     @State private var showOnboarding = false
@@ -93,6 +96,18 @@ struct RootView: View {
             .ignoresSafeArea()
         }
         .preferredColorScheme(app.theme.colorScheme)
+        // One-time "rate the app" nudge — only while the home grid is up, so
+        // it lands right after the player finishes something good and backs
+        // out to the menu. See ReviewPrompt.
+        .alert("Enjoying Docked?", isPresented: Binding(
+            get: { review.pending && openModule == nil && !showOnboarding },
+            set: { presenting in if !presenting { review.markAsked() } }
+        )) {
+            Button("Not now", role: .cancel) { review.markAsked() }
+            Button("Rate Docked") { review.markAsked(); requestReview() }
+        } message: {
+            Text("A quick App Store rating really helps a small app like this.")
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView(onShowPlus: {
                 showSettings = false

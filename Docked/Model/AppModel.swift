@@ -170,5 +170,6 @@ final class AppModel {
         ]
         for key in progressKeys { d.removeObject(forKey: key) }
         Analytics.shared.reset()
+        ReviewPrompt.shared.reset()
     }
 }

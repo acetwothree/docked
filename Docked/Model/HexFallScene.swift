@@ -2,7 +2,7 @@
 //  HexFallScene.swift
 //  Docked
 //
-//  "Hex Fall" — a real hexagon rests on top of a tower built from
+//  "Hex Drop" — a real hexagon rests on top of a tower built from
 //  interlocking tetromino pieces (O, I, L, J) that tile a rectangular column
 //  with no gaps. Each piece is ONE connected shape with a thick outline so
 //  you can tell touching same-colour pieces apart. Tap a piece to delete it
@@ -100,11 +100,11 @@ final class HexFallScene: SKScene {
         physicsWorld.speed = 1
         onScoreChange?(0)
 
-        towerW = size.width * 0.60          // narrower — easier to roll off
+        towerW = size.width * 0.72          // roomier cells — comfortable tap targets
         towerX0 = (size.width - towerW) / 2
         cellW = towerW / CGFloat(cols)
         rowH = cellW
-        firstRowY = size.height * 0.62
+        firstRowY = size.height * 0.60
 
         cam.position = CGPoint(x: size.width / 2, y: size.height / 2)
 

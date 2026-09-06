@@ -201,6 +201,7 @@ struct MarbleView: View {
         if visited.count >= openCells.count {
             cleared = true
             winTick += 1
+            ReviewPrompt.shared.recordDelight()
             let next = level + 1
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 level = next
