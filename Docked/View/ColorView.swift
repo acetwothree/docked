@@ -2,8 +2,9 @@
 //  ColorView.swift
 //  Docked
 //
-//  "Color" — simple tap-to-fill colouring scenes. Pick a colour, tap a shape.
-//  Save your picture or move on to the next scene. Nothing to get wrong.
+//  "Color" — a colour-by-number. Each region has one right colour; pick that
+//  number from the palette and tap the regions carrying it. Fill them all and
+//  the picture pops with a little burst, then the next scene loads.
 //
 
 import SwiftUI
@@ -12,19 +13,39 @@ import UIKit
 struct ColorView: View {
     @Environment(AppModel.self) private var app
 
+    /// Numbered palette. Index 0 == number 1.
     private let palette: [Color] = [
-        Color(hex: "E0473E"), Color(hex: "F2883C"), Color(hex: "F2B90C"),
-        Color(hex: "3ECF7A"), Color(hex: "3EA1E0"), Color(hex: "8B5CF6"),
-        Color(hex: "F25CA2"), Color(hex: "6B4A2E"), Color(hex: "1C1917"), Color.white,
+        Color(hex: "7EC8E3"),  // 1 sky blue
+        Color(hex: "7CB342"),  // 2 green
+        Color(hex: "F4C430"),  // 3 yellow
+        Color(hex: "E24A3B"),  // 4 red
+        Color(hex: "EF8C3A"),  // 5 orange
+        Color(hex: "96603E"),  // 6 brown
+        Color(hex: "F1E4C9"),  // 7 cream
+        Color(hex: "EC8FBE"),  // 8 pink
+        Color(hex: "8E6FD6"),  // 9 purple
+        Color(hex: "8B96A3"),  // 10 grey
+        Color(hex: "35B0A7"),  // 11 teal
+        Color(hex: "3B4149"),  // 12 dark
     ]
 
-    @State private var picked: Color = Color(hex: "3EA1E0")
+    @State private var picked = 1
     @State private var sheet = 0
-    @State private var fills: [Int: Color] = [:]
+    /// region index -> the number the player painted it with
+    @State private var fills: [Int: Int] = [:]
     @State private var fillTick = 0
+    @State private var wrongTick = 0
+    @State private var doneTick = 0
+    @State private var celebrating = false
     @State private var exportImage: Image?
 
     private var regions: [ColorRegion] { ColorSheets.all[sheet % ColorSheets.all.count] }
+    private var correctCount: Int { regions.indices.filter { fills[$0] == regions[$0].n }.count }
+    /// Palette numbers that actually appear in this scene, in ascending order.
+    private var activeNumbers: [Int] { Array(Set(regions.map(\.n))).sorted() }
+    private func remaining(_ n: Int) -> Int {
+        regions.indices.filter { regions[$0].n == n && fills[$0] != n }.count
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,19 +56,36 @@ struct ColorView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Theme.hairline, lineWidth: 1.5))
                     .shadow(color: .black.opacity(0.22), radius: 10, y: 5)
+                    .scaleEffect(celebrating ? 1.03 : 1)
+                    .overlay { if celebrating { burst(side: s) } }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .onChange(of: fills) { _, _ in refreshExport(side: 600) }
+                    .onChange(of: fills) { _, _ in
+                        refreshExport(side: 600)
+                        if !celebrating, correctCount == regions.count { finishSheet() }
+                    }
             }
 
-            HStack(spacing: 0) {
-                ForEach(Array(palette.enumerated()), id: \.offset) { pair in
-                    Circle()
-                        .fill(pair.element)
-                        .frame(width: 24, height: 24)
-                        .overlay(Circle().strokeBorder(.primary.opacity(picked == pair.element ? 0.9 : 0.12), lineWidth: 2.5))
+            HStack(spacing: 6) {
+                ForEach(activeNumbers, id: \.self) { n in
+                    let left = remaining(n)
+                    Button { picked = n } label: {
+                        ZStack {
+                            Circle().fill(palette[n - 1])
+                            if left == 0 {
+                                Image(systemName: "checkmark").font(.system(size: 11, weight: .black))
+                                    .foregroundStyle(.white)
+                            } else {
+                                Text("\(n)").font(.system(size: 12, weight: .black))
+                                    .foregroundStyle(n == 7 || n == 3 ? Color.black.opacity(0.7) : Color.white)
+                            }
+                        }
+                        .frame(width: 30, height: 30)
+                        .overlay(Circle().strokeBorder(.primary.opacity(picked == n ? 0.95 : 0.12),
+                                                       lineWidth: picked == n ? 3 : 2))
+                        .opacity(left == 0 ? 0.45 : 1)
                         .frame(maxWidth: .infinity)
-                        .contentShape(Circle())
-                        .onTapGesture { picked = pair.element }
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.vertical, 10)
@@ -59,18 +97,21 @@ struct ColorView: View {
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
 
-                Spacer(minLength: 24)
+                Spacer(minLength: 16)
+
+                Text("\(correctCount)/\(regions.count)")
+                    .font(.system(size: 13, weight: .heavy)).monospacedDigit()
+                    .foregroundStyle(correctCount == regions.count ? Color.green : Color.secondary)
+
+                Spacer(minLength: 16)
 
                 if let exportImage {
                     ShareLink(item: exportImage, preview: SharePreview("Colouring", image: exportImage)) {
-                        Label("Save", systemImage: "square.and.arrow.down")
-                            .font(.system(size: 13, weight: .heavy))
-                            .padding(.horizontal, 14).padding(.vertical, 7)
-                            .background(Color.primary.opacity(0.08), in: Capsule())
+                        Image(systemName: "square.and.arrow.down").font(.system(size: 15, weight: .heavy))
                     }
                 }
 
-                Button { sheet += 1; fills = [:] } label: {
+                Button { advance() } label: {
                     Label("Next", systemImage: "arrow.right")
                         .font(.system(size: 14, weight: .heavy))
                         .padding(.horizontal, 16).padding(.vertical, 7)
@@ -83,32 +124,85 @@ struct ColorView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: celebrating)
         .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: fillTick) { _, _ in app.haptics }
-        .onAppear { refreshExport(side: 600) }
+        .sensoryFeedback(.warning, trigger: wrongTick) { _, _ in app.haptics }
+        .sensoryFeedback(.success, trigger: doneTick) { _, _ in app.haptics }
+        .onAppear {
+            if !activeNumbers.contains(picked) { picked = activeNumbers.first ?? 1 }
+            refreshExport(side: 600)
+        }
     }
 
-    /// Warm paper tone instead of stark white — easier on the eyes against
-    /// the app's dark chrome, and close enough to white that colours still
-    /// read true.
     private static let paper = Color(hex: "F2EEE1")
-    /// Every line gets a light halo behind a dark core so it stays crisp
-    /// whether it's sitting on the pale paper or on a dark fill colour.
     private static let lineDark = Color(hex: "2B2620")
 
     private func artwork(side: CGFloat) -> some View {
         ZStack {
             ForEach(Array(regions.enumerated()), id: \.offset) { pair in
-                pair.element.shape
-                    .fill(fills[pair.offset] ?? Self.paper)
-                    .overlay(pair.element.shape.stroke(.white.opacity(0.55), lineWidth: 3.5))
-                    .overlay(pair.element.shape.stroke(Self.lineDark.opacity(0.85), lineWidth: 1.6))
-                    .frame(width: pair.element.rect.width * side, height: pair.element.rect.height * side)
-                    .position(x: pair.element.rect.midX * side, y: pair.element.rect.midY * side)
-                    .onTapGesture { fills[pair.offset] = picked; fillTick += 1 }
+                let i = pair.offset
+                let region = pair.element
+                let done = fills[i] == region.n
+                region.shape
+                    .fill(done ? palette[region.n - 1] : Self.paper)
+                    .overlay(region.shape.stroke(.white.opacity(0.55), lineWidth: 3.5))
+                    .overlay(region.shape.stroke(Self.lineDark.opacity(0.85), lineWidth: 1.6))
+                    .overlay {
+                        if !done {
+                            Text("\(region.n)")
+                                .font(.system(size: max(9, min(pair.element.rect.width, pair.element.rect.height) * side * 0.3),
+                                              weight: .heavy))
+                                .foregroundStyle(Self.lineDark.opacity(0.5))
+                                .minimumScaleFactor(0.4)
+                        }
+                    }
+                    .frame(width: region.rect.width * side, height: region.rect.height * side)
+                    .position(x: region.rect.midX * side, y: region.rect.midY * side)
+                    .onTapGesture { tap(i, region) }
             }
         }
         .frame(width: side, height: side)
         .background(Self.paper)
+    }
+
+    private func tap(_ i: Int, _ region: ColorRegion) {
+        guard !celebrating else { return }
+        if picked == region.n {
+            withAnimation(.easeOut(duration: 0.15)) { fills[i] = region.n }
+            fillTick += 1
+        } else {
+            wrongTick += 1
+        }
+    }
+
+    private func finishSheet() {
+        celebrating = true
+        doneTick += 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { advance() }
+    }
+
+    private func advance() {
+        celebrating = false
+        sheet += 1
+        fills = [:]
+        picked = (ColorSheets.all[sheet % ColorSheets.all.count].map(\.n).min()) ?? 1
+    }
+
+    /// A quick confetti-ish pop when a scene is completed.
+    private func burst(side: CGFloat) -> some View {
+        ZStack {
+            ForEach(0..<14, id: \.self) { k in
+                let a = Double(k) / 14 * 2 * .pi
+                Circle()
+                    .fill(palette[k % palette.count])
+                    .frame(width: 10, height: 10)
+                    .offset(x: CGFloat(cos(a)) * side * (celebrating ? 0.42 : 0.05),
+                            y: CGFloat(sin(a)) * side * (celebrating ? 0.42 : 0.05))
+                    .opacity(celebrating ? 0 : 1)
+                    .animation(.easeOut(duration: 0.7).delay(0.02 * Double(k)), value: celebrating)
+            }
+        }
+        .allowsHitTesting(false)
     }
 
     @MainActor private func refreshExport(side: CGFloat) {
@@ -121,6 +215,7 @@ struct ColorView: View {
 struct ColorRegion {
     var shape: AnyShape
     var rect: CGRect   // normalised 0…1 inside a square view box
+    var n: Int         // the correct palette number (1-based)
 }
 
 private struct ColorTri: Shape {
@@ -134,7 +229,6 @@ private struct ColorTri: Shape {
     }
 }
 
-/// Apex at the bottom instead of the top — an ice-cream cone, mostly.
 private struct ColorTriDown: Shape {
     func path(in r: CGRect) -> Path {
         var p = Path()
@@ -147,226 +241,207 @@ private struct ColorTriDown: Shape {
 }
 
 enum ColorSheets {
-    // A handful of BIG, mostly non-overlapping regions per sheet — easy to hit
-    // with a fingertip.
     static let all: [[ColorRegion]] = [
         house, flower, sailboat, cat, car, rocket, icecream, butterfly, robot,
         fish, sun, tree, balloon, snowman, ghost, mushroom, crown, apple, planet,
     ]
 
-    private static func e(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> ColorRegion {
-        ColorRegion(shape: AnyShape(Ellipse()), rect: CGRect(x: x, y: y, width: w, height: h))
+    private static func e(_ n: Int, _ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> ColorRegion {
+        ColorRegion(shape: AnyShape(Ellipse()), rect: CGRect(x: x, y: y, width: w, height: h), n: n)
     }
-    private static func rect(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> ColorRegion {
-        ColorRegion(shape: AnyShape(Rectangle()), rect: CGRect(x: x, y: y, width: w, height: h))
+    private static func rect(_ n: Int, _ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> ColorRegion {
+        ColorRegion(shape: AnyShape(Rectangle()), rect: CGRect(x: x, y: y, width: w, height: h), n: n)
     }
-    private static func tri(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> ColorRegion {
-        ColorRegion(shape: AnyShape(ColorTri()), rect: CGRect(x: x, y: y, width: w, height: h))
+    private static func tri(_ n: Int, _ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> ColorRegion {
+        ColorRegion(shape: AnyShape(ColorTri()), rect: CGRect(x: x, y: y, width: w, height: h), n: n)
     }
-    private static func triDown(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> ColorRegion {
-        ColorRegion(shape: AnyShape(ColorTriDown()), rect: CGRect(x: x, y: y, width: w, height: h))
+    private static func triDown(_ n: Int, _ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> ColorRegion {
+        ColorRegion(shape: AnyShape(ColorTriDown()), rect: CGRect(x: x, y: y, width: w, height: h), n: n)
     }
 
-    // A house on a sunny day — 7 regions.
+    // 1 blue · 2 green · 3 yellow · 4 red · 5 orange · 6 brown · 7 cream
+    // 8 pink · 9 purple · 10 grey · 11 teal · 12 dark
+
     static let house: [ColorRegion] = [
-        Self.rect(0, 0, 1, 0.62),          // sky
-        Self.rect(0, 0.60, 1, 0.40),       // ground
-        Self.e(0.70, 0.05, 0.20, 0.20),    // sun
-        Self.tri(0.15, 0.20, 0.70, 0.24),  // roof
-        Self.rect(0.22, 0.42, 0.56, 0.34), // house body
-        Self.rect(0.30, 0.48, 0.13, 0.13), // window
-        Self.rect(0.45, 0.56, 0.16, 0.20), // door
+        Self.rect(1, 0, 0, 1, 0.62),
+        Self.rect(2, 0, 0.60, 1, 0.40),
+        Self.e(3, 0.70, 0.05, 0.20, 0.20),
+        Self.tri(4, 0.15, 0.20, 0.70, 0.24),
+        Self.rect(7, 0.22, 0.42, 0.56, 0.34),
+        Self.rect(1, 0.30, 0.48, 0.13, 0.13),
+        Self.rect(6, 0.45, 0.56, 0.16, 0.20),
     ]
 
-    // A single big flower — 10 regions (5 roomy petals + centre).
     static let flower: [ColorRegion] = {
         var r: [ColorRegion] = [
-            Self.rect(0, 0, 1, 0.68),            // sky
-            Self.rect(0, 0.66, 1, 0.34),         // ground
-            Self.rect(0.47, 0.40, 0.06, 0.34),   // stem
-            Self.e(0.30, 0.50, 0.18, 0.11),      // left leaf
-            Self.e(0.52, 0.44, 0.18, 0.11),      // right leaf
+            Self.rect(1, 0, 0, 1, 0.68),
+            Self.rect(2, 0, 0.66, 1, 0.34),
+            Self.rect(2, 0.47, 0.40, 0.06, 0.34),
+            Self.e(2, 0.30, 0.50, 0.18, 0.11),
+            Self.e(2, 0.52, 0.44, 0.18, 0.11),
         ]
         let cx: CGFloat = 0.5, cy: CGFloat = 0.30, ring: CGFloat = 0.16, pet: CGFloat = 0.17
         for k in 0..<5 {
             let a = Double(k) / 5 * 2 * .pi - .pi / 2
-            r.append(Self.e(cx + CGFloat(cos(a)) * ring - pet / 2,
+            r.append(Self.e(8, cx + CGFloat(cos(a)) * ring - pet / 2,
                             cy + CGFloat(sin(a)) * ring - pet / 2, pet, pet))
         }
-        r.append(Self.e(cx - 0.09, cy - 0.09, 0.18, 0.18))   // centre (on top)
+        r.append(Self.e(3, cx - 0.09, cy - 0.09, 0.18, 0.18))
         return r
     }()
 
-    // A sailboat on calm water — 5 regions, contiguous sky/sea (no seams).
     static let sailboat: [ColorRegion] = [
-        Self.rect(0, 0, 1, 0.56),           // sky
-        Self.e(0.08, 0.06, 0.22, 0.22),     // sun
-        Self.rect(0, 0.56, 1, 0.44),        // sea
-        Self.rect(0.30, 0.56, 0.40, 0.10),  // hull, sitting on the waterline
-        Self.tri(0.46, 0.28, 0.22, 0.30),   // sail
+        Self.rect(1, 0, 0, 1, 0.56),
+        Self.e(3, 0.08, 0.06, 0.22, 0.22),
+        Self.rect(11, 0, 0.56, 1, 0.44),
+        Self.rect(6, 0.30, 0.56, 0.40, 0.10),
+        Self.tri(7, 0.46, 0.28, 0.22, 0.30),
     ]
 
-    // A cat face — 8 regions, symmetric about the vertical centre line.
     static let cat: [ColorRegion] = [
-        Self.rect(0, 0, 1, 0.58),           // sky
-        Self.rect(0, 0.56, 1, 0.44),        // ground
-        Self.e(0.27, 0.24, 0.46, 0.44),     // head        x[0.27..0.73] → mid 0.50
-        Self.tri(0.28, 0.07, 0.19, 0.22),   // left ear    x mid 0.375
-        Self.tri(0.53, 0.07, 0.19, 0.22),   // right ear   x mid 0.625
-        Self.e(0.36, 0.44, 0.10, 0.10),     // left eye    x mid 0.41
-        Self.e(0.54, 0.44, 0.10, 0.10),     // right eye   x mid 0.59
-        Self.triDown(0.46, 0.55, 0.08, 0.07), // nose      x mid 0.50
+        Self.rect(1, 0, 0, 1, 0.58),
+        Self.rect(2, 0, 0.56, 1, 0.44),
+        Self.e(5, 0.27, 0.24, 0.46, 0.44),
+        Self.tri(5, 0.28, 0.07, 0.19, 0.22),
+        Self.tri(5, 0.53, 0.07, 0.19, 0.22),
+        Self.e(12, 0.36, 0.44, 0.10, 0.10),
+        Self.e(12, 0.54, 0.44, 0.10, 0.10),
+        Self.triDown(8, 0.46, 0.55, 0.08, 0.07),
     ]
 
-    // A little car — 6 regions.
     static let car: [ColorRegion] = [
-        Self.rect(0, 0, 1, 0.55),           // sky
-        Self.rect(0, 0.53, 1, 0.47),        // road
-        Self.rect(0.10, 0.42, 0.80, 0.24),  // body
-        Self.rect(0.30, 0.26, 0.40, 0.18),  // cabin
-        Self.e(0.18, 0.60, 0.20, 0.20),     // left wheel
-        Self.e(0.62, 0.60, 0.20, 0.20),     // right wheel
+        Self.rect(1, 0, 0, 1, 0.55),
+        Self.rect(10, 0, 0.53, 1, 0.47),
+        Self.rect(4, 0.10, 0.42, 0.80, 0.24),
+        Self.rect(1, 0.30, 0.26, 0.40, 0.18),
+        Self.e(12, 0.18, 0.60, 0.20, 0.20),
+        Self.e(12, 0.62, 0.60, 0.20, 0.20),
     ]
 
-    // A rocket blasting off — 7 regions.
     static let rocket: [ColorRegion] = [
-        Self.rect(0, 0, 1, 0.7),            // sky
-        Self.rect(0, 0.68, 1, 0.32),        // ground
-        Self.rect(0.36, 0.18, 0.28, 0.48),  // body
-        Self.tri(0.32, 0.02, 0.36, 0.18),   // nose cone
-        Self.tri(0.16, 0.52, 0.22, 0.22),   // left fin
-        Self.tri(0.62, 0.52, 0.22, 0.22),   // right fin
-        Self.e(0.40, 0.30, 0.20, 0.20),     // window
+        Self.rect(1, 0, 0, 1, 0.7),
+        Self.rect(2, 0, 0.68, 1, 0.32),
+        Self.rect(10, 0.36, 0.18, 0.28, 0.48),
+        Self.tri(4, 0.32, 0.02, 0.36, 0.18),
+        Self.tri(4, 0.16, 0.52, 0.22, 0.22),
+        Self.tri(4, 0.62, 0.52, 0.22, 0.22),
+        Self.e(1, 0.40, 0.30, 0.20, 0.20),
     ]
 
-    // An ice-cream cone — 5 regions.
     static let icecream: [ColorRegion] = [
-        Self.rect(0, 0, 1, 1),              // background
-        Self.triDown(0.36, 0.55, 0.28, 0.38), // cone
-        Self.e(0.28, 0.32, 0.44, 0.30),     // bottom scoop
-        Self.e(0.32, 0.12, 0.36, 0.26),     // top scoop
-        Self.e(0.45, 0.05, 0.10, 0.10),     // cherry
+        Self.rect(1, 0, 0, 1, 1),
+        Self.triDown(6, 0.36, 0.55, 0.28, 0.38),
+        Self.e(7, 0.28, 0.32, 0.44, 0.30),
+        Self.e(8, 0.32, 0.12, 0.36, 0.26),
+        Self.e(4, 0.45, 0.05, 0.10, 0.10),
     ]
 
-    // A butterfly — 6 regions. Body on the centre line; each wing pair
-    // symmetric about it and touching the body at x 0.47 / 0.53.
     static let butterfly: [ColorRegion] = [
-        Self.rect(0, 0, 1, 1),              // background
-        Self.rect(0.47, 0.20, 0.06, 0.56),  // body        x mid 0.50
-        Self.e(0.12, 0.16, 0.35, 0.30),     // top-left wing     x[0.12..0.47]
-        Self.e(0.53, 0.16, 0.35, 0.30),     // top-right wing    x[0.53..0.88]
-        Self.e(0.18, 0.46, 0.29, 0.26),     // bottom-left wing  x[0.18..0.47]
-        Self.e(0.53, 0.46, 0.29, 0.26),     // bottom-right wing x[0.53..0.82]
+        Self.rect(3, 0, 0, 1, 1),
+        Self.rect(12, 0.47, 0.20, 0.06, 0.56),
+        Self.e(9, 0.12, 0.16, 0.35, 0.30),
+        Self.e(9, 0.53, 0.16, 0.35, 0.30),
+        Self.e(8, 0.18, 0.46, 0.29, 0.26),
+        Self.e(8, 0.53, 0.46, 0.29, 0.26),
     ]
 
-    // A friendly robot — 8 regions, no antenna, centred on the canvas.
     static let robot: [ColorRegion] = [
-        Self.rect(0, 0, 1, 0.6),            // sky
-        Self.rect(0, 0.58, 1, 0.42),        // ground
-        Self.rect(0.30, 0.20, 0.40, 0.26),  // head
-        Self.e(0.38, 0.28, 0.09, 0.09),     // left eye
-        Self.e(0.53, 0.28, 0.09, 0.09),     // right eye
-        Self.rect(0.26, 0.48, 0.48, 0.32),  // body
-        Self.rect(0.10, 0.50, 0.14, 0.24),  // left arm
-        Self.rect(0.76, 0.50, 0.14, 0.24),  // right arm
+        Self.rect(1, 0, 0, 1, 0.6),
+        Self.rect(2, 0, 0.58, 1, 0.42),
+        Self.rect(10, 0.30, 0.20, 0.40, 0.26),
+        Self.e(3, 0.38, 0.28, 0.09, 0.09),
+        Self.e(3, 0.53, 0.28, 0.09, 0.09),
+        Self.rect(10, 0.26, 0.48, 0.48, 0.32),
+        Self.rect(10, 0.10, 0.50, 0.14, 0.24),
+        Self.rect(10, 0.76, 0.50, 0.14, 0.24),
     ]
 
-    // A fish — 6 regions.
     static let fish: [ColorRegion] = [
-        Self.rect(0, 0, 1, 1),              // water
-        Self.e(0.14, 0.34, 0.50, 0.34),     // body
-        Self.tri(0.58, 0.30, 0.24, 0.20),   // tail (upper)
-        Self.triDown(0.58, 0.50, 0.24, 0.20), // tail (lower)
-        Self.e(0.22, 0.42, 0.09, 0.09),     // eye
-        Self.e(0.28, 0.60, 0.18, 0.10),     // belly fin
+        Self.rect(1, 0, 0, 1, 1),
+        Self.e(5, 0.14, 0.34, 0.50, 0.34),
+        Self.tri(5, 0.58, 0.30, 0.24, 0.20),
+        Self.triDown(5, 0.58, 0.50, 0.24, 0.20),
+        Self.e(12, 0.22, 0.42, 0.09, 0.09),
+        Self.e(3, 0.28, 0.60, 0.18, 0.10),
     ]
 
-    // A shining sun — 6 regions.
     static let sun: [ColorRegion] = [
-        Self.rect(0, 0, 1, 1),              // sky
-        Self.e(0.30, 0.30, 0.40, 0.40),     // core
-        Self.tri(0.43, 0.03, 0.14, 0.16),   // top ray
-        Self.triDown(0.43, 0.81, 0.14, 0.16), // bottom ray
-        Self.tri(0.10, 0.12, 0.14, 0.14),   // upper-left ray
-        Self.triDown(0.76, 0.74, 0.14, 0.14), // lower-right ray
+        Self.rect(1, 0, 0, 1, 1),
+        Self.e(3, 0.30, 0.30, 0.40, 0.40),
+        Self.tri(5, 0.43, 0.03, 0.14, 0.16),
+        Self.triDown(5, 0.43, 0.81, 0.14, 0.16),
+        Self.tri(5, 0.10, 0.12, 0.14, 0.14),
+        Self.triDown(5, 0.76, 0.74, 0.14, 0.14),
     ]
 
-    // A leafy tree — 6 regions.
     static let tree: [ColorRegion] = [
-        Self.rect(0, 0, 1, 0.72),           // sky
-        Self.rect(0, 0.70, 1, 0.30),        // ground
-        Self.rect(0.45, 0.42, 0.10, 0.34),  // trunk
-        Self.e(0.24, 0.18, 0.52, 0.34),     // crown (top)
-        Self.e(0.14, 0.32, 0.36, 0.28),     // crown (left)
-        Self.e(0.50, 0.32, 0.36, 0.28),     // crown (right)
+        Self.rect(1, 0, 0, 1, 0.72),
+        Self.rect(2, 0, 0.70, 1, 0.30),
+        Self.rect(6, 0.45, 0.42, 0.10, 0.34),
+        Self.e(2, 0.24, 0.18, 0.52, 0.34),
+        Self.e(2, 0.14, 0.32, 0.36, 0.28),
+        Self.e(2, 0.50, 0.32, 0.36, 0.28),
     ]
 
-    // A floating balloon — 5 regions.
     static let balloon: [ColorRegion] = [
-        Self.rect(0, 0, 1, 1),              // sky
-        Self.e(0.28, 0.10, 0.44, 0.50),     // balloon
-        Self.triDown(0.44, 0.56, 0.12, 0.10), // knot
-        Self.rect(0.49, 0.64, 0.02, 0.30),  // string
-        Self.e(0.32, 0.20, 0.14, 0.16),     // highlight
+        Self.rect(1, 0, 0, 1, 1),
+        Self.e(4, 0.28, 0.10, 0.44, 0.50),
+        Self.triDown(6, 0.44, 0.56, 0.12, 0.10),
+        Self.rect(6, 0.49, 0.64, 0.02, 0.30),
+        Self.e(7, 0.32, 0.20, 0.14, 0.16),
     ]
 
-    // A snowman — 7 regions.
     static let snowman: [ColorRegion] = [
-        Self.rect(0, 0, 1, 0.62),           // sky
-        Self.rect(0, 0.60, 1, 0.40),        // snow ground
-        Self.e(0.30, 0.52, 0.40, 0.34),     // bottom ball
-        Self.e(0.34, 0.30, 0.32, 0.28),     // middle ball
-        Self.e(0.38, 0.12, 0.24, 0.22),     // head
-        Self.e(0.43, 0.18, 0.05, 0.05),     // left eye
-        Self.e(0.52, 0.18, 0.05, 0.05),     // right eye
+        Self.rect(1, 0, 0, 1, 0.62),
+        Self.rect(7, 0, 0.60, 1, 0.40),
+        Self.e(7, 0.30, 0.52, 0.40, 0.34),
+        Self.e(7, 0.34, 0.30, 0.32, 0.28),
+        Self.e(7, 0.38, 0.12, 0.24, 0.22),
+        Self.e(12, 0.43, 0.18, 0.05, 0.05),
+        Self.e(12, 0.52, 0.18, 0.05, 0.05),
     ]
 
-    // A little ghost — 5 regions.
     static let ghost: [ColorRegion] = [
-        Self.rect(0, 0, 1, 1),              // background
-        Self.e(0.24, 0.14, 0.52, 0.64),     // body
-        Self.e(0.36, 0.30, 0.10, 0.13),     // left eye
-        Self.e(0.54, 0.30, 0.10, 0.13),     // right eye
-        Self.e(0.44, 0.48, 0.12, 0.10),     // mouth
+        Self.rect(9, 0, 0, 1, 1),
+        Self.e(7, 0.24, 0.14, 0.52, 0.64),
+        Self.e(12, 0.36, 0.30, 0.10, 0.13),
+        Self.e(12, 0.54, 0.30, 0.10, 0.13),
+        Self.e(12, 0.44, 0.48, 0.12, 0.10),
     ]
 
-    // A toadstool — 6 regions.
     static let mushroom: [ColorRegion] = [
-        Self.rect(0, 0, 1, 1),              // background
-        Self.e(0.16, 0.16, 0.68, 0.42),     // cap
-        Self.rect(0.38, 0.46, 0.24, 0.38),  // stem
-        Self.e(0.28, 0.24, 0.13, 0.11),     // spot (left)
-        Self.e(0.56, 0.30, 0.11, 0.09),     // spot (right)
-        Self.e(0.44, 0.19, 0.09, 0.08),     // spot (top)
+        Self.rect(2, 0, 0, 1, 1),
+        Self.e(4, 0.16, 0.16, 0.68, 0.42),
+        Self.rect(7, 0.38, 0.46, 0.24, 0.38),
+        Self.e(7, 0.28, 0.24, 0.13, 0.11),
+        Self.e(7, 0.56, 0.30, 0.11, 0.09),
+        Self.e(7, 0.44, 0.19, 0.09, 0.08),
     ]
 
-    // A crown — 7 regions.
     static let crown: [ColorRegion] = [
-        Self.rect(0, 0, 1, 1),              // background
-        Self.rect(0.18, 0.52, 0.64, 0.22),  // band
-        Self.tri(0.16, 0.28, 0.20, 0.28),   // left point
-        Self.tri(0.40, 0.20, 0.20, 0.36),   // middle point
-        Self.tri(0.64, 0.28, 0.20, 0.28),   // right point
-        Self.e(0.29, 0.56, 0.09, 0.09),     // left jewel
-        Self.e(0.62, 0.56, 0.09, 0.09),     // right jewel
+        Self.rect(1, 0, 0, 1, 1),
+        Self.rect(3, 0.18, 0.52, 0.64, 0.22),
+        Self.tri(3, 0.16, 0.28, 0.20, 0.28),
+        Self.tri(3, 0.40, 0.20, 0.20, 0.36),
+        Self.tri(3, 0.64, 0.28, 0.20, 0.28),
+        Self.e(4, 0.29, 0.56, 0.09, 0.09),
+        Self.e(11, 0.62, 0.56, 0.09, 0.09),
     ]
 
-    // An apple — 5 regions.
     static let apple: [ColorRegion] = [
-        Self.rect(0, 0, 1, 1),              // background
-        Self.e(0.20, 0.28, 0.34, 0.50),     // left lobe
-        Self.e(0.46, 0.28, 0.34, 0.50),     // right lobe
-        Self.rect(0.48, 0.12, 0.04, 0.18),  // stem
-        Self.e(0.52, 0.12, 0.18, 0.11),     // leaf
+        Self.rect(7, 0, 0, 1, 1),
+        Self.e(4, 0.20, 0.28, 0.34, 0.50),
+        Self.e(4, 0.46, 0.28, 0.34, 0.50),
+        Self.rect(6, 0.48, 0.12, 0.04, 0.18),
+        Self.e(2, 0.52, 0.12, 0.18, 0.11),
     ]
 
-    // A ringed planet — 6 regions.
     static let planet: [ColorRegion] = [
-        Self.rect(0, 0, 1, 1),              // space
-        Self.e(0.08, 0.40, 0.84, 0.20),     // ring (behind)
-        Self.e(0.28, 0.28, 0.44, 0.44),     // planet
-        Self.e(0.36, 0.38, 0.12, 0.12),     // crater (left)
-        Self.e(0.54, 0.50, 0.10, 0.10),     // crater (right)
-        Self.e(0.14, 0.14, 0.06, 0.06),     // star
+        Self.rect(12, 0, 0, 1, 1),
+        Self.e(10, 0.08, 0.40, 0.84, 0.20),
+        Self.e(9, 0.28, 0.28, 0.44, 0.44),
+        Self.e(8, 0.36, 0.38, 0.12, 0.12),
+        Self.e(8, 0.54, 0.50, 0.10, 0.10),
+        Self.e(3, 0.14, 0.14, 0.06, 0.06),
     ]
 }

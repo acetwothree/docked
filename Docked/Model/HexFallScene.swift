@@ -51,6 +51,11 @@ final class HexFallScene: SKScene {
     private var startHexY: CGFloat = 0
     private var blocksDestroyed = 0
     private var cam: SKCameraNode!
+    /// The hexagon has left the tower and is plummeting — physics stays live
+    /// and the camera keeps following so you watch it fall the length of the
+    /// whole tower before the level resets.
+    private var losing = false
+    private var loseClock: TimeInterval = 0
 
     private static let palette: [SKColor] = [
         SKColor(red: 0.90, green: 0.30, blue: 0.26, alpha: 1),
@@ -64,7 +69,7 @@ final class HexFallScene: SKScene {
     override func didMove(to view: SKView) {
         backgroundColor = .clear
         scaleMode = .resizeFill
-        physicsWorld.gravity = CGVector(dx: 0, dy: -9)
+        physicsWorld.gravity = CGVector(dx: 0, dy: -16)
         let camera = SKCameraNode()
         self.camera = camera
         cam = camera
@@ -91,6 +96,7 @@ final class HexFallScene: SKScene {
         hexagon?.removeFromParent(); hexagon = nil
         nextBrickID = 0; nextBandRow = 0; deepestRow = 0
         score = 0; blocksDestroyed = 0; isOver = false
+        losing = false; loseClock = 0
         physicsWorld.speed = 1
         onScoreChange?(0)
 
@@ -113,18 +119,25 @@ final class HexFallScene: SKScene {
     // MARK: tower generation
 
     private func bandPieces() -> [[(Int, Int)]] {
-        let tilings: [[[(Int, Int)]]] = [
-            [[(0, 0), (0, 1), (1, 0), (1, 1)], [(0, 2), (0, 3), (1, 2), (1, 3)]],   // O + O
-            [[(0, 0), (0, 1), (0, 2), (0, 3)], [(1, 0), (1, 1), (1, 2), (1, 3)]],   // I + I
-            [[(0, 0), (1, 0), (1, 1), (1, 2)], [(0, 1), (0, 2), (0, 3), (1, 3)]],   // L + J
+        // Full-width 3-piece tilings of a 6×2 block — every one gapless.
+        // (O/I/L/J only; S/Z/T can't tile a 2-row band without leaving a hole.)
+        let fullWidth: [[[(Int, Int)]]] = [
+            // O O O
+            [[(0,0),(0,1),(1,0),(1,1)], [(0,2),(0,3),(1,2),(1,3)], [(0,4),(0,5),(1,4),(1,5)]],
+            // I over I, then O
+            [[(0,0),(0,1),(0,2),(0,3)], [(1,0),(1,1),(1,2),(1,3)], [(0,4),(0,5),(1,4),(1,5)]],
+            // O, then I over I
+            [[(0,0),(0,1),(1,0),(1,1)], [(0,2),(0,3),(0,4),(0,5)], [(1,2),(1,3),(1,4),(1,5)]],
+            // J, horizontal I, L
+            [[(0,0),(1,0),(1,1),(1,2)], [(0,1),(0,2),(0,3),(0,4)], [(1,3),(1,4),(1,5),(0,5)]],
+            // vertical mirror of the above
+            [[(1,0),(0,0),(0,1),(0,2)], [(1,1),(1,2),(1,3),(1,4)], [(0,3),(0,4),(0,5),(1,5)]],
+            // L J, then O
+            [[(0,0),(1,0),(1,1),(1,2)], [(0,1),(0,2),(0,3),(1,3)], [(0,4),(0,5),(1,4),(1,5)]],
+            // O, then L J
+            [[(0,0),(0,1),(1,0),(1,1)], [(0,2),(1,2),(1,3),(1,4)], [(0,3),(0,4),(0,5),(1,5)]],
         ]
-        let sub = tilings.randomElement()!
-        let o: [(Int, Int)] = [(0, 0), (0, 1), (1, 0), (1, 1)]
-        if Bool.random() {
-            return sub + [o.map { ($0.0, $0.1 + 4) }]
-        } else {
-            return [o] + sub.map { piece in piece.map { ($0.0, $0.1 + 2) } }
-        }
+        return fullWidth.randomElement()!
     }
 
     private func addBand() {
@@ -231,14 +244,15 @@ final class HexFallScene: SKScene {
         hex.lineWidth = 2
         hex.position = CGPoint(x: size.width / 2, y: y)
         hex.zPosition = 50
-        // Real hexagon collider so it can tip onto an edge or vertex and
-        // topple instead of always sliding straight down.
+        // Real hexagon collider with almost no angular damping and modest
+        // friction — as soon as its support goes uneven, gravity's torque
+        // tips it and it rolls, instead of sitting flat like a rock.
         let body = SKPhysicsBody(polygonFrom: path)
-        body.friction = 0.85
+        body.friction = 0.45
         body.restitution = 0.0
         body.density = 1.0
-        body.angularDamping = 0.08
-        body.linearDamping = 0.05
+        body.angularDamping = 0.0
+        body.linearDamping = 0.0
         hex.physicsBody = body
         addChild(hex)
         hexagon = hex
@@ -254,16 +268,30 @@ final class HexFallScene: SKScene {
     }
 
     func handleTap(at point: CGPoint) {
-        guard !isOver else { return }
+        guard !isOver, !losing else { return }
         // Exact hit test via the grid: which cell did the tap land in?
         let col = Int((point.x - towerX0) / cellW)
-        guard col >= 0, col < cols else { return }
         let row = Int(((firstRowY - point.y) / rowH).rounded())
-        guard row >= 0, let id = occ[row * 100 + col], bricks[id] != nil else { return }
-        removeBrick(id)
-        blocksDestroyed += 1
-        onTapHit?()
-        dropUnsupported()
+        if col >= 0, col < cols, row >= 0, let id = occ[row * 100 + col], bricks[id] != nil {
+            removeBrick(id)
+            blocksDestroyed += 1
+            onTapHit?()
+            dropUnsupported()
+            return
+        }
+        // Fallback: a piece that already went dynamic and came to rest
+        // somewhere awkward — let the player clear that too.
+        for n in nodes(at: point) {
+            var node: SKNode? = n
+            while let cur = node, cur.name != "debris" { node = cur.parent }
+            if let d = node {
+                d.removeFromParent()
+                debris.removeAll { $0 === d }
+                blocksDestroyed += 1
+                onTapHit?()
+                return
+            }
+        }
     }
 
     private func removeBrick(_ id: Int) {
@@ -304,11 +332,21 @@ final class HexFallScene: SKScene {
     override func update(_ currentTime: TimeInterval) {
         guard !isOver, cam != nil, let hex = hexagon else { return }
 
-        // Keep the hexagon high on screen so most of the view is the tower
-        // below it — the part you're working on.
+        // Camera trails the hexagon down (never back up) — keeps working
+        // during a fall so you watch it drop the length of the tower.
         let desiredY = hex.position.y - size.height * 0.28
         let smoothed = cam.position.y + (desiredY - cam.position.y) * 0.09
         cam.position.y = min(cam.position.y, smoothed)
+
+        if losing {
+            let lowest = bricks.values.map { worldY($0) }.min() ?? firstRowY
+            if hex.position.y < lowest - size.height * 0.6 || currentTime - loseClock > 3.5 {
+                isOver = true
+                physicsWorld.speed = 0
+                onGameOver?()
+            }
+            return
+        }
 
         var guardCount = 0
         while firstRowY - CGFloat(nextBandRow) * rowH > cam.position.y - size.height && guardCount < 30 {
@@ -331,13 +369,15 @@ final class HexFallScene: SKScene {
             return false
         }
 
+        // Rolled off the side, or somehow slipped straight through — start
+        // the fall-and-watch sequence instead of freezing on the spot.
         let rolledOff = hex.position.x < towerX0 - cellW * 0.5
             || hex.position.x > towerX0 + towerW + cellW * 0.5
-        let fellThrough = hex.position.y < cam.position.y - size.height * 0.9
+        let fellThrough = hex.position.y < cam.position.y - size.height * 1.0
         if rolledOff || fellThrough {
-            isOver = true
-            physicsWorld.speed = 0
-            onGameOver?()
+            losing = true
+            loseClock = currentTime
+            physicsWorld.speed = 0.4        // slow-mo so the fall is watchable
             return
         }
 

@@ -28,6 +28,11 @@ struct RingsView: View {
         Color(hex: "3ECF7A"), Color(hex: "3EA1E0"), Color(hex: "8B5CF6"), Color(hex: "F25CA2"),
     ]
 
+    private struct RingSlot: Identifiable {
+        let size: Int, peg: Int, idx: Int, held: Bool
+        var id: Int { size }        // ring size is unique across the whole game
+    }
+
     var body: some View {
         VStack(spacing: 10) {
             HStack {
@@ -65,6 +70,14 @@ struct RingsView: View {
                 let ringH = min(24, (H - 60) / CGFloat(max(3, ringCount + 1)))
                 let unit = (pegW - 24) / CGFloat(ringCount + 1)
 
+                // Flatten every ring to one identity so a move between pegs
+                // animates as a single view gliding to its new spot.
+                let allRings: [RingSlot] =
+                    (0..<3).flatMap { p in
+                        pegs[p].enumerated().map { RingSlot(size: $0.element, peg: p, idx: $0.offset, held: false) }
+                    }
+                    + (held.map { [RingSlot(size: $0.size, peg: $0.peg, idx: 0, held: true)] } ?? [])
+
                 ZStack {
                     // pegs
                     ForEach(0..<3, id: \.self) { p in
@@ -81,17 +94,17 @@ struct RingsView: View {
                                 .foregroundStyle(Theme.accent)
                                 .position(x: cx, y: baseY + 15)
                         }
-                        // stacked rings
-                        ForEach(Array(pegs[p].enumerated()), id: \.offset) { pair in
-                            ringBar(size: pair.element, unit: unit, height: ringH)
-                                .position(x: cx, y: baseY - ringH / 2 - CGFloat(pair.offset) * (ringH + 2))
-                        }
-                        // held ring hovers above its source peg
-                        if let h = held, h.peg == p {
-                            ringBar(size: h.size, unit: unit, height: ringH)
-                                .position(x: cx, y: 16)
-                                .transition(.opacity)
-                        }
+                    }
+
+                    // Every ring in ONE ForEach keyed by its size, so moving a
+                    // ring between pegs is a single view gliding to a new
+                    // position — not a remove-and-reinsert that pops.
+                    ForEach(allRings) { ring in
+                        let cx = pegW * (CGFloat(ring.peg) + 0.5)
+                        ringBar(size: ring.size, unit: unit, height: ringH)
+                            .position(x: cx,
+                                      y: ring.held ? 16
+                                         : baseY - ringH / 2 - CGFloat(ring.idx) * (ringH + 2))
                     }
 
                     // tap targets
@@ -106,6 +119,7 @@ struct RingsView: View {
                 }
                 .frame(width: W, height: H)
                 .animation(.easeInOut(duration: 0.2), value: pegs)
+                .animation(.easeInOut(duration: 0.2), value: held?.size)
             }
 
             Text(solved ? "Solved in \(moves)! Use +/− above to change the ring count"

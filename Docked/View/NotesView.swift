@@ -55,33 +55,25 @@ struct NotesView: View {
     }
 
     private func editor(text: Binding<String>) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Text("\(wordCount) words")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                Button(action: close) {
-                    Text("Done").font(.system(size: 14, weight: .heavy))
-                        .padding(.horizontal, 16).padding(.vertical, 7)
-                        .background(Theme.accent, in: Capsule())
-                        .foregroundStyle(Color(red: 0.11, green: 0.08, blue: 0.02))
+        // No header row — every pixel goes to the text. "Done" rides the
+        // keyboard's accessory bar instead of eating a row of its own.
+        TextEditor(text: text)
+            .focused($focused)
+            .font(.body)
+            .scrollContentBackground(.hidden)
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
+            .background(Theme.paper)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Theme.hairline))
+            .shadow(color: .black.opacity(0.28), radius: 14, y: -2)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done", action: close).font(.system(size: 15, weight: .heavy))
                 }
-                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 14).padding(.vertical, 8)
-            .background(.ultraThinMaterial)
-
-            TextEditor(text: text)
-                .focused($focused)
-                .font(.body)
-                .scrollContentBackground(.hidden)
-                .padding(.horizontal, 10)
-                .padding(.bottom, 6)
-        }
-        .background(Theme.paper)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Theme.hairline))
-        .shadow(color: .black.opacity(0.28), radius: 14, y: -2)
     }
 
     private var footer: some View {

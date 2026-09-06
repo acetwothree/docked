@@ -41,8 +41,9 @@ final class BlockTowerScene: SKScene {
     private var awaitingSettle = false
     private var settledFrames = 0
 
-    /// How high above the tower top a fresh piece hovers.
-    private var hoverGap: CGFloat { size.height * 0.26 }
+    /// How high above the tower top a fresh piece hovers — small enough that
+    /// the whole piece stays on screen.
+    private var hoverGap: CGFloat { size.height * 0.14 }
 
     override func didMove(to view: SKView) {
         backgroundColor = .clear
@@ -113,7 +114,9 @@ final class BlockTowerScene: SKScene {
         platform.lineWidth = 1
         platform.position = CGPoint(x: size.width / 2, y: floorTopY - platH / 2)
         platform.zPosition = 1
-        platform.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: size.width * 2, height: platH))
+        // Collider matches the VISIBLE ledge — a block that misses it drops
+        // past into the water instead of landing on thin air.
+        platform.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: platW, height: platH))
         platform.physicsBody?.isDynamic = false
         platform.physicsBody?.friction = 1
         addChild(platform)
@@ -219,16 +222,18 @@ final class BlockTowerScene: SKScene {
             }()
             settledFrames = still ? settledFrames + 1 : 0
             if settledFrames >= 12 {
-                // Camera sits BELOW the tower top, so ~2/3 of the screen
-                // shows the tower under the newest piece — and the piece
-                // still drops from high up.
-                camTargetY = max(camTargetY, currentStackTopY() - size.height * 0.15)
+                // Keep the tower top a bit above centre so the piece you're
+                // dropping fits fully on screen with room below to see the
+                // tower. Cap the per-landing jump so one flung piece can't
+                // wrench the camera way up.
+                let want = currentStackTopY() - size.height * 0.06
+                camTargetY = max(camTargetY, min(want, camTargetY + cellSize() * 3.5))
                 awaitingSettle = false
                 settledFrames = 0
             }
         }
         camTargetY = max(camTargetY, size.height / 2)
-        let stepped = cam.position.y + (camTargetY - cam.position.y) * 0.07
+        let stepped = cam.position.y + (camTargetY - cam.position.y) * 0.11
         cam.position.y = max(cam.position.y, stepped)
 
         // Loss: a piece past the first couple falls back to the platform.

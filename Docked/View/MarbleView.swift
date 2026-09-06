@@ -158,35 +158,20 @@ struct MarbleView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    /// Wall tiles fuse into one solid blob wherever they touch.
-    /// `UnevenRoundedRectangle` rounds only the corners that don't border
-    /// another wall cell.
+    /// Flat, square wall tiles that butt together into clean rectilinear
+    /// blobs — no per-cell rounding, so touching walls never leave odd
+    /// rounded nubs in the inner corners.
     private func wallCellView(_ i: Int, cell: CGFloat) -> some View {
         let c = i % cols, r = i / cols
         let cx = cell / 2 + CGFloat(c) * cell
         let cy = cell / 2 + CGFloat(r) * cell
-        func isWall(_ cc: Int, _ rr: Int) -> Bool {
-            guard cc >= 0, cc < cols, rr >= 0, rr < rows else { return false }
-            return walls.contains(rr * cols + cc)
-        }
-        let up = isWall(c, r - 1), down = isWall(c, r + 1)
-        let left = isWall(c - 1, r), right = isWall(c + 1, r)
-        let bridge: CGFloat = 1
-        let w = cell + (left ? bridge : 0) + (right ? bridge : 0)
-        let h = cell + (up ? bridge : 0) + (down ? bridge : 0)
-        let ox = (right ? bridge : 0) - (left ? bridge : 0)
-        let oy = (down ? bridge : 0) - (up ? bridge : 0)
-        let r5: CGFloat = 5
-        let shape = UnevenRoundedRectangle(
-            topLeadingRadius: (up || left) ? 0 : r5,
-            bottomLeadingRadius: (down || left) ? 0 : r5,
-            bottomTrailingRadius: (down || right) ? 0 : r5,
-            topTrailingRadius: (up || right) ? 0 : r5)
         return ZStack {
-            shape.fill(Self.wallSide).frame(width: w, height: h).offset(x: 1.5, y: 2)
-            shape.fill(Self.wallTop).frame(width: w, height: h)
+            Rectangle().fill(Self.wallSide)
+                .frame(width: cell + 1, height: cell + 1).offset(x: 1, y: 2)
+            Rectangle().fill(Self.wallTop)
+                .frame(width: cell + 1, height: cell + 1)
         }
-        .position(x: cx + ox / 2, y: cy + oy / 2)
+        .position(x: cx, y: cy)
     }
 
     // MARK: movement
