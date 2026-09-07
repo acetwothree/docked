@@ -55,7 +55,7 @@ struct GameGridView: View {
 
     private var moreCard: some View {
         VStack(spacing: 10) {
-            Text("More activities coming soon")
+            Text("That's the whole shelf")
                 .font(.system(size: 13, weight: .heavy))
                 .foregroundStyle(.secondary)
             Button { requestReview() } label: {
