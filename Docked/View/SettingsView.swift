@@ -32,7 +32,9 @@ struct SettingsView: View {
 
     private var plusSubtitle: String {
         if store.hasPlus { return "Subscription active — thank you!" }
+        #if DEBUG
         if store.devUnlock { return "Developer unlock on" }
+        #endif
         return "Free app · optional premium activities"
     }
 
@@ -120,14 +122,17 @@ struct SettingsView: View {
                                 }
                                 divider
                                 VStack(spacing: 0) {
-                                    // NOTE: re-gate this behind #if DEBUG before the
-                                    // public launch — it's a free Plus bypass.
+                                    // Free Plus bypass — debug builds only, never in a
+                                    // shipping build. Real purchases test via TestFlight
+                                    // sandbox.
+                                    #if DEBUG
                                     row(icon: "lock.open.fill", "Unlock Plus (testing)") {
                                         Toggle("", isOn: Binding(
                                             get: { store.devUnlock },
                                             set: { store.devUnlock = $0 })).labelsHidden()
                                     }
                                     divider
+                                    #endif
                                     row(icon: "tv", "Force \"Free iOS App\" on the TV (for ads)") {
                                         Toggle("", isOn: $app.tvBadge).labelsHidden()
                                     }
