@@ -34,3 +34,8 @@ playground.xcworkspace
 *.mobileprovision
 *.base64
 AuthKey_*.p8
+
+# Local App Store screenshot / preview working files (not part of the app)
+/*.zip
+/previewed*/
+/ss*.png
