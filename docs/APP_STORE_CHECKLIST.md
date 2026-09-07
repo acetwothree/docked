@@ -20,11 +20,12 @@ account/portal work only you can do. Ordered roughly by when you'll need it.
       Settings seven times.
 - [x] Privacy policy is live: <https://acetwothree.github.io/docked/privacy/>
 
-## One code TODO left for you
+## Contact pages — DONE
 
-- [ ] **Fill the support email** in `docs/privacy/index.html` line 52 —
-      currently `REPLACE-WITH-YOUR-SUPPORT-EMAIL`. Use whatever address you'll put
-      as the App Store "Support URL"/contact. Commit + push; Pages redeploys in ~1 min.
+- [x] Support email is `trydocked@gmail.com` in both `docs/privacy/index.html`
+      and `docs/support/index.html`.
+- [x] Support page live at <https://acetwothree.github.io/docked/support/> —
+      use it as the App Store "Support URL".
 
 ## App Store Connect — you
 
