@@ -57,9 +57,11 @@ final class SandFallModel {
     /// off the automatic slow descent right away.
     private(set) var spawnTick = 0
 
+    // Four well-separated colours (was six) — fewer colours makes a
+    // one-colour wall-to-wall bridge realistic to build.
     private static let palette: [Color] = [
-        Color(hex: "E0473E"), Color(hex: "F2883C"), Color(hex: "F2B90C"),
-        Color(hex: "3ECF7A"), Color(hex: "3EA1E0"), Color(hex: "C77DFF"),
+        Color(hex: "E0473E"), Color(hex: "F2B90C"),
+        Color(hex: "3ECF7A"), Color(hex: "3EA1E0"),
     ]
 
     /// Row offsets are relative to a shape's own top; each is later shifted so
@@ -74,9 +76,18 @@ final class SandFallModel {
         [(0, 2), (1, 0), (1, 1), (1, 2)],              // L
     ]
 
+    /// Weighted draw pool: the flat, clean-tiling pieces (I, O, L, J) come up
+    /// far more often than the gap-leaving S/Z/T, so the pile stays tidy.
+    private static let bag: [[(row: Int, col: Int)]] = [
+        templates[0], templates[0],                    // I ×2
+        templates[1], templates[1], templates[1],      // O ×3
+        templates[6], templates[6],                    // L ×2
+        templates[5], templates[5],                    // J ×2
+        templates[2], templates[3], templates[4],      // T, S, Z ×1
+    ]
+
     /// The last colour dealt (pieces are biased to repeat it for easier
-    /// wall-to-wall connections) and how many in a row it's been — capped so
-    /// you never get three of the same colour back to back.
+    /// wall-to-wall connections) and how many in a row it's been.
     private var lastColor: Color?
     private var lastColorRun = 0
 
@@ -95,10 +106,12 @@ final class SandFallModel {
     }
 
     private func rollColor() -> Color {
-        if lastColorRun >= 2, let last = lastColor {
+        // Repeat the last colour hard (up to 3 in a row) so a bridge is
+        // buildable; only then force a switch.
+        if lastColorRun >= 3, let last = lastColor {
             return Self.palette.filter { $0 != last }.randomElement()!
         }
-        if let last = lastColor, Double.random(in: 0..<1) < 0.5 { return last }
+        if let last = lastColor, Double.random(in: 0..<1) < 0.6 { return last }
         return Self.palette.randomElement()!
     }
 
@@ -106,7 +119,7 @@ final class SandFallModel {
     /// now) — called once up front and again every time `spawn()` consumes
     /// the previously-rolled one, so there's always a piece ready to preview.
     private func rollNext() {
-        nextShape = Self.templates.randomElement()!
+        nextShape = Self.bag.randomElement()!
         nextColor = rollColor()
         // `rollColor()` biases toward `lastColor`, which `spawn()` only
         // updates to the piece that's about to become active — fine, this
@@ -131,11 +144,18 @@ final class SandFallModel {
         let shiftCol = (cols - width) / 2 - minCol
         activeCells = template.map { (row: $0.row + shiftRow, col: $0.col + shiftCol) }
 
-        // Over only when the board is genuinely full — a grain sitting in the
-        // top row of every column (grains settle downward, so that means every
-        // column is packed to the ceiling).
+        // Force-end when there's genuinely nowhere to put this piece: a column
+        // is "packed" when its top cell (row 0) is filled, and every piece
+        // except a line needs a run of at least two un-packed columns to land
+        // in (a line can be stood vertical in a single-column gap).
         let occ = occupiedSet()
-        if (0..<cols).allSatisfy({ occ.contains($0) }) {
+        var run = 0, longestGap = 0
+        for c in 0..<cols {
+            run = occ.contains(c) ? 0 : run + 1
+            longestGap = max(longestGap, run)
+        }
+        let isLine = Set(template.map(\.row)).count == 1
+        if longestGap == 0 || (longestGap < 2 && !isLine) {
             activeCells = []
             phase = .over
             overTick += 1

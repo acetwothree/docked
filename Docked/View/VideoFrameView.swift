@@ -31,26 +31,27 @@ struct VideoFrameView: View {
             Canvas { ctx, size in draw(ctx, size: size) }
 
             hintView
-                .frame(width: max(0, hole.width - 18), height: max(0, hole.height - 18))
+                .frame(width: max(0, hole.width - 16), height: max(0, hole.height - 16))
                 .position(x: hole.midX, y: hole.midY)
-                .opacity(dimHint ? 0.34 : 1)
+                .opacity(dimHint ? 0.6 : 1)
                 .animation(.easeInOut(duration: 0.6), value: dimHint)
                 .allowsHitTesting(false)
 
             if let onHelp {
                 Button(action: onHelp) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "questionmark.circle.fill").font(.system(size: 10, weight: .bold))
-                        Text("New here? How Docked works").font(.system(size: 9, weight: .heavy))
+                    HStack(spacing: 5) {
+                        Image(systemName: "questionmark.circle.fill").font(.system(size: 12, weight: .bold))
+                        Text("Need help? How Docked works").font(.system(size: 11, weight: .heavy))
                     }
-                    .padding(.horizontal, 9).padding(.vertical, 4)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(Capsule().stroke(Theme.accent.opacity(0.5), lineWidth: 1))
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Color.black.opacity(0.55), in: Capsule())
+                    .overlay(Capsule().stroke(Theme.accent, lineWidth: 1.5))
                     .foregroundStyle(Theme.accent)
+                    .shadow(color: .black.opacity(0.5), radius: 4)
                 }
                 .buttonStyle(.plain)
-                .position(x: hole.midX, y: hole.maxY - 16)
-                .opacity(dimHint ? 0.55 : 1)
+                .position(x: hole.midX, y: hole.minY + 24)
+                .opacity(dimHint ? 0.8 : 1)
                 .animation(.easeInOut(duration: 0.6), value: dimHint)
             }
         }
@@ -59,18 +60,18 @@ struct VideoFrameView: View {
     }
 
     @ViewBuilder private var hintView: some View {
-        VStack(spacing: 6) {
-            Image(systemName: "tv.fill").font(.system(size: 20))
+        VStack(spacing: 7) {
+            Image(systemName: "tv.fill").font(.system(size: 26, weight: .bold))
             Text("DRAG YOUR VIDEO HERE")
-                .font(.system(size: 11, weight: .heavy)).tracking(2.2)
+                .font(.system(size: 13, weight: .black)).tracking(2.4)
             Text("Drag the bottom of the TV to fit it to your video")
-                .font(.system(size: 9.5, weight: .semibold))
-                .foregroundStyle(Theme.accent.opacity(0.85))
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Theme.accent)
         }
         .foregroundStyle(Theme.accent)
-        .shadow(color: .black.opacity(0.6), radius: 3)
+        .shadow(color: .black.opacity(0.7), radius: 3)
         .multilineTextAlignment(.center)
-        .minimumScaleFactor(0.6)
+        .minimumScaleFactor(0.55)
         .lineLimit(2)
     }
 

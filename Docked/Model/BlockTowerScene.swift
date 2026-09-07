@@ -53,7 +53,7 @@ final class BlockTowerScene: SKScene {
     private var lastMarker = 0
     private var markers: [SKNode] = []
 
-    private var hoverGap: CGFloat { size.height * 0.30 }
+    private var hoverGap: CGFloat { size.height * 0.26 }
     private func cellSize() -> CGFloat { min(36, size.width * 0.15) }
 
     override func didMove(to view: SKView) {
@@ -123,7 +123,7 @@ final class BlockTowerScene: SKScene {
         pedestal.zPosition = -10
         addChild(pedestal)
 
-        let platW = size.width * 0.55
+        let platW = size.width * 0.46          // narrower base — less slack for a sloppy stack
         let platH: CGFloat = max(12, size.height * 0.03)
         let platform = SKShapeNode(rectOf: CGSize(width: platW, height: platH), cornerRadius: 3)
         platform.fillColor = SKColor(red: 0.30, green: 0.34, blue: 0.40, alpha: 1)
@@ -216,7 +216,12 @@ final class BlockTowerScene: SKScene {
         let color = TetrominoBuilder.palette[score % TetrominoBuilder.palette.count]
         let node = TetrominoBuilder.makeNode(shape: shape, cell: cell, color: color)
         let h = CGFloat(shape.rowSpan) * cell
-        node.position = CGPoint(x: size.width / 2, y: currentStackTopY() + hoverGap + h / 2)
+        // Spawn a little off-centre (random side) so every piece needs a real
+        // aim — you can't just tap-drop a straight column without steering.
+        let spawnX = size.width / 2 + CGFloat.random(in: -1.3...1.3) * cell
+        let halfW = node.calculateAccumulatedFrame().width / 2
+        node.position = CGPoint(x: min(max(spawnX, halfW), size.width - halfW),
+                                y: currentStackTopY() + hoverGap + h / 2)
         node.name = "hovering"
         node.zPosition = 100
         node.physicsBody?.isDynamic = false
@@ -332,6 +337,13 @@ final class BlockTowerScene: SKScene {
                     self.spawnPiece()
                 }
             }
+        }
+
+        // Always keep the whole hovering piece on screen — raise the camera so
+        // its top edge sits ~8% below the top of the view.
+        if let cur = current {
+            let pieceTop = cur.calculateAccumulatedFrame().maxY
+            camTargetY = max(camTargetY, pieceTop - size.height * 0.46)
         }
 
         camTargetY = max(camTargetY, size.height / 2)

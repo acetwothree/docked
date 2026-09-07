@@ -177,13 +177,13 @@ struct RootView: View {
             #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    /// The console text: the open game's name, or the app's own name when
-    /// nothing's open — or always the app name if the developer has forced it
-    /// on (Settings ▸ Developer), handy for recording ads without a game name
-    /// showing.
+    /// The console text: the open game's name; otherwise just "DOCKED" —
+    /// unless the developer has forced the "FREE iOS APP" tagline on
+    /// (Settings ▸ Developer), handy for recording ads.
     private var consoleLabel: String {
-        guard !app.tvBadge, let mod = openModule else { return "DOCKED · FREE iOS APP" }
-        return mod.title.uppercased()
+        if app.tvBadge { return "DOCKED · FREE iOS APP" }
+        if let mod = openModule { return mod.title.uppercased() }
+        return "DOCKED"
     }
 
     /// The whole bottom bar of the TV cabinet is the screen-fit control: press

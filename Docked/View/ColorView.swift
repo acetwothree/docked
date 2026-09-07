@@ -170,7 +170,8 @@ struct ColorView: View {
             ForEach(regions.indices, id: \.self) { i in
                 if fills[i] != regions[i].n {
                     let a = chipAnchor(i)
-                    numberChip(regions[i].n)
+                    let minDim = min(regions[i].rect.width, regions[i].rect.height) * side
+                    numberChip(regions[i].n, fitting: minDim)
                         .position(x: a.x * side, y: a.y * side)
                         .allowsHitTesting(false)
                 }
@@ -206,23 +207,37 @@ struct ColorView: View {
         let fillColor: Color = done ? palette[region.n - 1] : Self.paper
         let w = region.rect.width * side
         let h = region.rect.height * side
+        // Tiny regions get a padded, invisible hit area so a fingertip can
+        // still land on them — the drawn shape stays its true size. Kept
+        // modest (34pt) so neighbouring small regions don't overlap much.
+        let hitW = max(w, 34)
+        let hitH = max(h, 34)
 
-        region.shape
-            .fill(fillColor)
-            .overlay(region.shape.stroke(Color.white.opacity(0.55), lineWidth: 3.5))
-            .overlay(region.shape.stroke(Self.lineDark.opacity(0.85), lineWidth: 1.6))
-            .frame(width: w, height: h)
-            .position(x: region.rect.midX * side, y: region.rect.midY * side)
-            .onTapGesture { tap(i, region) }
+        ZStack {
+            Color.clear
+                .frame(width: hitW, height: hitH)
+                .contentShape(Rectangle())
+            region.shape
+                .fill(fillColor)
+                .overlay(region.shape.stroke(Color.white.opacity(0.55), lineWidth: 3.5))
+                .overlay(region.shape.stroke(Self.lineDark.opacity(0.85), lineWidth: 1.6))
+                .frame(width: w, height: h)
+        }
+        .frame(width: hitW, height: hitH)
+        .contentShape(Rectangle())
+        .position(x: region.rect.midX * side, y: region.rect.midY * side)
+        .onTapGesture { tap(i, region) }
     }
 
-    /// A small fixed-size pill so numbers stay readable and never balloon
-    /// over a neighbouring region.
-    private func numberChip(_ n: Int) -> some View {
-        Text("\(n)")
-            .font(.system(size: 12, weight: .black, design: .rounded))
+    /// A round number chip that never grows larger than the region it labels:
+    /// it shrinks to fit small shapes (down to a still-legible floor) and caps
+    /// at 20pt on big ones.
+    private func numberChip(_ n: Int, fitting minDim: CGFloat) -> some View {
+        let d = max(13, min(20, minDim * 0.92))
+        return Text("\(n)")
+            .font(.system(size: d * 0.62, weight: .black, design: .rounded))
             .foregroundStyle(Self.lineDark.opacity(0.75))
-            .frame(width: 20, height: 20)
+            .frame(width: d, height: d)
             .background(Color.white.opacity(0.82), in: Circle())
             .overlay(Circle().stroke(Self.lineDark.opacity(0.18), lineWidth: 1))
     }

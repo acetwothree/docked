@@ -218,9 +218,29 @@ struct MergeDropView: View {
             landing = r
             break
         }
-        guard landing >= 0 else { return }
 
         let val = next
+
+        // Column is full — the only legal drop is onto a matching top tile,
+        // which merges straight into it.
+        if landing < 0 {
+            guard grid[col] == val else { return }
+            next = Int.random(in: 1...3)
+            falling = FallingPiece(col: col, val: val, y: -ch * 0.62)
+            withAnimation(.easeIn(duration: 0.16)) {
+                falling?.y = ch / 2
+            } completion: {
+                grid[col] = val + 1
+                falling = nil
+                score += (1 << grid[col])
+                mergeTick += 1
+                squeeze()
+                persist()
+                resolveStep(origin: col)
+            }
+            return
+        }
+
         next = Int.random(in: 1...3)
 
         let endY = CGFloat(landing) * ch + ch / 2
@@ -257,7 +277,11 @@ struct MergeDropView: View {
     private func resolveStep(origin: Int?) {
         guard let group = firstMergeGroup() else {
             best = max(best, score)
-            if topRowFull() { over = true }
+            // Only truly over when the top row is full AND the next block
+            // can't merge onto any of those top tiles.
+            if topRowFull(), !(0..<cols).contains(where: { grid[$0] == next }) {
+                over = true
+            }
             persist()
             return
         }

@@ -60,7 +60,7 @@ struct SandFallView: View {
 
             VStack(spacing: 3) {
                 Text(model.phase == .over
-                     ? "Board full — resetting…"
+                     ? "No room left — resetting…"
                      : "Connect one colour from the left wall to the right wall")
                     .font(.system(size: 12, weight: .heavy))
                     .foregroundStyle(model.phase == .over ? Color.orange : Color.primary)
