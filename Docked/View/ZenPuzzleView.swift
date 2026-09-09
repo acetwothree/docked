@@ -215,9 +215,9 @@ struct ZenPuzzleView: View {
                 let dyRaw = v.location.y - v.startLocation.y   // negative = moving up
                 let upTravel = max(0, -dyRaw)
                 let upFrac = min(1, upTravel / 300)
-                let gain: CGFloat = 1.05 + upFrac * 0.35       // 1.05× near the dock, up to 1.4× higher up
+                let gain: CGFloat = 1.16 + upFrac * 0.4        // snappier: ~1.16× near the dock, up to ~1.55× higher up
                 let loc = CGPoint(
-                    x: v.startLocation.x + dx * 1.1,
+                    x: v.startLocation.x + dx * 1.22,
                     y: v.startLocation.y + dyRaw * gain)
                 drag = DragState(slot: i, shape: shape, location: loc)
             }
@@ -229,23 +229,32 @@ struct ZenPuzzleView: View {
             }
     }
 
+    /// The dragged piece. Drawn in a single `Canvas` (not a stack of shadowed
+    /// `shadedBlock`s) so rebuilding it every drag frame is cheap — that stack
+    /// of shadows was what made the drag feel like it lagged the finger.
     private func sprite(for d: DragState, g: ZenGeom) -> some View {
-        let w = CGFloat(d.shape.width) * (g.cell + g.gap) - g.gap
-        let h = CGFloat(d.shape.height) * (g.cell + g.gap) - g.gap
+        let step = g.cell + g.gap
+        let w = CGFloat(d.shape.width) * step - g.gap
+        let h = CGFloat(d.shape.height) * step - g.gap
         let anchor = Self.anchorCell(location: d.location, shape: d.shape, g: g)
         let ok = model.canPlace(d.shape, atRow: anchor.row, col: anchor.col)
-        let filled = Set(d.shape.cells.map { "\($0.0),\($0.1)" })
-        return VStack(spacing: g.gap) {
-            ForEach(Array(0..<d.shape.height), id: \.self) { r in
-                HStack(spacing: g.gap) {
-                    ForEach(Array(0..<d.shape.width), id: \.self) { c in
-                        if filled.contains("\(r),\(c)") {
-                            shadedBlock(d.shape.gradient, corner: 5).frame(width: g.cell, height: g.cell)
-                        } else {
-                            Color.clear.frame(width: g.cell, height: g.cell)
-                        }
-                    }
-                }
+        let cells = d.shape.cells
+        let colors = d.shape.palette
+        return Canvas { ctx, _ in
+            for (r, c) in cells {
+                let rect = CGRect(x: CGFloat(c) * step, y: CGFloat(r) * step,
+                                  width: g.cell, height: g.cell)
+                ctx.fill(Path(roundedRect: rect, cornerRadius: 5),
+                         with: .linearGradient(Gradient(colors: colors),
+                                               startPoint: rect.origin,
+                                               endPoint: CGPoint(x: rect.maxX, y: rect.maxY)))
+                let inset = rect.insetBy(dx: 2, dy: 2)
+                ctx.fill(Path(roundedRect: CGRect(x: inset.minX, y: inset.minY,
+                                                  width: inset.width, height: 3.5), cornerRadius: 2),
+                         with: .color(.white.opacity(0.5)))
+                ctx.fill(Path(roundedRect: CGRect(x: inset.minX, y: inset.maxY - 3.5,
+                                                  width: inset.width, height: 3.5), cornerRadius: 2),
+                         with: .color(.black.opacity(0.4)))
             }
         }
         .frame(width: w, height: h)
