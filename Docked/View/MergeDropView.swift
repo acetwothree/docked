@@ -197,13 +197,23 @@ struct MergeDropView: View {
 
     private func clampCol(_ x: Int) -> Int { min(max(x, 0), cols - 1) }
 
+    /// The next tile's tier, scaled to how far the board has come: once you're
+    /// stacking bigger numbers, the tiny ones stop showing up. Window is 3
+    /// wide, floor rises with the board's top tile, and it's capped so the
+    /// climb stays gentle and never near your current best.
+    private func rollNext() -> Int {
+        let boardMax = grid.max() ?? 0
+        let floor = min(6, max(1, boardMax - 4))
+        return Int.random(in: floor...(floor + 2))
+    }
+
     private func newGame() {
         grid = Array(repeating: 0, count: cols * rows)
         score = 0
         over = false
         falling = nil
         hoverCol = nil
-        next = Int.random(in: 1...3)
+        next = rollNext()
         persist()
     }
 
@@ -221,7 +231,7 @@ struct MergeDropView: View {
         // which merges straight into it.
         if landing < 0 {
             guard grid[col] == val else { return }
-            next = Int.random(in: 1...3)
+            next = rollNext()
             falling = FallingPiece(col: col, val: val, y: -ch * 0.62)
             withAnimation(.easeIn(duration: 0.16)) {
                 falling?.y = ch / 2
@@ -237,7 +247,7 @@ struct MergeDropView: View {
             return
         }
 
-        next = Int.random(in: 1...3)
+        next = rollNext()
 
         let endY = CGFloat(landing) * ch + ch / 2
         falling = FallingPiece(col: col, val: val, y: -ch * 0.62)
