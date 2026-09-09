@@ -39,3 +39,9 @@ AuthKey_*.p8
 /*.zip
 /previewed*/
 /ss*.png
+/IMG_*.png
+/IMG_*.jpg
+/*.jpg
+/*.jpeg
+/*.mp4
+/*.mov
